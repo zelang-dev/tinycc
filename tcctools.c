@@ -61,8 +61,8 @@ static int contains_any(const char *s, const char *list) {
 }
 
 static int ar_usage(int ret) {
-    fprintf(stderr, "usage: tcc -ar [rcsv] lib [file...]\n");
-    fprintf(stderr, "create library ([abdioptxN] not supported).\n");
+    fprintf(stderr, "usage: tcc -ar [crstvx] lib [files]\n");
+    fprintf(stderr, "create library ([abdiopN] not supported).\n");
     return ret;
 }
 
@@ -70,11 +70,11 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
 {
     static const ArHdr arhdr_init = {
         "/               ",
-        "            ",
+        "0           ",
         "0     ",
         "0     ",
         "0       ",
-        "          ",
+        "0         ",
         ARFMAG
         };
 
@@ -94,7 +94,9 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
     char tfile[260], stmp[20];
     char *file, *name;
     int ret = 2;
-    const char *ops_conflict = "habdioptxN";  // unsupported but destructive if ignored.
+    const char *ops_conflict = "habdiopN";  // unsupported but destructive if ignored.
+    int extract = 0;
+    int table = 0;
     int verbose = 0;
 
     i_lib = 0; i_obj = 0;  // will hold the index of the lib and first obj
@@ -105,6 +107,10 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
         if ((*a == '-') || (i == 1 && !strstr(a, "."))) {  // options argument
             if (contains_any(a, ops_conflict))
                 ret = 1;
+            if (strstr(a, "x"))
+                extract = 1;
+            if (strstr(a, "t"))
+                table = 1;
             if (strstr(a, "v"))
                 verbose = 1;
         } else {  // lib or obj files: don't abort - keep validating all args.
@@ -122,9 +128,63 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
     if (ret == 1)
         return ar_usage(ret);
 
+    if (extract || table) {
+        if ((fh = fopen(argv[i_lib], "rb")) == NULL)
+        {
+            fprintf(stderr, "tcc: ar: can't open file %s\n", argv[i_lib]);
+            goto finish;
+        }
+        fread(stmp, 1, 8, fh);
+	if (memcmp(stmp,ARMAG,8))
+	{
+no_ar:
+            fprintf(stderr, "tcc: ar: not an ar archive %s\n", argv[i_lib]);
+            goto finish;
+	}
+	while (fread(&arhdr, 1, sizeof(arhdr), fh) == sizeof(arhdr)) {
+	    char *p, *e;
+
+	    if (memcmp(arhdr.ar_fmag, ARFMAG, 2))
+		goto no_ar;
+	    p = arhdr.ar_name;
+	    for (e = p + sizeof arhdr.ar_name; e > p && e[-1] == ' ';)
+		e--;
+	    *e = '\0';
+	    arhdr.ar_size[sizeof arhdr.ar_size-1] = 0;
+	    fsize = atoi(arhdr.ar_size);
+	    buf = tcc_malloc(fsize + 1);
+	    fread(buf, fsize, 1, fh);
+	    if (strcmp(arhdr.ar_name,"/") && strcmp(arhdr.ar_name,"/SYM64/")) {
+		if (e > p && e[-1] == '/')
+		    e[-1] = '\0';
+		/* tv not implemented */
+	        if (table || verbose)
+		    printf("%s%s\n", extract ? "x - " : "", arhdr.ar_name);
+		if (extract) {
+		    if ((fo = fopen(arhdr.ar_name, "wb")) == NULL)
+		    {
+			fprintf(stderr, "tcc: ar: can't create file %s\n",
+				arhdr.ar_name);
+		        tcc_free(buf);
+			goto finish;
+		    }
+		    fwrite(buf, fsize, 1, fo);
+		    fclose(fo);
+		    /* ignore date/uid/gid/mode */
+		}
+	    }
+            tcc_free(buf);
+	}
+	ret = 0;
+finish:
+	if (fh)
+		fclose(fh);
+	return ret;
+    }
+
     if ((fh = fopen(argv[i_lib], "wb")) == NULL)
     {
-        fprintf(stderr, "tcc: ar: can't open file %s \n", argv[i_lib]);
+        fprintf(stderr, "tcc: ar: can't create file %s\n", argv[i_lib]);
         goto the_end;
     }
 
@@ -137,7 +197,7 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
 
     funcmax = 250;
     afpos = tcc_realloc(NULL, funcmax * sizeof *afpos); // 250 func
-    memcpy(&arhdro.ar_mode, "100666", 6);
+    memcpy(&arhdro.ar_mode, "100644", 6);
 
     // i_obj = first input object file
     while (i_obj < argc)
@@ -242,13 +302,13 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
     if ((hofs & 1)) // align
         hofs++, fpos = 1;
     // write header
-    fwrite("!<arch>\n", 8, 1, fh);
+    fwrite(ARMAG, 8, 1, fh);
     // create an empty archive
     if (!funccnt) {
         ret = 0;
         goto the_end;
     }
-    sprintf(stmp, "%-10d", (int)(strpos + (funccnt+1) * sizeof(int)));
+    sprintf(stmp, "%-10d", (int)(strpos + (funccnt+1) * sizeof(int)) + fpos);
     memcpy(&arhdr.ar_size, stmp, 10);
     fwrite(&arhdr, sizeof(arhdr), 1, fh);
     afpos[0] = le2belong(funccnt);
