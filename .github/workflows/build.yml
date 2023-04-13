@@ -1,9 +1,9 @@
 name: build and run tests
 on:
   push:
-    branches: [ mob ]
+    branches: [ release ]
   pull_request:
-    branches: [ mob ]
+    branches: [ release ]
 jobs:
   build-release-linux-i686-amd64:
     name: tinycc master linux/amd64
