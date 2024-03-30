@@ -416,12 +416,15 @@ ST_FUNC void tcc_debug_new(TCCState *s1)
     int shf = 0;
     if (!s1->dState)
         s1->dState = tcc_mallocz(sizeof *s1->dState);
+
 #ifdef CONFIG_TCC_BACKTRACE
     /* include stab info with standalone backtrace support */
-    if (s1->do_backtrace
-        && (s1->output_type & (TCC_OUTPUT_EXE | TCC_OUTPUT_DLL)))
+    if (s1->do_debug && s1->output_type == TCC_OUTPUT_MEMORY)
+        s1->do_backtrace = 1;
+    if (s1->do_backtrace)
         shf = SHF_ALLOC | SHF_WRITE; // SHF_WRITE needed for musl/SELINUX
 #endif
+
     if (s1->dwarf) {
         s1->dwlo = s1->nb_sections;
         dwarf_info_section =
@@ -714,9 +717,11 @@ ST_FUNC void tcc_debug_start(TCCState *s1)
     char buf[512];
     char *filename;
 
+    /* we might currently #include the <command-line> */
+    filename = file->prev ? file->prev->filename : file->filename;
+
     /* an elf symbol of type STT_FILE must be put so that STB_LOCAL
        symbols can be safely used */
-    filename = file->prev ? file->prev->filename : file->filename;
     put_elf_sym(symtab_section, 0, 0,
                 ELFW(ST_INFO)(STB_LOCAL, STT_FILE), 0,
                 SHN_ABS, filename);
@@ -911,7 +916,7 @@ ST_FUNC void tcc_debug_end(TCCState *s1)
                                              : DWARF_ABBREV_STRUCTURE_EMPTY_TYPE);
             dwarf_strp(dwarf_info_section,
                        (t->v & ~SYM_STRUCT) >= SYM_FIRST_ANOM
-                       ? "" : get_tok_str(t->v & ~SYM_STRUCT, NULL));
+                       ? "" : get_tok_str(t->v, NULL));
             dwarf_uleb128(dwarf_info_section, 0);
             dwarf_uleb128(dwarf_info_section, dwarf_line.cur_file);
             dwarf_uleb128(dwarf_info_section, file->line_num);
@@ -1327,7 +1332,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
             cstr_new (&str);
             cstr_printf (&str, "%s:T%d=%c%d",
                          (t->v & ~SYM_STRUCT) >= SYM_FIRST_ANOM
-                         ? "" : get_tok_str(t->v & ~SYM_STRUCT, NULL),
+                         ? "" : get_tok_str(t->v, NULL),
                          debug_type,
                          IS_UNION (t->type.t) ? 'u' : 's',
                          t->c);
@@ -1338,7 +1343,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
 		if (STRUCT_NODEBUG(t))
 		    continue;
                 cstr_printf (&str, "%s:",
-                             get_tok_str(t->v & ~SYM_FIELD, NULL));
+                             get_tok_str(t->v, NULL));
                 tcc_get_debug_info (s1, t, &str);
                 if (t->type.t & VT_BITFIELD) {
                     pos = t->c * 8 + BIT_POS(t->type.t);
@@ -1366,13 +1371,13 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
             cstr_new (&str);
             cstr_printf (&str, "%s:T%d=e",
                          (t->v & ~SYM_STRUCT) >= SYM_FIRST_ANOM
-                         ? "" : get_tok_str(t->v & ~SYM_STRUCT, NULL),
+                         ? "" : get_tok_str(t->v, NULL),
                          debug_type);
             while (t->next) {
                 t = t->next;
                 cstr_printf (&str, "%s:",
                              (t->v & ~SYM_FIELD) >= SYM_FIRST_ANOM
-                             ? "" : get_tok_str(t->v & ~SYM_FIELD, NULL));
+                             ? "" : get_tok_str(t->v, NULL));
                 cstr_printf (&str, e->type.t & VT_UNSIGNED ? "%u," : "%d,",
                              (int)t->enum_val);
             }
@@ -1459,7 +1464,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
 				  : DWARF_ABBREV_STRUCTURE_EMPTY_TYPE);
 	    dwarf_strp(dwarf_info_section,
                        (t->v & ~SYM_STRUCT) >= SYM_FIRST_ANOM
-                       ? "" : get_tok_str(t->v & ~SYM_STRUCT, NULL));
+                       ? "" : get_tok_str(t->v, NULL));
 	    dwarf_uleb128(dwarf_info_section, t->c);
 	    dwarf_uleb128(dwarf_info_section, dwarf_line.cur_file);
 	    dwarf_uleb128(dwarf_info_section, file->line_num);
@@ -1477,7 +1482,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
 			    e->type.t & VT_BITFIELD ? DWARF_ABBREV_MEMBER_BF
 						    : DWARF_ABBREV_MEMBER);
 		dwarf_strp(dwarf_info_section,
-			   get_tok_str(e->v & ~SYM_FIELD, NULL));
+			   get_tok_str(e->v, NULL));
 		dwarf_uleb128(dwarf_info_section, dwarf_line.cur_file);
 		dwarf_uleb128(dwarf_info_section, file->line_num);
 		pos_type[i++] = dwarf_info_section->data_offset;
@@ -1525,7 +1530,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
 	    dwarf_data1(dwarf_info_section, DWARF_ABBREV_ENUMERATION_TYPE);
 	    dwarf_strp(dwarf_info_section,
                        (t->v & ~SYM_STRUCT) >= SYM_FIRST_ANOM
-                       ? "" : get_tok_str(t->v & ~SYM_STRUCT, NULL));
+                       ? "" : get_tok_str(t->v, NULL));
 	    dwarf_data1(dwarf_info_section,
 		        type & VT_UNSIGNED ? DW_ATE_unsigned : DW_ATE_signed );
 	    dwarf_data1(dwarf_info_section, 4);
@@ -1542,7 +1547,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
 					   : DWARF_ABBREV_ENUMERATOR_SIGNED);
 	        dwarf_strp(dwarf_info_section,
                            (e->v & ~SYM_FIELD) >= SYM_FIRST_ANOM
-                           ? "" : get_tok_str(e->v & ~SYM_FIELD, NULL));
+                           ? "" : get_tok_str(e->v, NULL));
 		if (type & VT_UNSIGNED)
 	            dwarf_uleb128(dwarf_info_section, e->enum_val);
 		else
@@ -1997,7 +2002,7 @@ ST_FUNC void tcc_debug_typedef(TCCState *s1, Sym *sym)
         debug_type = tcc_get_dwarf_info(s1, sym);
 	if (debug_type != -1) {
 	    dwarf_data1(dwarf_info_section, DWARF_ABBREV_TYPEDEF);
-	    dwarf_strp(dwarf_info_section, get_tok_str(sym->v & ~SYM_FIELD, NULL));
+	    dwarf_strp(dwarf_info_section, get_tok_str(sym->v, NULL));
 	    dwarf_uleb128(dwarf_info_section, dwarf_line.cur_file);
 	    dwarf_uleb128(dwarf_info_section, file->line_num);
 	    tcc_debug_check_anon(s1, sym, dwarf_info_section->data_offset);
@@ -2010,7 +2015,7 @@ ST_FUNC void tcc_debug_typedef(TCCState *s1, Sym *sym)
         cstr_new (&str);
         cstr_printf (&str, "%s:t",
                      (sym->v & ~SYM_FIELD) >= SYM_FIRST_ANOM
-                     ? "" : get_tok_str(sym->v & ~SYM_FIELD, NULL));
+                     ? "" : get_tok_str(sym->v, NULL));
         tcc_get_debug_info(s1, sym, &str);
         tcc_debug_stabs(s1, str.data, N_LSYM, 0, NULL, 0, 0);
         cstr_free (&str);

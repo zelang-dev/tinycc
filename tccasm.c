@@ -323,6 +323,8 @@ static inline void asm_expr_sum(TCCState *s1, ExprValue *pe)
 		ElfSym *esym1, *esym2;
 		esym1 = elfsym(pe->sym);
 		esym2 = elfsym(e2.sym);
+		if (!esym2)
+		    goto cannot_relocate;
 		if (esym1 && esym1->st_shndx == esym2->st_shndx
 		    && esym1->st_shndx != SHN_UNDEF) {
 		    /* we also accept defined symbols in the same section */
@@ -331,7 +333,7 @@ static inline void asm_expr_sum(TCCState *s1, ExprValue *pe)
 		} else if (esym2->st_shndx == cur_text_section->sh_num) {
 		    /* When subtracting a defined symbol in current section
 		       this actually makes the value PC-relative.  */
-		    pe->v -= esym2->st_value - ind - 4;
+		    pe->v += 0 - esym2->st_value;
 		    pe->pcrel = 1;
 		    e2.sym = NULL;
 		} else {
@@ -662,8 +664,7 @@ static void asm_parse_directive(TCCState *s1, int global)
                     tcc_error("we at end of file, .endr not found");
                 tok_str_add_tok(init_str);
             }
-            tok_str_add(init_str, -1);
-            tok_str_add(init_str, 0);
+            tok_str_add(init_str, TOK_EOF);
             begin_macro(init_str, 1);
             while (repeat-- > 0) {
                 tcc_assemble_internal(s1, (parse_flags & PARSE_FLAG_PREPROCESS),
@@ -834,6 +835,10 @@ static void asm_parse_directive(TCCState *s1, int global)
 
             if (!strcmp(newtype, "function") || !strcmp(newtype, "STT_FUNC")) {
                 sym->type.t = (sym->type.t & ~VT_BTYPE) | VT_FUNC;
+                if (sym->c) {
+                    ElfSym *esym = elfsym(sym);
+                    esym->st_info = ELFW(ST_INFO)(ELFW(ST_BIND)(esym->st_info), STT_FUNC);
+                }
             } else
                 tcc_warning_c(warn_unsupported)("change type of '%s' from 0x%x to '%s' ignored",
                     get_tok_str(sym->v, NULL), sym->type.t, newtype);
@@ -916,6 +921,31 @@ static void asm_parse_directive(TCCState *s1, int global)
     /* added for compatibility with GAS */
     case TOK_ASMDIR_code64:
         next();
+        break;
+#endif
+#ifdef TCC_TARGET_RISCV64
+    case TOK_ASMDIR_option:
+        next();
+        switch(tok){
+            case TOK_ASM_rvc:    /* Will be deprecated soon in favor of arch */
+            case TOK_ASM_norvc:  /* Will be deprecated soon in favor of arch */
+            case TOK_ASM_pic:
+            case TOK_ASM_nopic:
+            case TOK_ASM_relax:
+            case TOK_ASM_norelax:
+            case TOK_ASM_push:
+            case TOK_ASM_pop:
+                /* TODO: unimplemented */
+                next();
+                break;
+            case TOK_ASM_arch:
+                /* TODO: unimplemented, requires extra parsing */
+                tcc_error("unimp .option '.%s'", get_tok_str(tok, NULL));
+                break;
+            default:
+                tcc_error("unknown .option '.%s'", get_tok_str(tok, NULL));
+                break;
+        }
         break;
 #endif
     default:
@@ -1009,7 +1039,9 @@ static void tcc_assemble_inline(TCCState *s1, char *str, int len, int global)
 {
     const int *saved_macro_ptr = macro_ptr;
     int dotid = set_idnum('.', IS_ID);
+#ifndef TCC_TARGET_RISCV64
     int dolid = set_idnum('$', 0);
+#endif
 
     tcc_open_bf(s1, ":asm:", len);
     memcpy(file->buffer, str, len);
@@ -1017,7 +1049,9 @@ static void tcc_assemble_inline(TCCState *s1, char *str, int len, int global)
     tcc_assemble_internal(s1, 0, global);
     tcc_close();
 
+#ifndef TCC_TARGET_RISCV64
     set_idnum('$', dolid);
+#endif
     set_idnum('.', dotid);
     macro_ptr = saved_macro_ptr;
 }

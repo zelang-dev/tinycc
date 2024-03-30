@@ -393,6 +393,8 @@
  DEF_ASM(fsd)
  DEF_ASM(fsw)
  DEF_ASM(j)
+ DEF_ASM(jump)
+ DEF_ASM(jr)
  DEF_ASM(la)
  DEF_ASM(li)
  DEF_ASM(lla)
@@ -408,5 +410,16 @@
  DEF_ASM(sltz)
  DEF_ASM(snez)
  DEF_ASM(tail)
+
+/* Possible values for .option directive */
+ DEF_ASM(arch)
+ DEF_ASM(rvc)
+ DEF_ASM(norvc)
+ DEF_ASM(pic)
+ DEF_ASM(nopic)
+ DEF_ASM(relax)
+ DEF_ASM(norelax)
+ DEF_ASM(push)
+ DEF_ASM(pop)
 
 #undef DEF_ASM_WITH_SUFFIX

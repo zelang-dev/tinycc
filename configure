@@ -56,6 +56,7 @@ build_cross=
 # use CC/AR from environment when set
 test -n "$CC" && cc="$CC"
 test -n "$AR" && ar="$AR"
+test -n "CFLAGS" && CFLAGS="-Wall -O2"
 
 # find source path
 source_path=${0%configure}
@@ -364,7 +365,7 @@ case $targetos in
     default tcc_libpaths "{B}:{R}/lib:/system/lib${S}"
     default tcc_crtprefix "{R}/lib"
     default tcc_elfinterp "/system/bin/linker${S}"
-    default tcc_switches "-Wl,-rpath=$sysroot/lib,-section-alignment=0x1000"
+    default tcc_switches "-Wl,-rpath=$sysroot/lib"
     ;;
   WIN32)
     mingw32="yes"
@@ -397,14 +398,6 @@ if test "$mingw32" = "no"; then
   default docdir       "${sharedir}/doc"
   default mandir       "${sharedir}/man"
   default infodir      "${sharedir}/info"
-fi
-
-# set default CFLAGS
-default CFLAGS "-Wall -O2"
-
-if test "$mingw32" = "yes" -a "$cc_name" = "gcc"; then
-  # avoid mingw dependencies such as 'libgcc_s_dw2-1.dll'
-  default LDFLAGS "-static"
 fi
 
 if test x"$show_help" = "xyes" ; then
@@ -464,6 +457,11 @@ if test "$bigendian" = "yes" ; then
   confvars="$confvars BIGENDIAN"
 fi
 
+if test "$mingw32" = "yes" -a "$cc_name" = "gcc"; then
+  # avoid mingw dependencies such as 'libgcc_s_dw2-1.dll'
+  default LDFLAGS "-static"
+fi
+
 if test "$cpu" = "arm"; then
   if test "${triplet%eabihf}" != "$triplet" ; then
     confvars="$confvars arm_eabihf arm_vfp"
@@ -478,6 +476,10 @@ if test "$cpu" = "arm"; then
       confvars="$confvars arm_vfp"
     fi
   fi
+fi
+
+if test -n "$dwarf"; then
+  confvars="$confvars dwarf=$dwarf"
 fi
 
 # a final configuration tuning
@@ -516,6 +518,7 @@ fcho "Doc directory       " "$docdir"
 fcho "Target root prefix  " "$sysroot"
 fcho "/usr/include dir    " "$tcc_usrinclude"
 echo "Source path         $source_path"
+echo "Build OS            $(uname -m -s)"
 echo "C compiler          $cc ($gcc_major.$gcc_minor)"
 echo "Target OS           $targetos"
 echo "CPU                 $cpu"
@@ -602,12 +605,6 @@ version=`head $source_path/VERSION`
 echo "VERSION = $version" >> config.mak
 echo "#define TCC_VERSION \"$version\"" >> $TMPH
 echo "@set VERSION $version" > config.texi
-
-if test "$targetos" = "Darwin"; then
-  # On macOS, -current_version and -compatibility_version must not contain letters.
-  macos_dylib_version=`echo $version | sed 's/[^0-9.]//g'`
-  echo "MACOS_DYLIB_VERSION = $macos_dylib_version" >> config.mak
-fi
 
 if test "$source_path_used" = "yes" ; then
     case $source_path in
