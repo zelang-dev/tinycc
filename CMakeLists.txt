@@ -294,7 +294,7 @@ add_custom_command(
 
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
-set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/tcov.c )
+set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
 
 set( I386_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
