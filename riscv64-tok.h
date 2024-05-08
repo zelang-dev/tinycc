@@ -8,6 +8,12 @@
 #define DEF_ASM_WITH_SUFFIX(x, y) \
   DEF(TOK_ASM_ ## x ## _ ## y, #x "." #y)
 
+#define DEF_ASM_WITH_SUFFIXES(x, y, z) \
+  DEF(TOK_ASM_ ## x ## _ ## y ## _ ## z, #x "." #y "." #z)
+
+#define DEF_ASM_FENCE(x) \
+  DEF(TOK_ASM_ ## x ## _fence, #x)
+
 /* register */
  /* integer */
  DEF_ASM(x0)
@@ -421,5 +427,49 @@
  DEF_ASM(norelax)
  DEF_ASM(push)
  DEF_ASM(pop)
+
+/* “A” Standard Extension for Atomic Instructions, Version 2.1 */
+ /* XXX: Atomic memory operations */
+ DEF_ASM_WITH_SUFFIX(lr, w)
+ DEF_ASM_WITH_SUFFIXES(lr, w, aq)
+ DEF_ASM_WITH_SUFFIXES(lr, w, rl)
+ DEF_ASM_WITH_SUFFIXES(lr, w, aqrl)
+
+ DEF_ASM_WITH_SUFFIX(lr, d)
+ DEF_ASM_WITH_SUFFIXES(lr, d, aq)
+ DEF_ASM_WITH_SUFFIXES(lr, d, rl)
+ DEF_ASM_WITH_SUFFIXES(lr, d, aqrl)
+
+
+ DEF_ASM_WITH_SUFFIX(sc, w)
+ DEF_ASM_WITH_SUFFIXES(sc, w, aq)
+ DEF_ASM_WITH_SUFFIXES(sc, w, rl)
+ DEF_ASM_WITH_SUFFIXES(sc, w, aqrl)
+
+ DEF_ASM_WITH_SUFFIX(sc, d)
+ DEF_ASM_WITH_SUFFIXES(sc, d, aq)
+ DEF_ASM_WITH_SUFFIXES(sc, d, rl)
+ DEF_ASM_WITH_SUFFIXES(sc, d, aqrl)
+
+/* `fence` arguments */
+/* NOTE: Order is important */
+ DEF_ASM_FENCE(w)
+ DEF_ASM_FENCE(r)
+ DEF_ASM_FENCE(rw)
+
+ DEF_ASM_FENCE(o)
+ DEF_ASM_FENCE(ow)
+ DEF_ASM_FENCE(or)
+ DEF_ASM_FENCE(orw)
+
+ DEF_ASM_FENCE(i)
+ DEF_ASM_FENCE(iw)
+ DEF_ASM_FENCE(ir)
+ DEF_ASM_FENCE(irw)
+
+ DEF_ASM_FENCE(io)
+ DEF_ASM_FENCE(iow)
+ DEF_ASM_FENCE(ior)
+ DEF_ASM_FENCE(iorw)
 
 #undef DEF_ASM_WITH_SUFFIX
