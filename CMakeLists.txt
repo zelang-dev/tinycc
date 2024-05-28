@@ -520,12 +520,12 @@ foreach(X ${TCC_X})
     # link all objects files to archive file
     add_custom_target(
         ${X}_libarchive ALL
-        ${tcc_cross} -ar rcs ${LIB_DIR}/${X}-libtcc1.a ${CROSS_OBJFILES}
+        ${tcc_cross} -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a ${CROSS_OBJFILES}
         DEPENDS ${CROSS_OBJFILES}
-        BYPRODUCTS ${LIB_DIR}/${X}-libtcc1.a
+        BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a
         COMMENT "Cross Linking Runtime Library - ${X}" )
     add_dependencies(${tcc_cross} libtcc)
-    install(FILES ${LIB_DIR}/${X}-libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
     set(CROSS_OBJFILES "")
 endforeach()
 
