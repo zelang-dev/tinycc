@@ -21,11 +21,9 @@ tcc_p
 *-tcc
 libtcc*.def
 
-config*.h
 *_.h
 config*.mak
 config.texi
-conftest*
 c2str
 tags
 TAGS
@@ -65,4 +63,8 @@ tests/hello
 tests/tests2/fred.txt
 libtcc.dylib
 build/
+built/
 TCC-BUILT/
+src/config.h
+tests/mt.c
+.vscode/

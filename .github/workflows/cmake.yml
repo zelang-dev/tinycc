@@ -22,7 +22,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake .. -A ${{ matrix.arch }}
+            cmake -DCMAKE_BUILD_TYPE=Debug -A ${{ matrix.arch }} ..
             cmake --build . --config Debug
       - name: Run ctest
         shell: cmd

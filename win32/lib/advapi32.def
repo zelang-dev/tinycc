@@ -1,0 +1,11 @@
+LIBRARY advapi32.dll
+
+EXPORTS
+GetUserNameW
+RegQueryValueExW
+RegOpenKeyExW
+RegCloseKey
+RegSetValueExW
+CryptAcquireContextA
+CryptGenRandom
+CryptReleaseContext

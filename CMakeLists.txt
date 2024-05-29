@@ -126,8 +126,10 @@ configure_file(config.texi.in config.texi)
 
 include_directories(${CMAKE_BINARY_DIR})
 
-set(CPACK_PACKAGE_VENDOR "https://github.com/TinyCC/tinycc")
+set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev/tinycc")
 set(CPACK_PACKAGE_VERSION ${TCC_VERSION})
+set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/COPYING.txt)
+set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 include(CPack)
 
 # Set target and sources
@@ -324,7 +326,7 @@ set( RISCV64_O
 
 set( WIN_O
  ${TCC_DIR}/win32/lib/crt1.c ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
- ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c ${TCC_DIR}/win32/lib/dllmain.c )
+ ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
 
 set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 
@@ -501,21 +503,21 @@ foreach(X ${TCC_X})
         add_dependencies(${tcc_cross} libtcc)
     endforeach()
 
-    #if(${X} STREQUAL i386-win32
-    #    OR ${X} STREQUAL x86_64-win32
-    #    OR ${X} STREQUAL arm-wince)
-    #        add_custom_command(
-    #            OUTPUT ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o
-    #            COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
-    #                -L ${LIB_DIR}
-    #                -c ${TCC_DIR}/win32/pthreads4w/pthread.c
-    #                -o ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o
-    #            MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread.c
-    #            DEPENDS ${tcc_cross}
-    #            VERBATIM
-    #            COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread.c)")
-    #       list(APPEND CROSS_OBJFILES ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o)
-    #endif()
+    if(${X} STREQUAL i386-win32
+        OR ${X} STREQUAL x86_64-win32
+        OR ${X} STREQUAL arm-wince)
+            add_custom_command(
+                OUTPUT ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o
+                COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+                    -L ${LIB_DIR}
+                    -c ${TCC_DIR}/win32/pthreads4w/pthread.c
+                    -o ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o
+                MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread.c
+                DEPENDS ${tcc_cross}
+                VERBATIM
+                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread.c)")
+           list(APPEND CROSS_OBJFILES ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o)
+    endif()
 
     # link all objects files to archive file
     add_custom_target(
@@ -543,3 +545,5 @@ else()
   install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32/include)
   install(DIRECTORY include/ DESTINATION lib/tcc/win32/include)
 endif()
+
+install(FILES tinycc-docs.html DESTINATION ${CMAKE_INSTALL_DOCDIR})
