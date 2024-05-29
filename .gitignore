@@ -65,4 +65,5 @@ tests/hello
 tests/tests2/fred.txt
 libtcc.dylib
 build/
+built/
 TCC-BUILT/
