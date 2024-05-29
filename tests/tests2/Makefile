@@ -55,6 +55,10 @@ endif
 
 # Some tests might need arguments
 ARGS =
+ifneq (-$(CONFIG_WIN32)-,-yes-)
+22_floating_point.test: FLAGS += -lm
+24_math_library.test: FLAGS += -lm
+endif
 31_args.test : ARGS = arg1 arg2 arg3 arg4 arg5
 46_grep.test : ARGS = '[^* ]*[:a:d: ]+\:\*-/: $$' $(SRC)/46_grep.c
 
@@ -65,10 +69,6 @@ NORUN =
 # Some tests might need different flags
 FLAGS =
 76_dollars_in_identifiers.test : FLAGS += -fdollars-in-identifiers
-ifneq (-$(CONFIG_WIN32)-,-yes-)
-22_floating_point.test: FLAGS += -lm
-24_math_library.test: FLAGS += -lm
-endif
 
 # These tests run several snippets from the same file one by one
 60_errors_and_warnings.test : FLAGS += -dt

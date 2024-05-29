@@ -31,10 +31,6 @@ FILTER = 2>&1 | sed 's,$(SRC)/,,g'
 
 testspp.%: %.test ;
 
-# generate .expect file with tcc, e.g. "make testspp.17+"
-testspp.%+: %.c
-	$(TCC) -E -P $*.[cS] -o $*.expect
-
 # automatically generate .expect files with gcc:
 %.expect: # %.c
 	gcc -E -P $*.[cS] >$*.expect 2>&1

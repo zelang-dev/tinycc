@@ -335,7 +335,7 @@ redo:
             tcc_error_noabort("no input files");
         } else if (s->output_type == TCC_OUTPUT_PREPROCESS) {
             if (s->outfile && 0!=strcmp("-",s->outfile)) {
-                ppfp = fopen(s->outfile, "wb");
+                ppfp = fopen(s->outfile, "w");
                 if (!ppfp)
                     tcc_error_noabort("could not write '%s'", s->outfile);
             }
@@ -368,18 +368,20 @@ redo:
     }
 
     /* compile or add each files or library */
-    first_file = NULL;
+    first_file = NULL, ret = 0;
     do {
         struct filespec *f = s->files[n];
         s->filetype = f->type;
         if (f->type & AFF_TYPE_LIB) {
-            ret = tcc_add_library_err(s, f->name);
+            if (tcc_add_library_err(s, f->name) < 0)
+                ret = 1;
         } else {
             if (1 == s->verbose)
                 printf("-> %s\n", f->name);
             if (!first_file)
                 first_file = f->name;
-            ret = tcc_add_file(s, f->name);
+            if (tcc_add_file(s, f->name) < 0)
+                ret = 1;
         }
         done = ret || ++n >= s->nb_files;
     } while (!done && (s->output_type != TCC_OUTPUT_OBJ || s->option_r));
@@ -400,24 +402,21 @@ redo:
             if (!s->outfile)
                 s->outfile = default_outputfile(s, first_file);
             if (!s->just_deps && tcc_output_file(s, s->outfile))
-                ;
+                ret = 1;
             else if (s->gen_deps)
-                gen_makedeps(s, s->outfile, s->deps_outfile);
+                ret = gen_makedeps(s, s->outfile, s->deps_outfile);
         }
     }
 
-    done = 1;
-    if (t)
-        done = 0; /* run more tests with -dt -run */
-    else if (s->nb_errors)
-        ret = 1;
-    else if (n < s->nb_files)
-        done = 0; /* compile more files with -c */
-    else if (s->do_bench)
+    if (done && 0 == t && 0 == ret && s->do_bench)
         tcc_print_stats(s, end_time - start_time);
+
     tcc_delete(s);
     if (!done)
-        goto redo;
+        goto redo; /* compile more files with -c */
+    if (t)
+        goto redo; /* run more tests with -dt -run */
+
     if (ppfp && ppfp != stdout)
         fclose(ppfp);
     return ret;

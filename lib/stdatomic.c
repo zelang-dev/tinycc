@@ -15,9 +15,6 @@
 #define __ATOMIC_SEQ_CST 5
 typedef __SIZE_TYPE__ size_t;
 
-void __atomic_thread_fence(int memorder);
-#define MemoryBarrier(memorder) __atomic_thread_fence(memorder)
-
 #if defined __i386__ || defined __x86_64__
 #define ATOMIC_COMPARE_EXCHANGE(TYPE, MODE, SUFFIX) \
     bool __atomic_compare_exchange_##MODE \
@@ -45,7 +42,6 @@ void __atomic_thread_fence(int memorder);
 #define ATOMIC_LOAD(TYPE, MODE) \
     TYPE __atomic_load_##MODE(const volatile void *atom, int memorder) \
     { \
-        MemoryBarrier(__ATOMIC_ACQUIRE); \
         return *(volatile TYPE *)atom; \
     }
 
@@ -53,7 +49,6 @@ void __atomic_thread_fence(int memorder);
     void __atomic_store_##MODE(volatile void *atom, TYPE value, int memorder) \
     { \
         *(volatile TYPE *)atom = value; \
-        MemoryBarrier(__ATOMIC_ACQ_REL); \
     }
 
 #define ATOMIC_GEN_OP(TYPE, MODE, NAME, OP, RET) \
