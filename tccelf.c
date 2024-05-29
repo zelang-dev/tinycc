@@ -48,10 +48,10 @@ struct sym_version {
 #define SHF_DYNSYM 0x40000000
 
 #ifdef TCC_TARGET_PE
-#define shf_RELRO SHF_ALLOC
+static const int shf_RELRO = SHF_ALLOC;
 static const char rdata[] = ".rdata";
 #else
-#define shf_RELRO s1->shf_RELRO
+static const int shf_RELRO = SHF_ALLOC | SHF_WRITE;
 static const char rdata[] = ".data.ro";
 #endif
 
@@ -60,13 +60,6 @@ static const char rdata[] = ".data.ro";
 ST_FUNC void tccelf_new(TCCState *s)
 {
     TCCState *s1 = s;
-
-#ifndef TCC_TARGET_PE
-    shf_RELRO = SHF_ALLOC;
-    if (s1->output_type != TCC_OUTPUT_MEMORY)
-        shf_RELRO |= SHF_WRITE; /* the ELF loader will set it to RO at runtime */
-#endif
-
     /* no section zero */
     dynarray_add(&s->sections, &s->nb_sections, NULL);
 
@@ -83,35 +76,28 @@ ST_FUNC void tccelf_new(TCCState *s)
     symtab_section = new_symtab(s, ".symtab", SHT_SYMTAB, 0,
                                 ".strtab",
                                 ".hashtab", SHF_PRIVATE);
+    s->symtab = symtab_section;
 
     /* private symbol table for dynamic symbols */
     s->dynsymtab_section = new_symtab(s, ".dynsymtab", SHT_SYMTAB, SHF_PRIVATE|SHF_DYNSYM,
                                       ".dynstrtab",
                                       ".dynhashtab", SHF_PRIVATE);
     get_sym_attr(s, 0, 1);
-
-    if (s->do_debug) {
-        /* add debug sections */
-        tcc_debug_new(s);
-    }
-
-#ifdef CONFIG_TCC_BCHECK
-    if (s->do_bounds_check) {
-        /* if bound checking, then add corresponding sections */
-        /* (make ro after relocation done with GNU_RELRO) */
-        bounds_section = new_section(s, ".bounds", SHT_PROGBITS, shf_RELRO);
-        lbounds_section = new_section(s, ".lbounds", SHT_PROGBITS, shf_RELRO);
-    }
-#endif
 }
 
-ST_FUNC void free_section(Section *s)
+#ifdef CONFIG_TCC_BCHECK
+ST_FUNC void tccelf_bounds_new(TCCState *s)
 {
-    if (!s)
-        return;
+    TCCState *s1 = s;
+    /* create bounds sections (make ro after relocation done with GNU_RELRO) */
+    bounds_section = new_section(s, ".bounds", SHT_PROGBITS, shf_RELRO);
+    lbounds_section = new_section(s, ".lbounds", SHT_PROGBITS, shf_RELRO);
+}
+#endif
+
+static void free_section(Section *s)
+{
     tcc_free(s->data);
-    s->data = NULL;
-    s->data_allocated = s->data_offset = 0;
 }
 
 ST_FUNC void tccelf_delete(TCCState *s1)
@@ -137,7 +123,22 @@ ST_FUNC void tccelf_delete(TCCState *s1)
         free_section(s1->priv_sections[i]);
     dynarray_reset(&s1->priv_sections, &s1->nb_priv_sections);
 
+    /* free any loaded DLLs */
+#ifdef TCC_IS_NATIVE
+    for ( i = 0; i < s1->nb_loaded_dlls; i++) {
+        DLLReference *ref = s1->loaded_dlls[i];
+        if ( ref->handle )
+# ifdef _WIN32
+            FreeLibrary((HMODULE)ref->handle);
+# else
+            dlclose(ref->handle);
+# endif
+    }
+#endif
+    /* free loaded dlls array */
+    dynarray_reset(&s1->loaded_dlls, &s1->nb_loaded_dlls);
     tcc_free(s1->sym_attrs);
+
     symtab_section = NULL; /* for tccrun.c:rt_printline() */
 }
 
@@ -172,22 +173,16 @@ ST_FUNC void tccelf_end_file(TCCState *s1)
 
     for (i = 0; i < nb_syms; ++i) {
         ElfSym *sym = (ElfSym*)s->data + first_sym + i;
-
-        if (sym->st_shndx == SHN_UNDEF) {
-            int sym_bind = ELFW(ST_BIND)(sym->st_info);
-            int sym_type = ELFW(ST_TYPE)(sym->st_info);
-            if (sym_bind == STB_LOCAL)
-                sym_bind = STB_GLOBAL;
+        if (sym->st_shndx == SHN_UNDEF
+            && ELFW(ST_BIND)(sym->st_info) == STB_LOCAL)
+            sym->st_info = ELFW(ST_INFO)(STB_GLOBAL, ELFW(ST_TYPE)(sym->st_info));
 #ifndef TCC_TARGET_PE
-            if (sym_bind == STB_GLOBAL && s1->output_type == TCC_OUTPUT_OBJ) {
-                /* undefined symbols with STT_FUNC are confusing gnu ld when
-                   linking statically to STT_GNU_IFUNC */
-                sym_type = STT_NOTYPE;
-            }
+	/* An ELF relocatable file should have the types of its undefined global symbol set
+	   to STT_NOTYPE or it will confuse binutils bfd */
+        if (s1->output_format == TCC_OUTPUT_FORMAT_ELF && s1->output_type == TCC_OUTPUT_OBJ)
+            if (sym->st_shndx == SHN_UNDEF && ELFW(ST_BIND)(sym->st_info) == STB_GLOBAL)
+                sym->st_info = ELFW(ST_INFO)(STB_GLOBAL, ELFW(ST_TYPE)(STT_NOTYPE));
 #endif
-            sym->st_info = ELFW(ST_INFO)(sym_bind, sym_type);
-        }
-
         tr[i] = set_elf_sym(s, sym->st_value, sym->st_size, sym->st_info,
             sym->st_other, sym->st_shndx, (char*)s->link->data + sym->st_name);
     }
@@ -256,32 +251,32 @@ ST_FUNC Section *new_section(TCCState *s1, const char *name, int sh_type, int sh
     return sec;
 }
 
-ST_FUNC void init_symtab(Section *s)
-{
-    int *ptr, nb_buckets = 1;
-    put_elf_str(s->link, "");
-    section_ptr_add(s, sizeof (ElfW(Sym)));
-    ptr = section_ptr_add(s->hash, (2 + nb_buckets + 1) * sizeof(int));
-    ptr[0] = nb_buckets;
-    ptr[1] = 1;
-    memset(ptr + 2, 0, (nb_buckets + 1) * sizeof(int));
-}
-
 ST_FUNC Section *new_symtab(TCCState *s1,
                            const char *symtab_name, int sh_type, int sh_flags,
                            const char *strtab_name,
                            const char *hash_name, int hash_sh_flags)
 {
     Section *symtab, *strtab, *hash;
+    int *ptr, nb_buckets;
+
     symtab = new_section(s1, symtab_name, sh_type, sh_flags);
     symtab->sh_entsize = sizeof(ElfW(Sym));
     strtab = new_section(s1, strtab_name, SHT_STRTAB, sh_flags);
+    put_elf_str(strtab, "");
     symtab->link = strtab;
+    put_elf_sym(symtab, 0, 0, 0, 0, 0, NULL);
+
+    nb_buckets = 1;
+
     hash = new_section(s1, hash_name, SHT_HASH, hash_sh_flags);
     hash->sh_entsize = sizeof(int);
     symtab->hash = hash;
     hash->link = symtab;
-    init_symtab(symtab);
+
+    ptr = section_ptr_add(hash, (2 + nb_buckets + 1) * sizeof(int));
+    ptr[0] = nb_buckets;
+    ptr[1] = 1;
+    memset(ptr + 2, 0, (nb_buckets + 1) * sizeof(int));
     return symtab;
 }
 
@@ -1567,15 +1562,14 @@ static void put_ptr(TCCState *s1, Section *s, int offs)
 ST_FUNC void tcc_add_btstub(TCCState *s1)
 {
     Section *s;
-    int n, o, *p;
+    int n, o;
     CString cstr;
-    const char *__rt_info = &"___rt_info"[!s1->leading_underscore];
 
     s = data_section;
     /* Align to PTR_SIZE */
     section_ptr_add(s, -s->data_offset & (PTR_SIZE - 1));
     o = s->data_offset;
-    /* create a struct rt_context (see tccrun.c) */
+    /* create (part of) a struct rt_context (see tccrun.c) */
     if (s1->dwarf) {
         put_ptr(s1, dwarf_line_section, 0);
         put_ptr(s1, dwarf_line_section, -1);
@@ -1590,23 +1584,18 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
         put_ptr(s1, stab_section, -1);
         put_ptr(s1, stab_section->link, 0);
     }
-
+    *(addr_t *)section_ptr_add(s, PTR_SIZE) = s1->dwarf;
     /* skip esym_start/esym_end/elf_str (not loaded) */
     section_ptr_add(s, 3 * PTR_SIZE);
-
-    if (s1->output_type == TCC_OUTPUT_MEMORY && 0 == s1->dwarf) {
-        put_ptr(s1, text_section, 0);
-    } else {
-        /* prog_base : local nameless symbol with offset 0 at SHN_ABS */
-        put_ptr(s1, NULL, 0);
+    /* prog_base : local nameless symbol with offset 0 at SHN_ABS */
+    put_ptr(s1, NULL, 0);
 #if defined TCC_TARGET_MACHO
-        /* adjust for __PAGEZERO */
-        if (s1->dwarf == 0 && s1->output_type == TCC_OUTPUT_EXE)
-            write64le(data_section->data + data_section->data_offset - PTR_SIZE,
-	              (uint64_t)1 << 32);
+    /* adjust for __PAGEZERO */
+    if (s1->dwarf == 0 && s1->output_type == TCC_OUTPUT_EXE)
+        write64le(data_section->data + data_section->data_offset - PTR_SIZE,
+	          (uint64_t)1 << 32);
 #endif
-    }
-    n = 3 * PTR_SIZE;
+    n = 2 * PTR_SIZE;
 #ifdef CONFIG_TCC_BCHECK
     if (s1->do_bounds_check) {
         put_ptr(s1, bounds_section, 0);
@@ -1614,16 +1603,6 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
     }
 #endif
     section_ptr_add(s, n);
-    p = section_ptr_add(s, 2 * sizeof (int));
-    p[0] = s1->rt_num_callers;
-    p[1] = s1->dwarf;
-    // if (s->data_offset - o != 10*PTR_SIZE + 2*sizeof (int)) exit(99);
-
-    if (s1->output_type == TCC_OUTPUT_MEMORY) {
-        set_global_sym(s1, __rt_info, s, o);
-        return;
-    }
-
     cstr_new(&cstr);
     cstr_printf(&cstr,
         "extern void __bt_init(),__bt_exit(),__bt_init_dll();"
@@ -1638,14 +1617,14 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
 #endif
 #endif
     cstr_printf(&cstr, "__bt_init(__rt_info,%d);}",
-        s1->output_type != TCC_OUTPUT_DLL);
+        s1->output_type == TCC_OUTPUT_DLL ? 0 : s1->rt_num_callers + 1);
     /* In case dlcose is called by application */
     cstr_printf(&cstr,
         "__attribute__((destructor)) static void __bt_exit_rt(){"
         "__bt_exit(__rt_info);}");
     tcc_compile_string_no_debug(s1, cstr.data);
     cstr_free(&cstr);
-    set_local_sym(s1, __rt_info, s, o);
+    set_local_sym(s1, &"___rt_info"[!s1->leading_underscore], s, o);
 }
 #endif /* def CONFIG_TCC_BACKTRACE */
 
@@ -1687,67 +1666,6 @@ static void tcc_tcov_add_file(TCCState *s1, const char *filename)
     set_local_sym(s1, &"___tcov_data"[!s1->leading_underscore], tcov_section, 0);
 }
 
-#if !defined TCC_TARGET_PE && !defined TCC_TARGET_MACHO
-/* add libc crt1/crti objects */
-ST_FUNC void tccelf_add_crtbegin(TCCState *s1)
-{
-#if TARGETOS_OpenBSD
-    if (s1->output_type != TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crt0.o");
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtbeginS.o");
-    else
-        tcc_add_crt(s1, "crtbegin.o");
-#elif TARGETOS_FreeBSD || TARGETOS_NetBSD
-    if (s1->output_type != TCC_OUTPUT_DLL)
-#if TARGETOS_FreeBSD
-        tcc_add_crt(s1, "crt1.o");
-#else
-        tcc_add_crt(s1, "crt0.o");
-#endif
-    tcc_add_crt(s1, "crti.o");
-    if (s1->static_link)
-        tcc_add_crt(s1, "crtbeginT.o");
-    else if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtbeginS.o");
-    else
-        tcc_add_crt(s1, "crtbegin.o");
-#elif TARGETOS_ANDROID
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtbegin_so.o");
-    else
-        tcc_add_crt(s1, "crtbegin_dynamic.o");
-#else
-    if (s1->output_type != TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crt1.o");
-    tcc_add_crt(s1, "crti.o");
-#endif
-}
-
-ST_FUNC void tccelf_add_crtend(TCCState *s1)
-{
-#if TARGETOS_OpenBSD
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtendS.o");
-    else
-        tcc_add_crt(s1, "crtend.o");
-#elif TARGETOS_FreeBSD || TARGETOS_NetBSD
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtendS.o");
-    else
-        tcc_add_crt(s1, "crtend.o");
-    tcc_add_crt(s1, "crtn.o");
-#elif TARGETOS_ANDROID
-    if (s1->output_type == TCC_OUTPUT_DLL)
-        tcc_add_crt(s1, "crtend_so.o");
-    else
-        tcc_add_crt(s1, "crtend_android.o");
-#else
-    tcc_add_crt(s1, "crtn.o");
-#endif
-}
-#endif /* !defined TCC_TARGET_PE && !defined TCC_TARGET_MACHO */
-
 #ifndef TCC_TARGET_PE
 /* add tcc runtime libraries */
 ST_FUNC void tcc_add_runtime(TCCState *s1)
@@ -1778,8 +1696,8 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
                 tcc_add_support(s1, "bt-exe.o");
             if (s1->output_type != TCC_OUTPUT_DLL)
                 tcc_add_support(s1, "bt-log.o");
-            tcc_add_btstub(s1);
-            lpthread = 1;
+            if (s1->output_type != TCC_OUTPUT_MEMORY)
+                tcc_add_btstub(s1);
         }
 #endif
         if (lpthread)
@@ -1790,7 +1708,7 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
             if (TCC_LIBGCC[0] == '/')
                 tcc_add_file(s1, TCC_LIBGCC);
             else
-                tcc_add_dll(s1, TCC_LIBGCC, AFF_PRINT_ERROR);
+                tcc_add_dll(s1, TCC_LIBGCC, 0);
         }
 #endif
 #if defined TCC_TARGET_ARM && TARGETOS_FreeBSD
@@ -1798,10 +1716,31 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
 #endif
         if (TCC_LIBTCC1[0])
             tcc_add_support(s1, TCC_LIBTCC1);
-#ifndef TCC_TARGET_MACHO
-        if (s1->output_type != TCC_OUTPUT_MEMORY)
-            tccelf_add_crtend(s1);
+
+        /* add crt end if not memory output */
+	if (s1->output_type != TCC_OUTPUT_MEMORY) {
+#if defined TCC_TARGET_MACHO
+            /* nothing to do */
+#elif TARGETOS_FreeBSD || TARGETOS_NetBSD
+	    if (s1->output_type & TCC_OUTPUT_DYN)
+	        tcc_add_crt(s1, "crtendS.o");
+	    else
+	        tcc_add_crt(s1, "crtend.o");
+            tcc_add_crt(s1, "crtn.o");
+#elif TARGETOS_OpenBSD
+	    if (s1->output_type == TCC_OUTPUT_DLL)
+	        tcc_add_crt(s1, "crtendS.o");
+	    else
+	        tcc_add_crt(s1, "crtend.o");
+#elif TARGETOS_ANDROID
+	    if (s1->output_type == TCC_OUTPUT_DLL)
+                tcc_add_crt(s1, "crtend_so.o");
+            else
+                tcc_add_crt(s1, "crtend_android.o");
+#else
+            tcc_add_crt(s1, "crtn.o");
 #endif
+        }
     }
 }
 #endif /* ndef TCC_TARGET_PE */
@@ -3895,7 +3834,7 @@ static int ld_add_file(TCCState *s1, const char filename[])
             return 0;
         filename = tcc_basename(filename);
     }
-    return tcc_add_dll(s1, filename, AFF_PRINT_ERROR);
+    return tcc_add_dll(s1, filename, 0);
 }
 
 static int ld_add_file_list(TCCState *s1, const char *cmd, int as_needed)

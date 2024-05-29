@@ -476,11 +476,4 @@ struct A {
     int x;
 };
 
-#elif defined test_pp_error_1
-# if //no expression
-# endif
-#elif defined test_pp_error_2
-# if X(1,2) //undefined function macro
-# endif
-
 #endif

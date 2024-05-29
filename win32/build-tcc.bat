@@ -10,7 +10,7 @@ set /p VERSION= < ..\VERSION
 set TCCDIR=
 set BINDIR=
 set DOC=no
-set XCC=no
+set EXES_ONLY=no
 goto :a0
 :a2
 shift
@@ -27,7 +27,7 @@ if (%1)==(-v) set VERSION=%~2&& goto :a2
 if (%1)==(-i) set TCCDIR=%2&& goto :a2
 if (%1)==(-b) set BINDIR=%2&& goto :a2
 if (%1)==(-d) set DOC=yes&& goto :a3
-if (%1)==(-x) set XCC=yes&& goto :a3
+if (%1)==(-x) set EXES_ONLY=yes&& goto :a3
 if (%1)==() goto :p1
 :usage
 echo usage: build-tcc.bat [ options ... ]
@@ -39,7 +39,7 @@ echo   -v "version"         set tcc version
 echo   -i tccdir            install tcc into tccdir
 echo   -b bindir            but install tcc.exe and libtcc.dll into bindir
 echo   -d                   create tcc-doc.html too (needs makeinfo)
-echo   -x                   build the cross compiler too
+echo   -x                   just create the executables
 echo   -clean               delete all previously produced files and directories
 exit /B 1
 
@@ -137,7 +137,6 @@ for %%f in (*tcc.exe *tcc.dll) do @del %%f
 @if _%TCC_C%_==__ goto compiler_2parts
 @rem if TCC_C was defined then build only tcc.exe
 %CC% -o tcc.exe %TCC_C% %D%
-@if errorlevel 1 goto :the_end
 @goto :compiler_done
 
 :compiler_2parts
@@ -145,10 +144,7 @@ for %%f in (*tcc.exe *tcc.dll) do @del %%f
 %CC% -o libtcc.dll -shared %LIBTCC_C% %D% -DLIBTCC_AS_DLL
 @if errorlevel 1 goto :the_end
 %CC% -o tcc.exe ..\tcc.c libtcc.dll %D% -DONE_SOURCE"=0"
-@if errorlevel 1 goto :the_end
-if not _%XCC%_==_yes_ goto :compiler_done
 %CC% -o %PX%-tcc.exe ..\tcc.c %DX%
-@if errorlevel 1 goto :the_end
 :compiler_done
 @if (%EXES_ONLY%)==(yes) goto :files_done
 
@@ -205,5 +201,4 @@ exit /B %ERRORLEVEL%
 .\tcc -B. -m%1 -c ../lib/bt-exe.c -o lib/%2bt-exe.o
 .\tcc -B. -m%1 -c ../lib/bt-log.c -o lib/%2bt-log.o
 .\tcc -B. -m%1 -c ../lib/bt-dll.c -o lib/%2bt-dll.o
-.\tcc -B. -m%1 -c ../lib/runmain.c -o lib/%2runmain.o
 exit /B %ERRORLEVEL%

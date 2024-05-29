@@ -14,22 +14,20 @@ TESTS = \
  libtest \
  libtest_mt \
  test3 \
+ memtest \
+ dlltest \
  abitest \
  asm-c-connect-test \
  vla_test-run \
+ cross-test \
  tests2-dir \
- pp-dir \
- memtest \
- dlltest \
- cross-test
+ pp-dir
 
 # test4_static -- Not all relocation types are implemented yet.
 # asmtest / asmtest2 -- minor differences with gcc
 
-ifeq ($(CONFIG_backtrace),no)
- TESTS := $(filter-out libtest_mt, $(TESTS))
-else ifneq ($(CONFIG_bcheck),no)
- TESTS += btest test1b tccb
+ifneq ($(CONFIG_bcheck),no)
+ TESTS += btest test1b
 endif
 ifeq ($(CONFIG_dll),no)
  TESTS := $(filter-out dlltest, $(TESTS))
@@ -78,12 +76,8 @@ DUMPTCC = (set -x; $(TOP)/tcc -vv; ldd $(TOP)/tcc; exit 1)
 endif
 
 all test :
-	@echo ------------ version ------------
-	@$(TCC_LOCAL) -v
 	@$(MAKE) --no-print-directory -s clean
-	@$(MAKE) --no-print-directory -s -r _all
-
-_all : $(TESTS)
+	@$(MAKE) --no-print-directory -s -r $(TESTS)
 
 hello-exe: ../examples/ex1.c
 	@echo ------------ $@ ------------
@@ -200,15 +194,7 @@ btest: boundtest.c
 	       echo "Test $$i failed as expected" ; \
 	   fi ;\
 	done ;\
-	echo Bound-Test OK
-
-tccb:
-	@echo ------------ $@ ------------
-	$(TCC) -b $(TOPSRC)/tcc.c $(TCCFLAGS) $(NATIVE_DEFINES) -o tccb1.exe
-	mv tccb1.exe tccb2.exe
-	./tccb2.exe -b $(TOPSRC)/tcc.c $(TCCFLAGS) $(NATIVE_DEFINES) -o tccb1.exe
-	cmp -s tccb1.exe tccb2.exe && echo "Exe Bound-Test OK"
-
+	echo Bound test OK
 
 # speed test
 speedtest: ex2 ex3
@@ -272,7 +258,7 @@ vla_test-run: vla_test$(EXESUF)
 	@echo ------------ $@ ------------
 	./vla_test$(EXESUF)
 
-.PHONY: abitest vla_test tccb
+.PHONY: abitest vla_test
 
 asm-c-connect$(EXESUF): asm-c-connect-1.c asm-c-connect-2.c
 	$(TCC) -o $@ $^
@@ -342,7 +328,7 @@ cache: tcc_g
 clean:
 	rm -f *~ *.o *.a *.bin *.i *.ref *.out *.out? *.out?b *.cc *.gcc
 	rm -f *-cc *-gcc *-tcc *.exe hello libtcc_test vla_test tcctest[1234]
-	rm -f asm-c-connect asm-c-connect-sep
+	rm -f asm-c-connect$(EXESUF) asm-c-connect-sep$(EXESUF)
 	rm -f ex? tcc_g weaktest.*.txt *.def *.pdb *.obj libtcc_test_mt
 	@$(MAKE) -C tests2 $@
 	@$(MAKE) -C pp $@
