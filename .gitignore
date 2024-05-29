@@ -68,3 +68,4 @@ TCC-BUILT/
 src/config.h
 tests/mt.c
 .vscode/
+config.h
