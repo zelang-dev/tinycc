@@ -181,7 +181,7 @@ find_package (Threads)
 ################################################################################
 # TCC compiler as library
 
-add_library(libtcc SHARED ${CODE_GENERATOR_SRCS})
+add_library(libtcc STATIC ${CODE_GENERATOR_SRCS})
 target_compile_definitions(libtcc
     PRIVATE ONE_SOURCE=0
     PUBLIC "${NATIVE_TARGET}="
@@ -325,16 +325,19 @@ set( RISCV64_O
  ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
 
 set( WIN_O
- ${TCC_DIR}/win32/lib/crt1.c ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
- ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
+ ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/win32/lib/crt1.c
+ ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
+ ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c
+ ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c ${TCC_DIR}/lib/bt-exe.c
+ ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c )
 
 set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 
 set( OBJ-i386 ${I386_O} ${BCHECK_O} ${DSO_O} )
 set( OBJ-x86_64 ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} ${DSO_O} )
 set( OBJ-x86_64-osx ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} )
-set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
-set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
+set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
+set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
 set( OBJ-arm64 ${ARM64_O} ${BCHECK_O} ${DSO_O} )
 set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
 set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
@@ -394,28 +397,28 @@ foreach(LIB_SRCFILE ${LIB_SRCFILES})
     list(APPEND LIB_OBJFILES ${LIB_DIR}/${LIB_SRCFILE_NOEXT}.o)
 endforeach()
 
-#if(WIN32)
-#    add_custom_command(
-#        OUTPUT ${TCC_DIR}/win32/pthreads4w/pthread.o
-#        COMMAND tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
-#                    -L ${LIB_DIR}
-#                    -c ${TCC_DIR}/win32/pthreads4w/pthread.c
-#                    -o ${TCC_DIR}/win32/pthreads4w/pthread.o
-#        MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread.c
-#        VERBATIM
-#        COMMENT "Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread.c)")
-#    list(APPEND LIB_OBJFILES ${TCC_DIR}/win32/pthreads4w/pthread.o)
-#endif()
+if(WIN32)
+    add_custom_command(
+        OUTPUT ${TCC_DIR}/win32/pthreads4w/pthread.o
+        COMMAND tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+                    -L ${LIB_DIR}
+                    -c ${TCC_DIR}/win32/pthreads4w/pthread.c
+                    -o ${TCC_DIR}/win32/pthreads4w/pthread.o
+        MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread.c
+        VERBATIM
+        COMMENT "Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread.c)")
+    list(APPEND LIB_OBJFILES ${TCC_DIR}/win32/pthreads4w/pthread.o)
+endif()
 
 # link all objects files to archive file
 add_custom_target(
     libarchive ALL
-    tcc -ar rcs ${LIB_DIR}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a ${LIB_OBJFILES}
+    tcc -ar ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a ${LIB_OBJFILES}
     DEPENDS ${LIB_OBJFILES}
-    BYPRODUCTS ${LIB_DIR}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a
+    BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a
     COMMENT "Linking Runtime Library"
     SOURCES ${LIB_SRCFILES})
-install(FILES ${LIB_DIR}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # cross compiler targets and cross libtcc1.a to build
 if(WIN32 AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64)
@@ -522,7 +525,7 @@ foreach(X ${TCC_X})
     # link all objects files to archive file
     add_custom_target(
         ${X}_libarchive ALL
-        ${tcc_cross} -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a ${CROSS_OBJFILES}
+        ${tcc_cross} -ar ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a ${CROSS_OBJFILES}
         DEPENDS ${CROSS_OBJFILES}
         BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a
         COMMENT "Cross Linking Runtime Library - ${X}" )
