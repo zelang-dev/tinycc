@@ -399,16 +399,27 @@ endforeach()
 
 if(WIN32)
     add_custom_command(
-        OUTPUT ${TCC_DIR}/win32/pthreads4w/pthread.o
+        OUTPUT ${LIB_DIR}/pthread.o
         COMMAND tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
-                    -c ${TCC_DIR}/win32/pthreads4w/pthread.c
-                    -o ${TCC_DIR}/win32/pthreads4w/pthread.o
-        MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread.c
+                    -c ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
+                    -o ${LIB_DIR}/pthread.o
+        MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
         VERBATIM
-        COMMENT "Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread.c)")
-    list(APPEND LIB_OBJFILES ${TCC_DIR}/win32/pthreads4w/pthread.o)
+        COMMENT "Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread-JMP.c)")
+    list(APPEND LIB_OBJFILES ${LIB_DIR}/pthread.o)
 endif()
+
+add_custom_command(
+    OUTPUT ${LIB_DIR}/cthread.o
+    COMMAND tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+            -L ${LIB_DIR}
+            -c ${TCC_DIR}/cthread.c
+            -o ${LIB_DIR}/cthread.o
+    MAIN_DEPENDENCY ${TCC_DIR}/cthread.c
+    VERBATIM
+    COMMENT "Compiling Runtime Library (${TCC_DIR}/cthread.c)")
+list(APPEND LIB_OBJFILES ${LIB_DIR}/cthread.o)
 
 # link all objects files to archive file
 add_custom_target(
@@ -510,16 +521,27 @@ foreach(X ${TCC_X})
         OR ${X} STREQUAL x86_64-win32
         OR ${X} STREQUAL arm-wince)
             add_custom_command(
-                OUTPUT ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o
+                OUTPUT ${LIB_DIR}/${X}_pthread.o
                 COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
-                    -c ${TCC_DIR}/win32/pthreads4w/pthread.c
-                    -o ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o
-                MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread.c
+                    -c ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
+                    -o ${LIB_DIR}/${X}_pthread.o
+                MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
                 DEPENDS ${tcc_cross}
                 VERBATIM
-                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread.c)")
-           list(APPEND CROSS_OBJFILES ${TCC_DIR}/win32/pthreads4w/${X}_pthread.o)
+                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread-JMP.c)")
+            list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_pthread.o)
+            add_custom_command(
+                OUTPUT ${LIB_DIR}/${X}_cthread.o
+                COMMAND ${tcc_cross} -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT ${TCC_INCLUDE_DIRS}
+                        -L ${LIB_DIR}
+                        -c ${TCC_DIR}/cthread.c
+                        -o ${LIB_DIR}/${X}_cthread.o
+                MAIN_DEPENDENCY ${TCC_DIR}/cthread.c
+                DEPENDS ${tcc_cross}
+                VERBATIM
+                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/cthread.c)")
+            list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_cthread.o)
     endif()
 
     # link all objects files to archive file
