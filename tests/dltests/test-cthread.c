@@ -172,8 +172,8 @@ void run_timed_mtx_test(void) {
     }
 
     CHK_THRD(mtx_unlock(&mtx2));
-  //  cnd_destroy(&cnd);
     mtx_destroy(&mtx2);
+    cnd_destroy(&cnd);
 
     CHK_EXPECTED(xtime_get(&ts, TIME_UTC), TIME_UTC);
     ts.tv_nsec += 500000000;

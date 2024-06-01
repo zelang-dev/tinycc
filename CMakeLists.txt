@@ -533,7 +533,7 @@ foreach(X ${TCC_X})
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_pthread.o)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_cthread.o
-                COMMAND ${tcc_cross} -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT ${TCC_INCLUDE_DIRS}
+                COMMAND ${tcc_cross} -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DHAVE_CONFIG_H ${TCC_INCLUDE_DIRS}
                         -L ${LIB_DIR}
                         -c ${TCC_DIR}/cthread.c
                         -o ${LIB_DIR}/${X}_cthread.o
