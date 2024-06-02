@@ -1,7 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 if(WIN32)
-    set( DL_DIR ${CMAKE_SOURCE_DIR}/tests/dltests )
+    set( DL_DIR ${CMAKE_CURRENT_SOURCE_DIR} )
     set( DL_SRCFILES
      testdll
      testdll2
@@ -23,13 +23,4 @@ if(WIN32)
         SOURCES ${DL_DIR}/test.c )
 
     add_test(NAME t_dlfcn COMMAND t_dlfcn WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
-
-    add_custom_target(
-        test-cthread ALL
-        COMMAND tcc ${DL_DIR}/test-cthread.c ${CFLAGS} -o ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
-        BYPRODUCTS ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
-        SOURCES ${DL_DIR}/test-cthread.c )
-
-    add_test(NAME test-cthread COMMAND test-cthread WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()

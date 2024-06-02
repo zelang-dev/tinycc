@@ -1,4 +1,6 @@
 @echo off
 if EXIST "c:\Program Files\tcc" (
-    %comspec% /k ".winvar.bat"
+    %comspec% /k ".tccVar.bat"
+) else if EXIST "C:\Program Files (x86)\tcc" (
+    %comspec% /k ".tccVar32.bat"
 )

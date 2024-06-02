@@ -33,9 +33,9 @@ set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
 include(TargetArch)
 
 # Set target architectures
-target_architecture(CMAKE_TARGET_ARCHITECTURES)
-list(LENGTH CMAKE_TARGET_ARCHITECTURES cmake_target_arch_len)
-message("Target architecture type: ${CMAKE_TARGET_ARCHITECTURES}")
+target_architecture(TARGET_ARCH)
+list(LENGTH TARGET_ARCH cmake_target_arch_len)
+message("Target architecture type: ${TARGET_ARCH}")
 
 set(TCC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(LIB_DIR ${CMAKE_CURRENT_BINARY_DIR}/lib)
@@ -134,43 +134,43 @@ include(CPack)
 
 # Set target and sources
 if( WIN32 AND NOT CYGWIN )
-  if( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386 )
+  if( ${TARGET_ARCH} STREQUAL i386 )
     set( NATIVE_TARGET TCC_TARGET_I386 )
     set( CODE_GENERATOR_SRCS ${I386_WIN32_FILES} )
-  elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+  elseif( ${TARGET_ARCH} STREQUAL x86_64 )
     set( NATIVE_TARGET TCC_X86_64 )
     set( CODE_GENERATOR_SRCS ${X86_64_WIN32_FILES} )
-  elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm
-    OR ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+  elseif( ${TARGET_ARCH} STREQUAL arm
+    OR ${TARGET_ARCH} STREQUAL arm64 )
         set( NATIVE_TARGET TCC_TARGET_ARM )
         set( CODE_GENERATOR_SRCS ${ARM_WINCE_FILES} )
   endif()
 else()
-  if( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL riscv64 )
+  if( NOT APPLE AND ${TARGET_ARCH} STREQUAL riscv64 )
     set( NATIVE_TARGET TCC_TARGET_RISCV64 )
     set( CODE_GENERATOR_SRCS ${RISCV64_FILES} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm64 )
     set( NATIVE_TARGET TCC_TARGET_ARM64 )
     set( CODE_GENERATOR_SRCS ${ARM64_FILES} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL i386 )
     set( NATIVE_TARGET TCC_TARGET_I386 )
     set( CODE_GENERATOR_SRCS ${I386_FILES} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL x86_64 )
     set( NATIVE_TARGET TCC_X86_64 )
     set( CODE_GENERATOR_SRCS ${X86_64_FILES} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm_eabi )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm_eabi )
     set( NATIVE_TARGET TCC_ARM_EABI )
     set( CODE_GENERATOR_SRCS ${ARM_FILES} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm )
     set( NATIVE_TARGET TCC_TARGET_ARM )
     set( CODE_GENERATOR_SRCS ${ARM_FILES} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL armv7 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL armv7 )
     set( NATIVE_TARGET TCC_TARGET_ARM )
     set( CODE_GENERATOR_SRCS ${ARM_FILES} )
-  elseif( APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+  elseif( APPLE AND ${TARGET_ARCH} STREQUAL arm64 )
     set( NATIVE_TARGET TCC_TARGET_MACHO )
     set( CODE_GENERATOR_SRCS ${ARM64_OSX_FILES} )
-  elseif( APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+  elseif( APPLE AND ${TARGET_ARCH} STREQUAL x86_64 )
     set( NATIVE_TARGET TCC_TARGET_MACHO )
     set( CODE_GENERATOR_SRCS ${X86_64_OSX_FILES} )
   endif()
@@ -185,13 +185,13 @@ add_library(libtcc STATIC ${CODE_GENERATOR_SRCS})
 target_compile_definitions(libtcc
     PRIVATE ONE_SOURCE=0
     PUBLIC "${NATIVE_TARGET}="
-    PUBLIC TCC_LIBTCC1=\"libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a\"
+    PUBLIC TCC_LIBTCC1=\"libtcc1-${TARGET_ARCH}.a\"
     PRIVATE CONFIG_TCCDIR=\".\"
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
 
 if(WIN32)
     target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
-    if( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+    if( ${TARGET_ARCH} STREQUAL arm64 )
         target_compile_definitions(libtcc PUBLIC
             "TCC_TARGET_ARM="
             "TCC_ARM_VFP="
@@ -199,12 +199,12 @@ if(WIN32)
             "TCC_ARM_HARDFLOAT="
             "TCC_TARGET_PE="
             CONFIG_TCC_LIBPATHS=\"{B}\")
-    elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386 )
+    elseif( ${TARGET_ARCH} STREQUAL i386 )
         target_compile_definitions(libtcc PUBLIC
             "TCC_TARGET_I386="
             "TCC_TARGET_PE="
             CONFIG_TCC_LIBPATHS=\"{B}\")
-    elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+    elseif( ${TARGET_ARCH} STREQUAL x86_64 )
         target_compile_definitions(libtcc PUBLIC
             "TCC_TARGET_X86_64="
             "TCC_TARGET_PE="
@@ -212,37 +212,37 @@ if(WIN32)
     endif()
 elseif (UNIX)
     if(APPLE)
-        if( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+        if( ${TARGET_ARCH} STREQUAL arm64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM64="
                 "TCC_TARGET_MACHO=1")
-        elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+        elseif( ${TARGET_ARCH} STREQUAL x86_64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_X86_64="
                 "TCC_TARGET_MACHO=1")
         endif()
     else()
-        if( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL riscv64 )
+        if( ${TARGET_ARCH} STREQUAL riscv64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_RISCV64="
                 "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"riscv64-linux-gnu\")
-        elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+        elseif( ${TARGET_ARCH} STREQUAL arm64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM64="
                 "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"aarch64-linux-gnu\")
-        elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386 )
+        elseif( ${TARGET_ARCH} STREQUAL i386 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_I386="
                 "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"i386-linux-gnu\")
-        elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+        elseif( ${TARGET_ARCH} STREQUAL x86_64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_X86_64="
                 "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"x86_64-linux-gnu\")
-        elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL armv7 )
+        elseif( ${TARGET_ARCH} STREQUAL armv7 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM="
                 "TCC_ARM_VFP="
@@ -250,7 +250,7 @@ elseif (UNIX)
                 "TCC_ARM_HARDFLOAT="
                 "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"arm-linux-gnueabi\")
-        elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm_eabi )
+        elseif( ${TARGET_ARCH} STREQUAL arm_eabi )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM="
                 "TCC_ARM_VFP="
@@ -351,32 +351,32 @@ set( OBJ-arm-wince ${ARM_O} ${WIN_O} )
 set( OBJ-riscv64 ${RISCV64_O} ${BCHECK_O} ${DSO_O} )
 
 if (WIN32)
-  if( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386 )
+  if( ${TARGET_ARCH} STREQUAL i386 )
     set( LIB_SRCFILES ${OBJ-i386-win32} )
-  elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+  elseif( ${TARGET_ARCH} STREQUAL x86_64 )
     set( LIB_SRCFILES ${OBJ-x86_64-win32} )
-  elseif( ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64
-    OR ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm )
+  elseif( ${TARGET_ARCH} STREQUAL arm64
+    OR ${TARGET_ARCH} STREQUAL arm )
         set( LIB_SRCFILES ${OBJ-arm-wince} )
   endif()
 else()
-  if( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL riscv64 )
+  if( NOT APPLE AND ${TARGET_ARCH} STREQUAL riscv64 )
     set( LIB_SRCFILES ${OBJ-riscv64} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm64 )
     set( LIB_SRCFILES ${OBJ-arm64} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL i386 )
     set( LIB_SRCFILES ${OBJ-i386} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL x86_64 )
     set( LIB_SRCFILES ${OBJ-x86_64} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm_eabi )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm_eabi )
     set( LIB_SRCFILES ${OBJ-arm-eabi} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm )
     set( LIB_SRCFILES ${OBJ-arm} )
-  elseif( NOT APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL armv7 )
+  elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL armv7 )
     set( LIB_SRCFILES ${OBJ-eabihf} )
-  elseif( APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm64 )
+  elseif( APPLE AND ${TARGET_ARCH} STREQUAL arm64 )
     set( LIB_SRCFILES ${OBJ-arm64-osx} )
-  elseif( APPLE AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64 )
+  elseif( APPLE AND ${TARGET_ARCH} STREQUAL x86_64 )
     set( LIB_SRCFILES ${OBJ-x86_64-osx} )
   endif()
 endif()
@@ -424,21 +424,21 @@ list(APPEND LIB_OBJFILES ${LIB_DIR}/cthread.o)
 # link all objects files to archive file
 add_custom_target(
     libarchive ALL
-    tcc -ar ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a ${LIB_OBJFILES}
+    tcc -ar ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a ${LIB_OBJFILES}
     DEPENDS ${LIB_OBJFILES}
-    BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a
+    BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a
     COMMENT "Linking Runtime Library"
     SOURCES ${LIB_SRCFILES})
-install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${CMAKE_TARGET_ARCHITECTURES}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 # cross compiler targets and cross libtcc1.a to build
-if(WIN32 AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL x86_64)
+if(WIN32 AND ${TARGET_ARCH} STREQUAL x86_64)
     set(TCC_X i386 x86_64 i386-win32 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
-elseif(WIN32 AND ${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386)
+elseif(WIN32 AND ${TARGET_ARCH} STREQUAL i386)
     set(TCC_X i386 arm)
-elseif(${CMAKE_TARGET_ARCHITECTURES} STREQUAL i386)
+elseif(${TARGET_ARCH} STREQUAL i386)
     set(TCC_X i386-win32 arm)
-elseif(${CMAKE_TARGET_ARCHITECTURES} STREQUAL arm)
+elseif(${TARGET_ARCH} STREQUAL arm)
     set(TCC_X i386 i386-win32)
 else()
     set(TCC_X i386 x86_64 i386-win32 x86_64-win32 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)

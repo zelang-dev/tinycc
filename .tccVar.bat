@@ -1,5 +1,3 @@
-
-
 @echo off
 set LIBRARY_PATH=C:\Program Files\tcc\lib
 set C_INCLUDE_PATH=C:\Program Files\tcc\include

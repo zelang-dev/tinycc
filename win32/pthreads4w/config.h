@@ -189,9 +189,6 @@
 #if defined(__TINYC__)
 typedef long long int64_t;
 typedef unsigned long long uint64_t;
-#if defined(WINCE)
-
-#endif
 #endif
 #if defined(__TINYC__) && (defined(WIN64) || defined(_WIN64))
 #include <atomic.h>
