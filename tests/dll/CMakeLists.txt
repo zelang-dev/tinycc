@@ -17,7 +17,7 @@ if(WIN32)
 
     add_custom_target(
         t_dlfcn ALL
-        COMMAND tcc ${DL_DIR}/test.c ${CFLAGS} -o ${CMAKE_BINARY_DIR}/t_dlfcn.exe
+        COMMAND tcc ${DL_DIR}/test.c ${CFLAGS} -B ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} -o ${CMAKE_BINARY_DIR}/t_dlfcn.exe
         DEPENDS ${DL_DLLFILES}
         BYPRODUCTS ${CMAKE_BINARY_DIR}/t_dlfcn.exe
         SOURCES ${DL_DIR}/test.c )

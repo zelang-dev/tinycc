@@ -487,7 +487,7 @@ ST_FUNC void gen_expr32(ExprValue *pe)
     if (pe->pcrel)
         /* If PC-relative, always set VT_SYM, even without symbol,
 	   so as to force a relocation to be emitted.  */
-	gen_addrpc32(VT_SYM, pe->sym, pe->v);
+	gen_addrpc32(VT_SYM, pe->sym, pe->v + (ind + 4));
     else
 	gen_addr32(pe->sym ? VT_SYM : 0, pe->sym, pe->v);
 }
@@ -515,7 +515,13 @@ static void gen_disp32(ExprValue *pe)
             sym->type.t = VT_FUNC;
             sym->type.ref = NULL;
         }
+#ifdef TCC_TARGET_X86_64
+        greloca(cur_text_section, sym, ind, R_X86_64_PLT32, pe->v - 4);
+        gen_le32(0);
+#else
         gen_addrpc32(VT_SYM, sym, pe->v);
+#endif
+
     }
 }
 

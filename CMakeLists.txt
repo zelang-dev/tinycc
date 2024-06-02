@@ -298,7 +298,8 @@ add_custom_command(
 
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
-set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/tcov.c )
+set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
+set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
 
 set( I386_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
@@ -328,8 +329,7 @@ set( WIN_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/win32/lib/crt1.c
  ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
  ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c
- ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c ${TCC_DIR}/lib/bt-exe.c
- ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c )
+ ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
 
 set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 
@@ -381,6 +381,7 @@ else()
   endif()
 endif()
 
+list(APPEND LIB_SRCFILES ${EXTRA_O})
 # compile C files to object files
 file(MAKE_DIRECTORY ${LIB_DIR})
 foreach(LIB_SRCFILE ${LIB_SRCFILES})

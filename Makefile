@@ -29,6 +29,9 @@ ifdef CONFIG_WIN32
  ifneq ($(CONFIG_static),yes)
   LIBTCC = libtcc$(DLLSUF)
   LIBTCCDEF = libtcc.def
+  -LTCC = $(bindir)/libtcc.dll
+ else
+  -LTCC = -ltcc -L$(libdir)
  endif
  ifneq ($(CONFIG_debug),yes)
   LDFLAGS += -s
@@ -55,6 +58,8 @@ else
       # `make test' when libtcc.dylib is used (configure --disable-static), so
       # we bake a relative path into the binary. $libdir is used after install.
       LINK_LIBTCC += -Wl,-rpath,"@executable_path/$(TOP)" -Wl,-rpath,"$(libdir)"
+      # -current/compatibility_version must not contain letters.
+      MACOS_DYLIB_VERSION := $(firstword $(subst rc, ,$(VERSION)))
       DYLIBVER += -current_version $(MACOS_DYLIB_VERSION)
       DYLIBVER += -compatibility_version $(MACOS_DYLIB_VERSION)
     endif
@@ -68,6 +73,7 @@ else
   endif
   export MACOSX_DEPLOYMENT_TARGET := 10.6
  endif
+ -LTCC = -ltcc
 endif
 
 # run local version of tcc with local libraries and includes
@@ -76,6 +82,15 @@ TCCFLAGS-win = -B$(TOPSRC)/win32 -I$(TOPSRC)/include -I$(TOPSRC) -I$(TOP) -L$(TO
 TCCFLAGS = $(TCCFLAGS$(CFG))
 TCC_LOCAL = $(TOP)/tcc$(EXESUF)
 TCC = $(TCC_LOCAL) $(TCCFLAGS)
+
+# run tests with the installed tcc instead
+ifdef TESTINSTALL
+  TCC_LOCAL = $(bindir)/tcc
+  TCCFLAGS-unx = -I..
+  TCCFLAGS-win = -I.. -B$(bindir)
+  LIBTCC =
+  LIBS += $(-LTCC)
+endif
 
 CFLAGS_P = $(CFLAGS) -pg -static -DCONFIG_TCC_STATIC -DTCC_PROFILE
 LIBS_P = $(LIBS)
@@ -150,8 +165,7 @@ TCC_X += riscv64 arm64-osx
 # TCC_X += arm-fpa arm-fpa-ld arm-vfp arm-eabi
 
 # cross libtcc1.a targets to build
-LIBTCC1_X = i386 x86_64 i386-win32 x86_64-win32 x86_64-osx arm arm64 arm-wince
-LIBTCC1_X += riscv64 arm64-osx
+LIBTCC1_X = $(filter-out c67,$(TCC_X))
 
 PROGS_CROSS = $(foreach X,$(TCC_X),$X-tcc$(EXESUF))
 LIBTCC1_CROSS = $(foreach X,$(LIBTCC1_X),$X-libtcc1.a)
@@ -193,7 +207,6 @@ endif
 # include custom configuration (see make help)
 -include config-extra.mak
 
-ifneq ($(X),)
 ifneq ($(T),$(NATIVE_TARGET))
 # assume support files for cross-targets in "/usr/<triplet>" by default
 TRIPLET-i386 ?= i686-linux-gnu
@@ -201,11 +214,12 @@ TRIPLET-x86_64 ?= x86_64-linux-gnu
 TRIPLET-arm ?= arm-linux-gnueabi
 TRIPLET-arm64 ?= aarch64-linux-gnu
 TRIPLET-riscv64 ?= riscv64-linux-gnu
+MARCH-i386 ?= i386-linux-gnu
+MARCH-$T ?= $(TRIPLET-$T)
 TR = $(if $(TRIPLET-$T),$T,ignored)
 CRT-$(TR) ?= /usr/$(TRIPLET-$T)/lib
-LIB-$(TR) ?= {B}:/usr/$(TRIPLET-$T)/lib
-INC-$(TR) ?= {B}/include:/usr/$(TRIPLET-$T)/include
-endif
+LIB-$(TR) ?= {B}:/usr/$(TRIPLET-$T)/lib:/usr/lib/$(MARCH-$T)
+INC-$(TR) ?= {B}/include:/usr/$(TRIPLET-$T)/include:/usr/include
 endif
 
 CORE_FILES = tcc.c tcctools.c libtcc.c tccpp.c tccgen.c tccdbg.c tccelf.c tccasm.c tccrun.c
@@ -372,13 +386,13 @@ IR = $(IM) mkdir -p $2 && cp -r $1/. $2
 IM = @echo "-> $2 : $1" ;
 BINCHECK = $(if $(wildcard $(PROGS) *-tcc$(EXESUF)),,@echo "Makefile: nothing found to install" && exit 1)
 
-B_O = bcheck.o bt-exe.o bt-log.o bt-dll.o
+EXTRA_O = runmain.o bt-exe.o bt-dll.o bt-log.o bcheck.o
 
 # install progs & libs
 install-unx:
 	$(call BINCHECK)
 	$(call IBw,$(PROGS) *-tcc,"$(bindir)")
-	$(call IFw,$(LIBTCC1) $(B_O) $(LIBTCC1_U),"$(tccdir)")
+	$(call IFw,$(LIBTCC1) $(EXTRA_O) $(LIBTCC1_U),"$(tccdir)")
 	$(call IF,$(TOPSRC)/include/*.h $(TOPSRC)/tcclib.h,"$(tccdir)/include")
 	$(call $(if $(findstring .so,$(LIBTCC)),IBw,IFw),$(LIBTCC),"$(libdir)")
 	$(call IF,$(TOPSRC)/libtcc.h,"$(includedir)")
@@ -405,12 +419,12 @@ install-win:
 	$(call BINCHECK)
 	$(call IBw,$(PROGS) *-tcc.exe libtcc.dll,"$(bindir)")
 	$(call IF,$(TOPSRC)/win32/lib/*.def,"$(tccdir)/lib")
-	$(call IFw,libtcc1.a $(B_O) $(LIBTCC1_W),"$(tccdir)/lib")
+	$(call IFw,libtcc1.a $(EXTRA_O) $(LIBTCC1_W),"$(tccdir)/lib")
 	$(call IF,$(TOPSRC)/include/*.h $(TOPSRC)/tcclib.h,"$(tccdir)/include")
 	$(call IR,$(TOPSRC)/win32/include,"$(tccdir)/include")
 	$(call IR,$(TOPSRC)/win32/examples,"$(tccdir)/examples")
 	$(call IF,$(TOPSRC)/tests/libtcc_test.c,"$(tccdir)/examples")
-	$(call IFw,$(TOPSRC)/libtcc.h libtcc.def,"$(libdir)")
+	$(call IFw,$(TOPSRC)/libtcc.h libtcc.def libtcc.a,"$(libdir)")
 	$(call IFw,$(TOPSRC)/win32/tcc-win32.txt tcc-doc.html,"$(docdir)")
 ifneq "$(wildcard $(LIBTCC1_U))" ""
 	$(call IFw,$(LIBTCC1_U),"$(tccdir)/lib")
@@ -419,9 +433,9 @@ endif
 
 # uninstall on windows
 uninstall-win:
-	@rm -fv $(addprefix "$(bindir)/", libtcc*.dll $(PROGS) *-tcc.exe)
-	@rm -fr $(foreach P,doc examples include lib libtcc,"$(tccdir)/$P/*")
-	@rm -frv $(addprefix "$(tccdir)/", doc examples include lib libtcc)
+	@rm -fv $(foreach P,libtcc*.dll $(PROGS) *-tcc.exe,"$(bindir)"/$P)
+	@rm -fr $(foreach P,doc examples include lib libtcc,"$(tccdir)"/$P/*)
+	@rm -frv $(foreach P,doc examples include lib libtcc,"$(tccdir)"/$P)
 
 # the msys-git shell works to configure && make except it does not have install
 ifeq ($(OS),Windows_NT)
@@ -472,9 +486,12 @@ tcov-tes% : tcc_c$(EXESUF)
 	@$(MAKE) --no-print-directory TCC_LOCAL=$(CURDIR)/$< tes$*
 tcc_c$(EXESUF): $($T_FILES)
 	$S$(TCC) tcc.c -o $@ -ftest-coverage $(DEFINES) $(LIBS)
+# test the installed tcc instead
+test-install: tccdefs_.h
+	@$(MAKE) -C tests TESTINSTALL=yes #_all
 
 clean:
-	@rm -f tcc$(EXESUF) tcc_c$(EXESUF) tcc_p$(EXESUF) *-tcc$(EXESUF)
+	@rm -f tcc *-tcc tcc_p tcc_c
 	@rm -f tags ETAGS *.o *.a *.so* *.out *.log lib*.def *.exe *.dll
 	@rm -f a.out *.dylib *_.h *.pod *.tcov
 	@$(MAKE) -s -C lib $@
@@ -505,6 +522,8 @@ help:
 	@echo "   run all/single test(s) from tests/pp"
 	@echo "make tcov-test / tcov-tests2... / tcov-testspp..."
 	@echo "   run tests as above with code coverage. After test(s) see tcc_c$(EXESUF).tcov"
+	@echo "make test-install"
+	@echo "   run tests with the installed tcc"
 	@echo "Other supported make targets:"
 	@echo "   install install-strip doc clean tags ETAGS tar distclean help"
 	@echo "Custom configuration:"

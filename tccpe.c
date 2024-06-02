@@ -35,7 +35,7 @@
 # define REL_TYPE_DIRECT R_X86_64_64
 # define R_XXX_THUNKFIX R_X86_64_PC32
 # define R_XXX_RELATIVE R_X86_64_RELATIVE
-# define R_XXX_FUNCCALL R_X86_64_PC32
+# define R_XXX_FUNCCALL R_X86_64_PLT32
 # define IMAGE_FILE_MACHINE 0x8664
 # define RSRC_RELTYPE 3
 
@@ -732,7 +732,7 @@ static int pe_write(struct pe_info *pe)
 
         memcpy(psh->Name, sh_name, umin(strlen(sh_name), sizeof psh->Name));
         if (si->cls == sec_debug)
-            need_strtab += pe_put_long_secname(psh->Name, sh_name);
+            need_strtab += pe_put_long_secname((char*)psh->Name, sh_name);
 
         psh->Characteristics = si->pe_flags;
         psh->VirtualAddress = addr;
@@ -921,7 +921,7 @@ static void pe_build_imports(struct pe_info *pe)
                 if (pe->type == PE_RUN) {
                     if (dllref) {
                         if ( !dllref->handle )
-                            dllref->handle = LoadLibrary(dllref->name);
+                            dllref->handle = LoadLibraryA(dllref->name);
                         v = (ADDR3264)GetProcAddress(dllref->handle, ordinal?(char*)0+ordinal:name);
                     }
                     if (!v)
@@ -1349,7 +1349,7 @@ static int pe_check_symbols(struct pe_info *pe)
                     sprintf(buffer, "IAT.%s", name);
                     is->iat_index = put_elf_sym(
                         symtab_section, 0, sizeof(DWORD),
-                        ELFW(ST_INFO)(STB_GLOBAL, STT_OBJECT),
+                        ELFW(ST_INFO)(STB_LOCAL, STT_OBJECT),
                         0, SHN_UNDEF, buffer);
 
                     offset = text_section->data_offset;
@@ -1600,14 +1600,15 @@ static int read_mem(int fd, unsigned offset, void *buffer, unsigned len)
 
 static int get_dllexports(int fd, char **pp)
 {
-    int l, i, n, n0, ret;
+    int i, k, l, n, n0, ret;
     char *p;
 
     IMAGE_SECTION_HEADER ish;
     IMAGE_EXPORT_DIRECTORY ied;
     IMAGE_DOS_HEADER dh;
     IMAGE_FILE_HEADER ih;
-    DWORD sig, ref, addr, ptr, namep;
+    DWORD sig, ref, addr;
+    DWORD *namep = NULL, p0 = 0, p1;
 
     int pef_hdroffset, opt_hdroffset, sec_hdroffset;
 
@@ -1652,33 +1653,37 @@ static int get_dllexports(int fd, char **pp)
             goto found;
     }
     goto the_end_0;
-
 found:
     ref = ish.VirtualAddress - ish.PointerToRawData;
     if (!read_mem(fd, addr - ref, &ied, sizeof ied))
         goto the_end;
-
-    namep = ied.AddressOfNames - ref;
-    for (i = 0; i < ied.NumberOfNames; ++i) {
-        if (!read_mem(fd, namep, &ptr, sizeof ptr))
+    k = ied.NumberOfNames;
+    if (k) {
+        namep = tcc_malloc(l = k * sizeof *namep);
+        if (!read_mem(fd, ied.AddressOfNames - ref, namep, l))
             goto the_end;
-        namep += sizeof ptr;
-        for (l = 0;;) {
-            if (n+1 >= n0)
-                p = tcc_realloc(p, n0 = n0 ? n0 * 2 : 256);
-            if (!read_mem(fd, ptr - ref + l++, p + n, 1)) {
-                tcc_free(p), p = NULL;
-                goto the_end;
-            }
-            if (p[n++] == 0)
-                break;
+        for (i = l = 0; i < k; ++i) {
+            p1 = namep[i] - ref;
+            if (p1 != p0)
+                lseek(fd, p0 = p1, SEEK_SET), l = 0;
+            do {
+                if (0 == l) {
+                    if (n + 1000 >= n0)
+                        p = tcc_realloc(p, n0 += 1000);
+                    if ((l = read(fd, p + n, 1000 - 1)) <= 0)
+                        goto the_end;
+                }
+                --l, ++p0;
+            } while (p[n++]);
         }
-    }
-    if (p)
         p[n] = 0;
+    }
 the_end_0:
     ret = 0;
 the_end:
+    tcc_free(namep);
+    if (ret && p)
+        tcc_free(p), p = NULL;
     *pp = p;
     return ret;
 }
@@ -1810,15 +1815,14 @@ quit:
 static int pe_load_dll(TCCState *s1, int fd, const char *filename)
 {
     char *p, *q;
-    int index, ret;
-
-    ret = get_dllexports(fd, &p);
-    if (ret) {
+    DLLReference *ref = tcc_add_dllref(s1, filename, 0);
+    if (ref->found)
+        return 0;
+    if (get_dllexports(fd, &p))
         return -1;
-    } else if (p) {
-        index = tcc_add_dllref(s1, filename, 0)->index;
+    if (p) {
         for (q = p; *q; q += 1 + strlen(q))
-            pe_putimport(s1, index, q, 0);
+            pe_putimport(s1, ref->index, q, 0);
         tcc_free(p);
     }
     return 0;
@@ -1941,15 +1945,20 @@ static void pe_add_runtime(TCCState *s1, struct pe_info *pe)
             start_symbol =  "__start";
             run_symbol = "__runmain";
             pe_type = PE_EXE;
-
+            if (s1->pe_subsystem == 2)
+                pe_type = PE_GUI;
         }
-        if (TCC_OUTPUT_MEMORY == s1->output_type)
+
+        if (TCC_OUTPUT_MEMORY == s1->output_type && !s1->nostdlib)
             start_symbol = run_symbol;
     }
-
-    pe->start_symbol = start_symbol + 1;
-    if (!s1->leading_underscore || strchr(start_symbol, '@'))
-        ++start_symbol;
+    if (s1->elf_entryname) {
+        pe->start_symbol = start_symbol = s1->elf_entryname;
+    } else {
+        pe->start_symbol = start_symbol + 1;
+        if (!s1->leading_underscore || strchr(start_symbol, '@'))
+            ++start_symbol;
+    }
 
 #ifdef CONFIG_TCC_BACKTRACE
     if (s1->do_backtrace) {
@@ -1963,14 +1972,13 @@ static void pe_add_runtime(TCCState *s1, struct pe_info *pe)
             tcc_add_support(s1, "bt-dll.o");
         if (s1->output_type != TCC_OUTPUT_DLL)
             tcc_add_support(s1, "bt-log.o");
-        if (s1->output_type != TCC_OUTPUT_MEMORY)
-            tcc_add_btstub(s1);
+        tcc_add_btstub(s1);
     }
 #endif
 
     /* grab the startup code from libtcc1.a */
 #ifdef TCC_IS_NATIVE
-    if (TCC_OUTPUT_MEMORY != s1->output_type || s1->runtime_main)
+    if (TCC_OUTPUT_MEMORY != s1->output_type || s1->run_main)
 #endif
     set_global_sym(s1, start_symbol, NULL, 0);
 
@@ -2056,8 +2064,8 @@ ST_FUNC int pe_output_file(TCCState *s1, const char *filename)
 #ifdef CONFIG_TCC_BCHECK
     tcc_add_bcheck(s1);
 #endif
-    tcc_add_pragma_libs(s1);
     pe_add_runtime(s1, &pe);
+    tcc_add_pragma_libs(s1);
     resolve_common_syms(s1);
     pe_set_options(s1, &pe);
     pe_check_symbols(&pe);
@@ -2078,7 +2086,7 @@ ST_FUNC int pe_output_file(TCCState *s1, const char *filename)
 #ifdef TCC_IS_NATIVE
         pe.thunk = data_section;
         pe_build_imports(&pe);
-        s1->runtime_main = pe.start_symbol;
+        s1->run_main = pe.start_symbol;
 #ifdef TCC_TARGET_X86_64
         s1->uw_pdata = find_section(s1, ".pdata");
 #endif
