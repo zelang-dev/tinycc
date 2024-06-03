@@ -2,7 +2,7 @@ name: build and test
 
 on:
   push:
-    branches: [ mob ]
+    branches: [ master ]
 
 jobs:
   test-x86_64-linux:
