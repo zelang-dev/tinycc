@@ -59,7 +59,7 @@ typedef struct rt_frame {
     void *ip, *fp, *sp;
 } rt_frame;
 
-#ifdef CONFIG_TCC_BACKTRACE_ONLY
+#ifndef _WIN32
     __attribute__((noreturn)) void __rt_exit(rt_frame *, int);
 #endif
 
@@ -70,7 +70,7 @@ void exit(int code)
     __run_on_exit(code);
     f.fp = 0;
     f.ip = exit;
-#ifdef CONFIG_TCC_BACKTRACE_ONLY
+#ifndef _WIN32
     __rt_exit(&f, code);
 #endif
 }

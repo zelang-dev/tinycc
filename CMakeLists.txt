@@ -190,6 +190,8 @@ target_compile_definitions(libtcc
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
 
 if(WIN32)
+    list(REMOVE_ITEM CODE_GENERATOR_SRCS ${TCC_DIR}/tccrun.c)
+    list(REMOVE_ITEM CODE_GENERATOR_SRCS ${TCC_DIR}/tcctools.c)
     target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
     if( ${TARGET_ARCH} STREQUAL arm64 )
         target_compile_definitions(libtcc PUBLIC
@@ -299,7 +301,6 @@ add_custom_command(
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
 set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
-set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
 
 set( I386_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
@@ -329,7 +330,7 @@ set( WIN_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/win32/lib/crt1.c
  ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
  ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c
- ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
+ ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c ${TCC_DIR}/lib/runmain.c )
 
 set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 
@@ -381,7 +382,6 @@ else()
   endif()
 endif()
 
-list(APPEND LIB_SRCFILES ${EXTRA_O})
 # compile C files to object files
 file(MAKE_DIRECTORY ${LIB_DIR})
 foreach(LIB_SRCFILE ${LIB_SRCFILES})
@@ -425,7 +425,7 @@ list(APPEND LIB_OBJFILES ${LIB_DIR}/cthread.o)
 # link all objects files to archive file
 add_custom_target(
     libarchive ALL
-    tcc -ar ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a ${LIB_OBJFILES}
+    tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a ${LIB_OBJFILES}
     DEPENDS ${LIB_OBJFILES}
     BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a
     COMMENT "Linking Runtime Library"
@@ -548,7 +548,7 @@ foreach(X ${TCC_X})
     # link all objects files to archive file
     add_custom_target(
         ${X}_libarchive ALL
-        ${tcc_cross} -ar ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a ${CROSS_OBJFILES}
+        ${tcc_cross} -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a ${CROSS_OBJFILES}
         DEPENDS ${CROSS_OBJFILES}
         BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a
         COMMENT "Cross Linking Runtime Library - ${X}" )
