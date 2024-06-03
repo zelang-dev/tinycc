@@ -300,7 +300,7 @@ add_custom_command(
 
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
-set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/tcov.c )
+set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
 set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
 
 set( I386_O
@@ -338,8 +338,8 @@ set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 set( OBJ-i386 ${I386_O} ${BCHECK_O} ${DSO_O} )
 set( OBJ-x86_64 ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} ${DSO_O} )
 set( OBJ-x86_64-osx ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} )
-set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
-set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
+set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
+set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
 set( OBJ-arm64 ${ARM64_O} ${BCHECK_O} ${DSO_O} )
 set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
 set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
@@ -384,6 +384,7 @@ else()
 endif()
 
 # compile C files to object files
+list(REMOVE_ITEM LIB_SRCFILES ${EXTRA_O})
 file(MAKE_DIRECTORY ${LIB_DIR})
 foreach(LIB_SRCFILE ${LIB_SRCFILES})
     get_filename_component(LIB_SRCFILE_NOEXT ${LIB_SRCFILE} NAME_WE)
