@@ -300,7 +300,8 @@ add_custom_command(
 
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
-set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
+set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/tcov.c )
+set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
 
 set( I386_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
@@ -330,7 +331,7 @@ set( WIN_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/win32/lib/crt1.c
  ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
  ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c
- ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c ${TCC_DIR}/lib/runmain.c )
+ ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
 
 set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 
@@ -431,6 +432,17 @@ add_custom_target(
     COMMENT "Linking Runtime Library"
     SOURCES ${LIB_SRCFILES})
 install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+foreach(EXTRA_SRCFILE ${EXTRA_O})
+    get_filename_component(EXTRA_SRCFILE_NOEXT ${EXTRA_SRCFILE} NAME_WE)
+    add_custom_target(
+        ${EXTRA_SRCFILE_NOEXT} ALL
+        tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
+        VERBATIM
+        COMMENT "Compiling Runtime Library (${EXTRA_SRCFILE})"
+        SOURCES ${EXTRA_SRCFILE})
+    install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endforeach()
 
 # cross compiler targets and cross libtcc1.a to build
 if(WIN32 AND ${TARGET_ARCH} STREQUAL x86_64)
