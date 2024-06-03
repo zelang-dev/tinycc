@@ -30,6 +30,11 @@ message(STATUS "Installing to ${CMAKE_INSTALL_PREFIX}")
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_MODULE_PATH})
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
 
+cmake_dependent_option(BUILD_TESTING
+  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
+  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
+option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
+
 include(TargetArch)
 
 # Set target architectures
@@ -181,7 +186,15 @@ find_package (Threads)
 ################################################################################
 # TCC compiler as library
 
-add_library(libtcc STATIC ${CODE_GENERATOR_SRCS})
+if(BUILD_SHARED_LIBS)
+    add_library(libtcc SHARED ${CODE_GENERATOR_SRCS})
+    target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
+    set(CFG_BUILD )
+else()
+    add_library(libtcc STATIC ${CODE_GENERATOR_SRCS})
+    set(CFG_BUILD -s -DCONFIG_TCC_STATIC)
+endif()
+
 target_compile_definitions(libtcc
     PRIVATE ONE_SOURCE=0
     PUBLIC "${NATIVE_TARGET}="
@@ -190,9 +203,6 @@ target_compile_definitions(libtcc
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
 
 if(WIN32)
-    list(REMOVE_ITEM CODE_GENERATOR_SRCS ${TCC_DIR}/tccrun.c)
-    list(REMOVE_ITEM CODE_GENERATOR_SRCS ${TCC_DIR}/tcctools.c)
-    target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
     if( ${TARGET_ARCH} STREQUAL arm64 )
         target_compile_definitions(libtcc PUBLIC
             "TCC_TARGET_ARM="
@@ -390,7 +400,7 @@ foreach(LIB_SRCFILE ${LIB_SRCFILES})
     get_filename_component(LIB_SRCFILE_NOEXT ${LIB_SRCFILE} NAME_WE)
     add_custom_command(
         OUTPUT ${LIB_DIR}/${LIB_SRCFILE_NOEXT}.o
-        COMMAND tcc -s -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS}
+        COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
                     -c ${LIB_SRCFILE}
                     -o ${LIB_DIR}/${LIB_SRCFILE_NOEXT}.o
@@ -403,7 +413,7 @@ endforeach()
 if(WIN32)
     add_custom_command(
         OUTPUT ${LIB_DIR}/pthread.o
-        COMMAND tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+        COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
                     -c ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
                     -o ${LIB_DIR}/pthread.o
@@ -415,7 +425,7 @@ endif()
 
 add_custom_command(
     OUTPUT ${LIB_DIR}/cthread.o
-    COMMAND tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+    COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
             -L ${LIB_DIR}
             -c ${TCC_DIR}/cthread.c
             -o ${LIB_DIR}/cthread.o
@@ -438,7 +448,7 @@ foreach(EXTRA_SRCFILE ${EXTRA_O})
     get_filename_component(EXTRA_SRCFILE_NOEXT ${EXTRA_SRCFILE} NAME_WE)
     add_custom_target(
         ${EXTRA_SRCFILE_NOEXT} ALL
-        tcc -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
+        tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
         VERBATIM
         COMMENT "Compiling Runtime Library (${EXTRA_SRCFILE})"
         SOURCES ${EXTRA_SRCFILE})
@@ -447,7 +457,7 @@ endforeach()
 
 # cross compiler targets and cross libtcc1.a to build
 if(WIN32 AND ${TARGET_ARCH} STREQUAL x86_64)
-    set(TCC_X i386 x86_64 i386-win32 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
+    set(TCC_X x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
 elseif(WIN32 AND ${TARGET_ARCH} STREQUAL i386)
     set(TCC_X i386 arm)
 elseif(${TARGET_ARCH} STREQUAL i386)
@@ -547,7 +557,7 @@ foreach(X ${TCC_X})
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_pthread.o)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_cthread.o
-                COMMAND ${tcc_cross} -s -Ox -DCONFIG_TCC_STATIC -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DHAVE_CONFIG_H ${TCC_INCLUDE_DIRS}
+                COMMAND ${tcc_cross} -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DHAVE_CONFIG_H ${TCC_INCLUDE_DIRS}
                         -L ${LIB_DIR}
                         -c ${TCC_DIR}/cthread.c
                         -o ${LIB_DIR}/${X}_cthread.o
