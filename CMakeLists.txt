@@ -457,7 +457,7 @@ endforeach()
 
 # cross compiler targets and cross libtcc1.a to build
 if(WIN32 AND ${TARGET_ARCH} STREQUAL x86_64)
-    set(TCC_X x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
+    set(TCC_X i386 i386-win32 x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
 elseif(WIN32 AND ${TARGET_ARCH} STREQUAL i386)
     set(TCC_X i386 arm)
 elseif(${TARGET_ARCH} STREQUAL i386)
