@@ -138,6 +138,8 @@ set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev/tinycc")
 set(CPACK_PACKAGE_VERSION ${TCC_VERSION})
 set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/COPYING.txt)
 set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
+set(CPACK_NSIS_MENU_LINKS "share/doc/tcc/tinycc-docs.html"
+     "Tiny C Compiler Reference Documentation" "share/.tcc.bat" "Tiny C Command Prompt")
 include(CPack)
 
 # Set target and sources
