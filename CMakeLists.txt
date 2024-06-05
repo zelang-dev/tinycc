@@ -285,9 +285,7 @@ target_include_directories(libtcc
     PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/tcc-config)
 set_target_properties(libtcc PROPERTIES
     PREFIX ""
-    POSITION_INDEPENDENT_CODE ON
-    ARCHIVE_OUTPUT_DIRECTORY_DEBUG "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}"
-    ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}")
+    POSITION_INDEPENDENT_CODE ON)
 
 ################################################################################
 # TCC compiler as executable
