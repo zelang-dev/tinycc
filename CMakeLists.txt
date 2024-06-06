@@ -458,9 +458,13 @@ install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a DESTINA
 
 foreach(EXTRA_SRCFILE ${EXTRA_O})
     get_filename_component(EXTRA_SRCFILE_NOEXT ${EXTRA_SRCFILE} NAME_WE)
+    set(BFLAGS )
+    if(${EXTRA_SRCFILE} STREQUAL ${BCHECK_O} )
+        set(BFLAGS -bt)
+    endif()
     add_custom_target(
         ${EXTRA_SRCFILE_NOEXT} ALL
-        tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
+        tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
         VERBATIM
         COMMENT "Compiling Runtime Library (${EXTRA_SRCFILE})"
         SOURCES ${EXTRA_SRCFILE})
