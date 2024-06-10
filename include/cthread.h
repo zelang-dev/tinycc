@@ -403,6 +403,8 @@ extern "C" {
                 thrd_##var##_tls = sizeof(type);    \
                 if (tss_create(&thrd_##var##_tss, C11_FREE) == thrd_success)	\
                     atexit(var##_delete);   \
+                else                        \
+                    goto err;			    \
             }								\
             void *ptr = tss_get(thrd_##var##_tss);  \
             if (ptr == NULL) {                      \
@@ -417,14 +419,16 @@ extern "C" {
             return NULL;                    \
         }
 
-#define thrd_local_delete(type, var)        \
-        void var##_delete(void) {           \
-            void *ptr = tss_get(thrd_##var##_tss);  \
-            if (ptr != NULL)                \
-                C11_FREE(ptr);              \
-            tss_delete(thrd_##var##_tss);   \
-            thrd_##var##_tss = 0;           \
-            thrd_##var##_tls = 0;           \
+#define thrd_local_delete(type, var)            \
+        void var##_delete(void) {               \
+            if(thrd_##var##_tls == 0) {         \
+                void *ptr = tss_get(thrd_##var##_tss);  \
+                if (ptr != NULL)                \
+                    C11_FREE(ptr);              \
+                tss_delete(thrd_##var##_tss);   \
+                thrd_##var##_tss = 0;           \
+                thrd_##var##_tls = 0;           \
+            }                                   \
         }
 
 /* Initialize and setup thread local storage `var name` as functions. */
