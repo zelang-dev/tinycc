@@ -89,7 +89,6 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # ifndef va_copy
 #  define va_copy(a,b) a = b
 # endif
-# undef CONFIG_TCC_STATIC
 #endif
 
 #ifndef O_BINARY
@@ -487,7 +486,7 @@ typedef int nwchar_t;
 typedef struct CString {
     int size; /* size in bytes */
     int size_allocated;
-    void *data; /* either 'char *' or 'nwchar_t *' */
+    char *data; /* nwchar_t* in cases */
 } CString;
 
 /* type definition */
@@ -503,7 +502,7 @@ typedef union CValue {
     float f;
     uint64_t i;
     struct {
-        const void *data;
+        char *data;
         int size;
     } str;
     int tab[LDOUBLE_SIZE/4];
@@ -1157,7 +1156,7 @@ struct filespec {
 #define TOK_TWODOTS 0xa2 /* C++ token ? */
 #define TOK_TWOSHARPS 0xa3 /* ## preprocessing token */
 #define TOK_PLCHLDR 0xa4 /* placeholder token as defined in C99 */
-#define TOK_PPJOIN  0xa6 /* A '##' in the right position to mean pasting */
+#define TOK_PPJOIN  (TOK_TWOSHARPS | SYM_FIELD) /* A '##' in a macro to mean pasting */
 #define TOK_SOTYPE  0xa7 /* alias of '(' for parsing sizeof (type) */
 
 /* assignment operators */
@@ -1253,8 +1252,8 @@ ST_FUNC void libc_free(void *ptr);
 PUB_FUNC int _tcc_error_noabort(const char *fmt, ...) PRINTF_LIKE(1,2);
 PUB_FUNC NORETURN void _tcc_error(const char *fmt, ...) PRINTF_LIKE(1,2);
 PUB_FUNC void _tcc_warning(const char *fmt, ...) PRINTF_LIKE(1,2);
-#define tcc_internal_error(msg) tcc_error("internal compiler error\n"\
-        "%s:%d: in %s(): " msg, __FILE__,__LINE__,__FUNCTION__)
+#define tcc_internal_error(msg) \
+    tcc_error("internal compiler error in %s:%d: %s", __FUNCTION__,__LINE__,msg)
 
 /* other utilities */
 ST_FUNC void dynarray_add(void *ptab, int *nb_ptr, void *data);
@@ -1391,6 +1390,7 @@ ST_FUNC void define_undef(Sym *s);
 ST_INLN Sym *define_find(int v);
 ST_FUNC void free_defines(Sym *b);
 ST_FUNC void parse_define(void);
+ST_FUNC void skip_to_eol(int warn);
 ST_FUNC void preprocess(int is_bof);
 ST_FUNC void next(void);
 ST_INLN void unget_tok(int last_tok);
@@ -1398,6 +1398,7 @@ ST_FUNC void preprocess_start(TCCState *s1, int filetype);
 ST_FUNC void preprocess_end(TCCState *s1);
 ST_FUNC void tccpp_new(TCCState *s);
 ST_FUNC void tccpp_delete(TCCState *s);
+ST_FUNC void tccpp_putfile(const char *filename);
 ST_FUNC int tcc_preprocess(TCCState *s1);
 ST_FUNC void skip(int c);
 ST_FUNC NORETURN void expect(const char *msg);
@@ -1823,7 +1824,7 @@ ST_FUNC void tcc_debug_start(TCCState *s1);
 ST_FUNC void tcc_debug_end(TCCState *s1);
 ST_FUNC void tcc_debug_bincl(TCCState *s1);
 ST_FUNC void tcc_debug_eincl(TCCState *s1);
-ST_FUNC void tcc_debug_putfile(TCCState *s1, const char *filename);
+ST_FUNC void tcc_debug_newfile(TCCState *s1);
 
 ST_FUNC void tcc_debug_line(TCCState *s1);
 ST_FUNC void tcc_add_debug_info(TCCState *s1, int param, Sym *s, Sym *e);
