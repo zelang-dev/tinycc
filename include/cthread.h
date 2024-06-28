@@ -7,7 +7,8 @@
     #endif
 #endif
 
-#ifdef __TINYC__
+#if defined(__TINYC__) || defined(USE_EMULATED_TLS)
+    #undef emulate_tls
     #define emulate_tls 1
 #elif !defined(thread_local) /* User can override thread_local for obscure compilers */
      /* Running in multi-threaded environment */
@@ -49,7 +50,7 @@
 extern "C" {
 #endif
 
-    /* Which platform are we on? */
+/* Which platform are we on? */
 #if !defined(_CTHREAD_PLATFORM_DEFINED_)
 #if defined(_WIN32) || defined(__WIN32__) || defined(__WINDOWS__)
     #define _CTHREAD_WIN32_
@@ -62,17 +63,17 @@ extern "C" {
 /* Activate some POSIX functionality (e.g. clock_gettime and recursive mutexes) */
 #if defined(_CTHREAD_POSIX_)
 #undef _FEATURES_H
-#if !defined(_GNU_SOURCE)
-#define _GNU_SOURCE
-#endif
-#if !defined(_POSIX_C_SOURCE) || ((_POSIX_C_SOURCE - 0) < 199309L)
-#undef _POSIX_C_SOURCE
-#define _POSIX_C_SOURCE 199309L
-#endif
-#if !defined(_XOPEN_SOURCE) || ((_XOPEN_SOURCE - 0) < 500)
-#undef _XOPEN_SOURCE
-#define _XOPEN_SOURCE 500
-#endif
+    #if !defined(_GNU_SOURCE)
+        #define _GNU_SOURCE
+    #endif
+    #if !defined(_POSIX_C_SOURCE) || ((_POSIX_C_SOURCE - 0) < 199309L)
+        #undef _POSIX_C_SOURCE
+        #define _POSIX_C_SOURCE 199309L
+    #endif
+    #if !defined(_XOPEN_SOURCE) || ((_XOPEN_SOURCE - 0) < 500)
+        #undef _XOPEN_SOURCE
+        #define _XOPEN_SOURCE 500
+    #endif
 #define _XPG6
 #endif
 
@@ -90,8 +91,8 @@ extern "C" {
 #elif defined(_CTHREAD_WIN32_)
     #include <windows.h>
     #include <sys/timeb.h>
-    #include <time.h>
 #endif
+#include <time.h>
 
 /* Compiler-specific information */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
@@ -303,8 +304,15 @@ int thrd_join(thrd_t thr, int *res);
 /** Put the calling thread to sleep.
 * Suspend execution of the calling thread.
 * @param duration  Interval to sleep for
+* @param remaining If non-NULL, this parameter will hold the remaining
+*                  time until time_point upon return. This will
+*                  typically be zero, but if the thread was woken up
+*                  by a signal that is not ignored before duration was
+*                  reached @c remaining will hold a positive time.
+* @return 0 (zero) on successful sleep, -1 if an interrupt occurred,
+*         or a negative value if the operation fails.
 */
-int thrd_sleep(const struct timespec *);
+int thrd_sleep(const struct timespec *duration, struct timespec *remaining);
 
 /** Yield execution to another thread.
 * Permit other threads to run, even if the current thread would ordinarily
@@ -373,6 +381,12 @@ int tss_set(tss_t key, void *val);
 #endif /* HAS_C11_THREADS */
 #endif /* _CTHREAD_H_ */
 
+#if defined(__APPLE__) || defined(__MACH__)
+#include <mach/clock.h>
+#include <mach/mach.h>
+int timespec_get(struct timespec *ts, int base);
+#endif
+
 #ifndef _CTHREAD_EXTRA_H_
 #define _CTHREAD_EXTRA_H_
 
@@ -397,14 +411,16 @@ extern "C" {
     #define C_API extern
 #endif
 
-#define thrd_local_get(type, var)           \
+#ifndef thrd_local
+#ifdef emulate_tls
+#   define thrd_local_get(type, var)        \
         type* var(void) {                   \
             if (thrd_##var##_tls == 0) {	\
                 thrd_##var##_tls = sizeof(type);    \
                 if (tss_create(&thrd_##var##_tss, C11_FREE) == thrd_success)	\
                     atexit(var##_delete);   \
                 else                        \
-                    goto err;			    \
+                      goto err;			    \
             }								\
             void *ptr = tss_get(thrd_##var##_tss);  \
             if (ptr == NULL) {                      \
@@ -419,9 +435,9 @@ extern "C" {
             return NULL;                    \
         }
 
-#define thrd_local_delete(type, var)            \
+#   define thrd_local_delete(type, var)         \
         void var##_delete(void) {               \
-            if(thrd_##var##_tls == 0) {         \
+            if (thrd_##var##_tls == 0) {        \
                 void *ptr = tss_get(thrd_##var##_tss);  \
                 if (ptr != NULL)                \
                     C11_FREE(ptr);              \
@@ -431,24 +447,48 @@ extern "C" {
             }                                   \
         }
 
-/* Initialize and setup thread local storage `var name` as functions. */
-#define thrd_local(type, var)           \
-        int thrd_##var##_tls = 0;       \
-        tss_t thrd_##var##_tss = 0;     \
-        thrd_local_delete(type, var)    \
+    /* Initialize and setup thread local storage `var name` as functions. */
+#   define thrd_local(type, var)            \
+        static type thrd_##var##_buffer;    \
+        int thrd_##var##_tls = 0;           \
+        tss_t thrd_##var##_tss = 0;         \
+        thrd_local_delete(type, var)        \
         thrd_local_get(type, var)
 
-#define thrd_local_proto(type, var, prefix) \
+#   define thrd_local_proto(type, var, prefix) \
         prefix int thrd_##var##_tls;        \
         prefix tss_t thrd_##var##_tss;      \
-        prefix type* var(void);       \
+        prefix type* var(void);             \
         prefix void var##_delete(void);
 
-/* Creates a compile time thread local storage variable */
-#define thrd_local_create(type, var) thrd_local_proto(type, var, C_API)
+#   define thrd_local_return(type, var)    return (type *)tss_get(thrd_##var##_tss);
+
+    /* Creates a compile time thread local storage variable */
+#   define thrd_local_create(type, var) thrd_local_proto(type, var, C_API)
+#else
+#   define thrd_local_return(type, var)    return (type *)thrd_##var##_tls;
+#   define thrd_local_get(type, var)        \
+        type* var(void) {                   \
+            if (thrd_##var##_tls == NULL)   \
+                thrd_##var##_tls = &thrd_##var##_buffer;    \
+            thrd_local_return(type, var)    \
+        }
+
+#   define thrd_local(type, var)                        \
+        static thread_local type thrd_##var##_buffer;   \
+        thread_local type* thrd_##var##_tls = NULL;     \
+        thrd_local_get(type, var)
+
+#   define thrd_local_proto(type, var, prefix)      \
+        prefix thread_local type* thrd_##var##_tls; \
+        prefix type* var(void);
+
+#   define thrd_local_create(type, var) thrd_local_proto(type, var, C_API)
+#endif
+#endif /* thrd_local */
 
 #ifndef MAX_THREADS
-    #define MAX_THREADS 32
+    #define MAX_THREADS 64
     #define MAX_QUEUE 256
 #endif
 
@@ -488,7 +528,7 @@ int thrd_add(thrd_pool_t *pool, void (*routine)(void *), void *arg);
  * @param pool  Thread pool to destroy.
  * @param flags Flags for shutdown
  *
- * Known values for flags are 0 (default) and pool_graceful in
+ * Known values for flags are 0 (default) and `pool_graceful` in
  * which case the thread pool doesn't accept any new tasks but
  * processes all pending tasks before shutdown.
  */

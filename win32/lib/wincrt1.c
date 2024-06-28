@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <stdlib.h>
+#include "rpmalloc.h"
 
 #define __UNKNOWN_APP    0
 #define __CONSOLE_APP    1

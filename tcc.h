@@ -27,6 +27,7 @@
 
 #include <stdarg.h>
 #include <stdlib.h>
+#include "rpmalloc.h"
 #include <stdio.h>
 /* gnu headers use to #define __attribute__ to empty for non-gcc compilers */
 #ifdef __TINYC__
@@ -1244,9 +1245,6 @@ PUB_FUNC char *tcc_strdup_debug(const char *str, const char *file, int line);
 #endif
 
 ST_FUNC void libc_free(void *ptr);
-#define free(p) use_tcc_free(p)
-#define malloc(s) use_tcc_malloc(s)
-#define realloc(p, s) use_tcc_realloc(p, s)
 #undef strdup
 #define strdup(s) use_tcc_strdup(s)
 PUB_FUNC int _tcc_error_noabort(const char *fmt, ...) PRINTF_LIKE(1,2);

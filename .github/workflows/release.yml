@@ -34,7 +34,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Packaging/tcc-0.9.28rc-${{ matrix.config.build }}.exe
+          file: built/Package/tcc-0.9.28rc-${{ matrix.config.build }}.exe
           asset_name: TinyCC-0.9.28rc_cross-compiler-${{ matrix.config.build }}.exe
           tag: ${{ github.ref }}
           overwrite: true
@@ -63,7 +63,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Packaging/xxx.dmg
+          file: built/Package/xxx.dmg
           asset_name: TinyCC-0.9.28rc_cross-compiler-xxx.dmg
           tag: ${{ github.ref }}
           overwrite: true
@@ -101,7 +101,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Packaging/xxx.deb
+          file: built/Package/xxx.deb
           asset_name: TinyCC-0.9.28rc_cross-compiler-xxx.deb
           tag: ${{ github.ref }}
           overwrite: true

@@ -23,6 +23,7 @@ SET(CPACK_WIX_COMPONENT_INSTALL ON)
 SET(CPACK_NSIS_MODIFY_PATH ON)
 SET(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 1)
 set(CPACK_VERBATIM_VARIABLES YES)
+set(CPACK_INSTALL_CMAKE_CONFIGURATIONS Release)
 
 set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 
@@ -55,12 +56,13 @@ set(TCC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(LIB_DIR ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
-set(CPACK_PACKAGE_DIRECTORY "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/Packaging")
+set(CPACK_PACKAGE_DIRECTORY "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/Package")
 set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY tcc)
 
 enable_testing()
 set( CORE_FILES
+    ${TCC_DIR}/threads/rpmalloc.c
     ${TCC_DIR}/tcctools.c
     ${TCC_DIR}/libtcc.c
     ${TCC_DIR}/tccpp.c
@@ -427,11 +429,11 @@ if(WIN32)
         OUTPUT ${LIB_DIR}/pthread.o
         COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
-                    -c ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
+                    -c ${TCC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/pthread.o
-        MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
+        MAIN_DEPENDENCY ${TCC_DIR}/threads/deps/pthread-JMP.c
         VERBATIM
-        COMMENT "Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread-JMP.c)")
+        COMMENT "Compiling Runtime Library (${TCC_DIR}/threads/deps/pthread-JMP.c)")
     list(APPEND LIB_OBJFILES ${LIB_DIR}/pthread.o)
 endif()
 
@@ -439,11 +441,11 @@ add_custom_command(
     OUTPUT ${LIB_DIR}/cthread.o
     COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
             -L ${LIB_DIR}
-            -c ${TCC_DIR}/cthread.c
+            -c ${TCC_DIR}/threads/cthread.c
             -o ${LIB_DIR}/cthread.o
-    MAIN_DEPENDENCY ${TCC_DIR}/cthread.c
+    MAIN_DEPENDENCY ${TCC_DIR}/threads/cthread.c
     VERBATIM
-    COMMENT "Compiling Runtime Library (${TCC_DIR}/cthread.c)")
+    COMMENT "Compiling Runtime Library (${TCC_DIR}/threads/cthread.c)")
 list(APPEND LIB_OBJFILES ${LIB_DIR}/cthread.o)
 
 # link all objects files to archive file
@@ -564,23 +566,23 @@ foreach(X ${TCC_X})
                 OUTPUT ${LIB_DIR}/${X}_pthread.o
                 COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
-                    -c ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
+                    -c ${TCC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/${X}_pthread.o
-                MAIN_DEPENDENCY ${TCC_DIR}/win32/pthreads4w/pthread-JMP.c
+                MAIN_DEPENDENCY ${TCC_DIR}/threads/deps/pthread-JMP.c
                 DEPENDS ${tcc_cross}
                 VERBATIM
-                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/win32/pthreads4w/pthread-JMP.c)")
+                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/threads/deps/pthread-JMP.c)")
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_pthread.o)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_cthread.o
                 COMMAND ${tcc_cross} -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DHAVE_CONFIG_H ${TCC_INCLUDE_DIRS}
                         -L ${LIB_DIR}
-                        -c ${TCC_DIR}/cthread.c
+                        -c ${TCC_DIR}/threads/cthread.c
                         -o ${LIB_DIR}/${X}_cthread.o
-                MAIN_DEPENDENCY ${TCC_DIR}/cthread.c
+                MAIN_DEPENDENCY ${TCC_DIR}/threads/cthread.c
                 DEPENDS ${tcc_cross}
                 VERBATIM
-                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/cthread.c)")
+                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/threads/cthread.c)")
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_cthread.o)
     endif()
 
@@ -599,19 +601,17 @@ endforeach()
 add_subdirectory(tests)
 
 if(WIN32)
-  file(GLOB WIN32_DEFS win32/lib/*.def)
-  install(FILES ${WIN32_DEFS} DESTINATION lib)
-  install(FILES tcclib.h libtcc.h DESTINATION include)
-  install(DIRECTORY include/ DESTINATION include)
-  install(DIRECTORY win32/include/ DESTINATION include)
+    file(GLOB WIN32_DEFS win32/lib/*.def)
+    install(FILES ${WIN32_DEFS} DESTINATION lib)
+    install(FILES tcclib.h libtcc.h DESTINATION include)
+    install(DIRECTORY include/ DESTINATION include)
+    install(DIRECTORY win32/include/ DESTINATION include)
+    install(FILES .tcc.bat .tccVar.bat .tccVar32.bat DESTINATION ${CMAKE_INSTALL_DATADIR})
 else()
-  install(FILES libtcc.h tcclib.h DESTINATION include)
-  install(DIRECTORY include/ DESTINATION lib/tcc/include)
-  install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32/include)
-  install(DIRECTORY include/ DESTINATION lib/tcc/win32/include)
+    install(FILES libtcc.h tcclib.h DESTINATION include)
+    install(DIRECTORY include/ DESTINATION lib/tcc/include)
+    install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32/include)
+    install(DIRECTORY include/ DESTINATION lib/tcc/win32/include)
 endif()
 
 install(FILES tinycc-docs.html DESTINATION ${CMAKE_INSTALL_DOCDIR})
-install(FILES .tcc.bat DESTINATION ${CMAKE_INSTALL_DATADIR})
-install(FILES .tccVar.bat DESTINATION ${CMAKE_INSTALL_DATADIR})
-install(FILES .tccVar32.bat DESTINATION ${CMAKE_INSTALL_DATADIR})

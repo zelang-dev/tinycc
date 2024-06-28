@@ -7,7 +7,7 @@
 #define _WSPIAPI_H_
 
 #include <stdio.h>
-#include <stdlib.h>
+#include "rpmalloc.h"
 #include <malloc.h>
 #include <string.h>
 #include <ws2tcpip.h>

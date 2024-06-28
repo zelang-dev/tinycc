@@ -27,6 +27,21 @@ int mtx_lock(mtx_t *mtx) {
     return pthread_mutex_lock(mtx) == 0 ? thrd_success : thrd_error;
 }
 
+#if defined(__APPLE__) || defined(__MACH__)
+int timespec_get(struct timespec *ts, int base) {
+    clock_serv_t cclock;
+    mach_timespec_t mts;
+
+    host_get_clock_service(mach_host_self(), CALENDAR_CLOCK, &cclock);
+    clock_get_time(cclock, &mts);
+    mach_port_deallocate(mach_task_self(), cclock);
+    ts->tv_sec = mts.tv_sec;
+    ts->tv_nsec = mts.tv_nsec;
+
+    return base;
+}
+#endif
+
 int mtx_timedlock(mtx_t *mtx, const struct timespec *ts) {
     if (!mtx || !ts)
         return thrd_error;
@@ -35,11 +50,40 @@ int mtx_timedlock(mtx_t *mtx, const struct timespec *ts) {
     int rt;
     tts.tv_sec = ts->tv_sec;
     tts.tv_nsec = ts->tv_nsec;
+
+#if defined(_WIN32) || (defined(_POSIX_TIMEOUTS) && (_POSIX_TIMEOUTS >= 200112L) && defined(_POSIX_THREADS) && (_POSIX_THREADS >= 200112L))
     rt = pthread_mutex_timedlock(mtx, &tts);
+#else
+    struct timespec cur, dur;
+
+    /* Try to acquire the lock and, if we fail, sleep for 5ms. */
+    while ((rt = pthread_mutex_trylock(mtx)) == EBUSY) {
+        timespec_get(&cur, TIME_UTC);
+
+        if ((cur.tv_sec > ts->tv_sec) || ((cur.tv_sec == ts->tv_sec) && (cur.tv_nsec >= ts->tv_nsec))) {
+            break;
+        }
+
+        dur.tv_sec = ts->tv_sec - cur.tv_sec;
+        dur.tv_nsec = ts->tv_nsec - cur.tv_nsec;
+        if (dur.tv_nsec < 0) {
+            dur.tv_sec--;
+            dur.tv_nsec += 1000000000;
+        }
+
+        if ((dur.tv_sec != 0) || (dur.tv_nsec > 5000000)) {
+            dur.tv_sec = 0;
+            dur.tv_nsec = 5000000;
+        }
+
+        nanosleep(&dur, NULL);
+    }
+#endif
+
     if (rt == 0)
         return thrd_success;
 
-    return (rt == ETIMEDOUT) ? thrd_timedout : thrd_error;
+    return (rt == ETIMEDOUT || rt == EBUSY) ? thrd_timedout : thrd_error;
 }
 
 int mtx_trylock(mtx_t *mtx) {
@@ -152,14 +196,12 @@ int thrd_join(thrd_t thr, int *res) {
     return thrd_success;
 }
 
-int thrd_sleep(const struct timespec *ms) {
+int thrd_sleep(const struct timespec *duration, struct timespec *remaining) {
+    (void)remaining;
 #if !defined(_CTHREAD_WIN32_)
-    struct timespec req;
-    req.tv_sec = ms->tv_sec;
-    req.tv_nsec = ms->tv_nsec;
-    nanosleep(&req, NULL);
+    nanosleep(duration, NULL);
 #else
-    Sleep(time2msec(ms));
+    Sleep(time2msec(duration));
 #endif
 
     return thrd_success;
@@ -192,5 +234,6 @@ int tss_set(tss_t key, void *val) {
 
     return thrd_success;
 }
-#include "cthread_pool.c"
 #endif /* HAS_C11_THREADS */
+
+#include "cthread_pool.c"

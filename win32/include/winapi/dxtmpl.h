@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
+#include "rpmalloc.h"
 #include <search.h>
 
 #define DXASSERT_VALID(pObj)
