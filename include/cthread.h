@@ -77,9 +77,6 @@ extern "C" {
 #define _XPG6
 #endif
 
-/* Generic includes */
-#include <pthread.h>
-
 /* Platform specific includes */
 #if defined(_CTHREAD_POSIX_)
     #include <signal.h>
@@ -88,9 +85,11 @@ extern "C" {
     #include <sys/time.h>
     #include <errno.h>
     #include <limits.h>
+    #include <pthread.h>
 #elif defined(_CTHREAD_WIN32_)
     #include <windows.h>
     #include <sys/timeb.h>
+    #include "pthread.h"
 #endif
 #include <time.h>
 
