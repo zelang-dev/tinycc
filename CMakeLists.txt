@@ -409,6 +409,7 @@ endif()
 
 # compile C files to object files
 list(REMOVE_ITEM LIB_SRCFILES ${EXTRA_O})
+list(APPEND LIB_SRCFILES ${TCC_DIR}/threads/cmalloc.c)
 file(MAKE_DIRECTORY ${LIB_DIR})
 foreach(LIB_SRCFILE ${LIB_SRCFILES})
     get_filename_component(LIB_SRCFILE_NOEXT ${LIB_SRCFILE} NAME_WE)

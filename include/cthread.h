@@ -394,7 +394,7 @@ extern "C" {
 #endif
 
 #if !defined(C11_MALLOC) || !defined(C11_FREE) || !defined(C11_REALLOC)|| !defined(C11_CALLOC)
-    #include <stdlib.h>
+    #include "cmalloc.h"
     #define C11_MALLOC malloc
     #define C11_FREE free
     #define C11_REALLOC realloc

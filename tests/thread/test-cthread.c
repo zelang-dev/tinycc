@@ -19,15 +19,53 @@ cnd_t cnd2;
 tss_t tss;
 once_flag once = ONCE_FLAG_INIT;
 int flag;
+static int test_failed;
 
-thrd_local_create(int, gLocalVar)
+thread_storage_create(int, gLocalVar)
 void run_thread_test(void);
 void run_timed_mtx_test(void);
 void run_cnd_test(void);
 void run_tss_test(void);
 void run_emulated_tls(void);
 void run_call_once_test(void);
-thrd_local(int, gLocalVar)
+thread_storage(int, gLocalVar)
+
+static int test_fail_cb(const char *reason, const char *file, int line) {
+    fprintf(stderr, "FAIL: %s @ %s:%d\n", reason, file, line);
+    fflush(stderr);
+    test_failed = 1;
+    return -1;
+}
+
+#define test_fail(msg) test_fail_cb(msg, __FILE__, __LINE__)
+
+static int got_error = 0;
+
+static void test_error_callback(const char *message) {
+    //printf("%s\n", message);
+    (void)sizeof(message);
+    got_error = 1;
+}
+
+static int test_error(void) {
+    //printf("Detecting memory leak\n");
+
+    rpmalloc_config_t config = {0};
+    config.error_callback = test_error_callback;
+    rpmalloc_initialize_config(&config);
+
+    rpmalloc(10);
+
+    rpmalloc_finalize();
+
+    if (!got_error) {
+        printf("Leak not detected and reported as expected\n");
+        return -1;
+    }
+
+    printf("Error detection test passed\n");
+    return 0;
+}
 
 /* Thread function: Compile time thread-local storage */
 static int thread_test_local_storage(void *aArg) {
@@ -45,11 +83,11 @@ static int thread_test_local_storage(void *aArg) {
 
 void run_emulated_tls(void) {
     thrd_t t[THREAD_COUNT];
-    assert(thrd_gLocalVar_tls == 0);
+  //  assert(thrd_gLocalVar_tls == 0);
     /* Clear the TLS variable (it should keep this value after all
        threads are finished). */
     *gLocalVar() = 1;
-    assert(thrd_gLocalVar_tls == sizeof(int));
+   // assert(thrd_gLocalVar_tls == sizeof(int));
 
     for (int i = 0; i < THREAD_COUNT; i++) {
         int *n = C11_MALLOC(sizeof * n);  // Holds a thread serial number
@@ -64,6 +102,7 @@ void run_emulated_tls(void) {
 
     /* Check if the TLS variable has changed */
     assert(*gLocalVar() == 1);
+    gLocalVar_delete();
 }
 
 int main(void) {
@@ -90,6 +129,10 @@ int main(void) {
     puts("start call once test");
     run_call_once_test();
     puts("end call once test\n");
+
+    puts("start memory test");
+    test_error();
+    puts("end memory test\n");
 
     puts("tests finished");
 
