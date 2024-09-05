@@ -18,11 +18,11 @@ add_custom_target(
 add_test(NAME test-cthread COMMAND test-cthread WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
-    thread-tls ALL
-    COMMAND tcc ${TH_DIR}/thread-tls.c ${TH_CFLAGS}  ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/thread-tls${EXESUF}
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/thread-tls${EXESUF}
-    SOURCES ${TH_DIR}/thread-tls.c )
-add_test(NAME thread-tls COMMAND thread-tls WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    test-thread_local ALL
+    COMMAND tcc ${TH_DIR}/test-thread_local.c ${TH_CFLAGS}  ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test-thread_local${EXESUF}
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/test-thread_local${EXESUF}
+    SOURCES ${TH_DIR}/test-thread_local.c )
+add_test(NAME test-thread_local COMMAND test-thread_local WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
     atomicity-test ALL

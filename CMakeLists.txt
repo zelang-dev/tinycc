@@ -119,7 +119,7 @@ if (WIN32)
 endif()
 
 if(UNIX)
-  add_definitions(-Wall -O2 -lpthread -Wdeclaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result )
+  add_definitions(-Wall -O2 -lpthread -Wdeclaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
   if(NOT APPLE)
     add_definitions( -Wno-format-truncation -Wno-stringop-truncation )
   elseif(APPLE)
