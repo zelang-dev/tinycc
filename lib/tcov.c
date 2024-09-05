@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
 #include "rpmalloc.h"
 #include <fcntl.h>
 #ifndef _WIN32

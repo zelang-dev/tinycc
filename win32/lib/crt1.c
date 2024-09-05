@@ -6,7 +6,6 @@
 
 #include <windows.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include "rpmalloc.h"
 
 #define _UNKNOWN_APP    0

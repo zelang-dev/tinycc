@@ -1,5 +1,5 @@
-#include "cthread.h"
-#include <stdio.h>
+#include "thrd.h"
+
 #include <assert.h>
 
 #define THREAD 4

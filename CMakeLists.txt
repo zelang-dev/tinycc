@@ -113,9 +113,9 @@ if( HAVE_NOSTRICTALIASING )
 endif( HAVE_NOSTRICTALIASING )
 
 set (TCC_INCLUDE_DIRS -I${TCC_DIR}/include)
+set (TCC_CROSS_INCLUDE_DIRS -I${TCC_DIR}/win32/include -I${TCC_DIR}/win32/include/winapi)
 if (WIN32)
-    list(APPEND TCC_INCLUDE_DIRS
-            -I${TCC_DIR}/win32/include -I${TCC_DIR}/win32/include/winapi)
+    list(APPEND TCC_INCLUDE_DIRS ${TCC_CROSS_INCLUDE_DIRS})
 endif()
 
 if(UNIX)
@@ -325,48 +325,48 @@ add_custom_command(
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
 set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
-set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
+set( EXTRA_O ${TCC_DIR}/lib/tcov.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
 
 set( I386_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
  ${TCC_DIR}/lib/alloca-bt.S ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
 
 set( X86_64_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
  ${TCC_DIR}/lib/alloca-bt.S ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
 
 set( ARM_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/armeabi.c
  ${TCC_DIR}/lib/alloca.S ${TCC_DIR}/lib/armflush.c
  ${TCC_DIR}/lib/stdatomic.c ${TCC_DIR}/lib/atomic.S
- ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
 
 set( ARM64_O
  ${TCC_DIR}/lib/lib-arm64.c ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
 
 set( RISCV64_O
  ${TCC_DIR}/lib/lib-arm64.c ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
 
 set( WIN_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/win32/lib/crt1.c
  ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
  ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c
- ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
+ ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c ${TCC_DIR}/lib/runmain.c )
 
 set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 
-set( OBJ-i386 ${I386_O} ${BCHECK_O} ${DSO_O} )
-set( OBJ-x86_64 ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} ${DSO_O} )
-set( OBJ-x86_64-osx ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} )
-set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
-set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
-set( OBJ-arm64 ${ARM64_O} ${BCHECK_O} ${DSO_O} )
-set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
-set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
+set( OBJ-i386 ${I386_O} ${DSO_O} )
+set( OBJ-x86_64 ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${DSO_O} )
+set( OBJ-x86_64-osx ${X86_64_O} ${TCC_DIR}/lib/va_list.c )
+set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
+set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
+set( OBJ-arm64 ${ARM64_O} ${DSO_O} )
+set( OBJ-arm64-osx ${ARM64_O} )
+set( OBJ-arm ${ARM_O} ${DSO_O} )
 
 set( OBJ-arm-fpa ${ARM_O} ${DSO_O} )
 set( OBJ-arm-fpa-ld ${ARM_O} ${DSO_O} )
@@ -374,7 +374,7 @@ set( OBJ-arm-vfp ${ARM_O} ${DSO_O} )
 set( OBJ-arm-eabi ${ARM_O} ${DSO_O} )
 set( OBJ-arm-eabihf ${ARM_O} ${DSO_O} )
 set( OBJ-arm-wince ${ARM_O} ${WIN_O} )
-set( OBJ-riscv64 ${RISCV64_O} ${BCHECK_O} ${DSO_O} )
+set( OBJ-riscv64 ${RISCV64_O} ${DSO_O} )
 
 if (WIN32)
   if( ${TARGET_ARCH} STREQUAL i386 )
@@ -408,7 +408,6 @@ else()
 endif()
 
 # compile C files to object files
-list(REMOVE_ITEM LIB_SRCFILES ${EXTRA_O})
 list(APPEND LIB_SRCFILES ${TCC_DIR}/threads/cmalloc.c)
 file(MAKE_DIRECTORY ${LIB_DIR})
 foreach(LIB_SRCFILE ${LIB_SRCFILES})
@@ -459,6 +458,10 @@ add_custom_target(
     SOURCES ${LIB_SRCFILES})
 install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+if(UNIX)
+    list(REMOVE_ITEM EXTRA_O ${TCC_DIR}/lib/bt-dll.c)
+endif()
+
 foreach(EXTRA_SRCFILE ${EXTRA_O})
     get_filename_component(EXTRA_SRCFILE_NOEXT ${EXTRA_SRCFILE} NAME_WE)
     set(BFLAGS )
@@ -469,7 +472,7 @@ foreach(EXTRA_SRCFILE ${EXTRA_O})
         ${EXTRA_SRCFILE_NOEXT} ALL
         tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
         VERBATIM
-        COMMENT "Compiling Runtime Library (${EXTRA_SRCFILE})"
+        COMMENT "Compiling Extra Runtime Library (${EXTRA_SRCFILE})"
         SOURCES ${EXTRA_SRCFILE})
     install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o DESTINATION ${CMAKE_INSTALL_LIBDIR})
 endforeach()
@@ -490,16 +493,18 @@ endif()
 set(CROSS_TARGET_i386 TCC_TARGET_I386 CONFIG_TCC_CROSSPREFIX=\"i386-\"
  CONFIG_TCC_CRTPREFIX=\"/usr/i686-linux-gnu/lib\"
  CONFIG_TCC_LIBPATHS=\"{B}:/usr/i686-linux-gnu/lib\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/i686-linux-gnu/include\")
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/i686-linux-gnu/include:/usr/include\")
 
 set(CROSS_TARGET_x86_64 CONFIG_TRIPLET=\"x86_64-linux-gnu\"
  TCC_TARGET_X86_64 CONFIG_TCC_CROSSPREFIX=\"x86_64-\")
 
 set(CROSS_TARGET_i386-win32 TCC_TARGET_I386 TCC_TARGET_PE
- CONFIG_TCC_CROSSPREFIX=\"i386-win32-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc\")
+ CONFIG_TCC_CROSSPREFIX=\"i386-win32-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc\"
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/win32/include\")
 
 set(CROSS_TARGET_x86_64-win32 TCC_TARGET_X86_64 TCC_TARGET_PE
- CONFIG_TCC_CROSSPREFIX=\"x86_64-win32-\" CONFIG_TCCDIR=\"/usr/local/lc/win32\")
+ CONFIG_TCC_CROSSPREFIX=\"x86_64-win32-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\"
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/win32/include\")
 
 set(CROSS_TARGET_x86_64-osx TCC_TARGET_X86_64 TCC_TARGET_MACHO
  CONFIG_TCC_CROSSPREFIX=\"x86_64-osx-\")
@@ -508,20 +513,21 @@ set(CROSS_TARGET_arm TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT
  CONFIG_TCC_CROSSPREFIX=\"arm-\"
  CONFIG_TCC_CRTPREFIX=\"sr/arm-linux-gnueabi/lib\"
  CONFIG_TCC_LIBPATHS=\"{B}:/usr/arm-linux-gnueabi/lib\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/arm-linux-gnueablude\")
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/arm-linux-gnueablude/include:/usr/include\")
 
 set(CROSS_TARGET_arm64 TCC_TARGET_ARM64 CONFIG_TCC_CROSSPREFIX=\"arm64-\"
  CONFIG_TCC_CRTPREFIX=\"/usr/aarch64-linux-gnu/lib\"
  CONFIG_TBPATHS=\"{B}:/usr/aarch64-linux-gnu/lib\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/aarch64-linux-gnu/include\")
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/aarch64-linux-gnu/include:/usr/include\")
 
 set(CROSS_TARGET_arm-wince TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT TCC_TARGET_PE
- CONFIG_TCC_CROSSPREFIX=\"arm-wince-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\")
+ CONFIG_TCC_CROSSPREFIX=\"arm-wince-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\"
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/win32/include\")
 
 set(CROSS_TARGET_riscv64 TCC_TARGET_RISCV64 CONFIG_TCC_CROSSPREFIX=\"riscv64-\"
  CONFIG_TCC_CRTPREFIX=\"/usr/riscv64-linux-gnu/lib\"
  COTCC_LIBPATHS=\"{B}:/usr/riscv64-linux-gnu/lib\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/riscv64-linux-gnu/include\")
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/riscv64-linux-gnu/include:/usr/include\")
 
 set(CROSS_TARGET_arm64-osx TCC_TARGET_ARM64 TCC_TARGET_MACHO CONFIG_TCC_CROSSPREFIX=\"arm64-osx-\")
 
@@ -532,6 +538,12 @@ foreach(X ${TCC_X})
     set(tcc_cross ${X}-tcc)
     set(CROSS_SRCFILES ${OBJ-${X}})
     set(CROSS_TARGET ${CROSS_TARGET_${X}})
+    set(CROSS_INCLUDE ${TCC_DIR}/include)
+    if(${X} STREQUAL i386-win32
+        OR ${X} STREQUAL x86_64-win32
+        OR ${X} STREQUAL arm-wince)
+            set(CROSS_INCLUDE ${TCC_DIR}/include -I${TCC_DIR}/win32/include -I${TCC_DIR}/win32/include/winapi)
+    endif()
     add_executable(${tcc_cross} ${TCC_DIR}/tcc.c)
     target_compile_definitions(${tcc_cross} PUBLIC ${CROSS_TARGET})
     install(TARGETS ${tcc_cross} RUNTIME)
@@ -552,6 +564,7 @@ foreach(X ${TCC_X})
                 -L ${LIB_DIR}
                 -c ${CROSS_SRCFILE}
                 -o ${LIB_DIR}/${X}-${CROSS_SRCFILE_NOEXT}.o
+                -I ${CROSS_INCLUDE}
             MAIN_DEPENDENCY ${CROSS_SRCFILE}
             DEPENDS ${tcc_cross}
             VERBATIM
@@ -569,6 +582,7 @@ foreach(X ${TCC_X})
                     -L ${LIB_DIR}
                     -c ${TCC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/${X}_pthread.o
+                    -I ${CROSS_INCLUDE}
                 MAIN_DEPENDENCY ${TCC_DIR}/threads/deps/pthread-JMP.c
                 DEPENDS ${tcc_cross}
                 VERBATIM
@@ -580,6 +594,7 @@ foreach(X ${TCC_X})
                         -L ${LIB_DIR}
                         -c ${TCC_DIR}/threads/cthread.c
                         -o ${LIB_DIR}/${X}_cthread.o
+                        -I ${CROSS_INCLUDE}
                 MAIN_DEPENDENCY ${TCC_DIR}/threads/cthread.c
                 DEPENDS ${tcc_cross}
                 VERBATIM

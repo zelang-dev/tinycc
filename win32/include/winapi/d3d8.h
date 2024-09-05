@@ -23,7 +23,6 @@
 #define DIRECT3D_VERSION  0x0800
 #endif
 
-#include <stdlib.h>
 #include "rpmalloc.h"
 
 #define COM_NO_WINDOWS_H

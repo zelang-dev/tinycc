@@ -19,7 +19,6 @@
 #ifndef __WINE_D3D_H
 #define __WINE_D3D_H
 
-#include <stdlib.h>
 #include "rpmalloc.h"
 
 #define COM_NO_WINDOWS_H

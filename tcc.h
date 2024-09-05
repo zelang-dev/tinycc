@@ -26,7 +26,6 @@
 #include "config.h"
 
 #include <stdarg.h>
-#include <stdlib.h>
 #include "rpmalloc.h"
 #include <stdio.h>
 /* gnu headers use to #define __attribute__ to empty for non-gcc compilers */

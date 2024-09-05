@@ -1,8 +1,7 @@
 #define THREAD 32
 #define QUEUE  256
 
-#include "cthread.h"
-#include <stdio.h>
+#include "thrd.h"
 #include <assert.h>
 
 int tasks = 0, done = 0;

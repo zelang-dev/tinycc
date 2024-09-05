@@ -10,6 +10,9 @@
 #if defined(__TINYC__) || defined(USE_EMULATED_TLS)
     #undef emulate_tls
     #define emulate_tls 1
+    #ifndef thread_local
+        #define thread_local
+    #endif
 #elif !defined(thread_local) /* User can override thread_local for obscure compilers */
      /* Running in multi-threaded environment */
     #if defined(__STDC__) /* Compiling as C Language */
@@ -77,6 +80,9 @@ extern "C" {
 #define _XPG6
 #endif
 
+/* Generic includes */
+#include <pthread.h>
+
 /* Platform specific includes */
 #if defined(_CTHREAD_POSIX_)
     #include <signal.h>
@@ -85,13 +91,15 @@ extern "C" {
     #include <sys/time.h>
     #include <errno.h>
     #include <limits.h>
-    #include <pthread.h>
 #elif defined(_CTHREAD_WIN32_)
     #include <windows.h>
     #include <sys/timeb.h>
-    #include "pthread.h"
+#   ifndef usleep
+#       define  usleep(n) Sleep(n)
+#   endif
 #endif
 #include <time.h>
+#include <stdbool.h>
 
 /* Compiler-specific information */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
@@ -254,7 +262,6 @@ typedef int (*thrd_start_t)(void *arg);
 
 /** Create a new thread.
 * @param thr Identifier of the newly created thread.
-* @param stacksize The initial size of the stack, in bytes.
 * @param func A function pointer to the function that will be executed in
 *        the new thread.
 * @param arg An argument to the thread function.
@@ -393,31 +400,32 @@ int timespec_get(struct timespec *ts, int base);
 extern "C" {
 #endif
 
+#include "rpmalloc.h"
 #if !defined(C11_MALLOC) || !defined(C11_FREE) || !defined(C11_REALLOC)|| !defined(C11_CALLOC)
-    #include "cmalloc.h"
-    #define C11_MALLOC malloc
-    #define C11_FREE free
-    #define C11_REALLOC realloc
-    #define C11_CALLOC calloc
+#define C11_MALLOC malloc
+#define C11_FREE free
+#define C11_REALLOC realloc
+#define C11_CALLOC calloc
 #endif
 
 #ifndef TIME_UTC
 #define TIME_UTC 1
 #endif
 
-/* Public API qualifier. */
+    /* Public API qualifier. */
 #ifndef C_API
-    #define C_API extern
+#define C_API extern
 #endif
 
 #ifndef thrd_local
-#ifdef emulate_tls
-#   define thrd_local_get(type, var)        \
-        type* var(void) {                   \
-            if (thrd_##var##_tls == 0) {	\
-                thrd_##var##_tls = sizeof(type);    \
+#if defined(emulate_tls) || defined(__TINYC__)
+#   define thrd_local_return(type, var)    return (type *)tss_get(thrd_##var##_tss);
+#   define thrd_local_get(type, var, initial, prefix)   \
+        prefix type* var(void) {                        \
+            if (thrd_##var##_tls == 0) {	            \
+                thrd_##var##_tls = sizeof(type);        \
                 if (tss_create(&thrd_##var##_tss, C11_FREE) == thrd_success)	\
-                    atexit(var##_delete);   \
+                    atexit(var##_del);      \
                 else                        \
                       goto err;			    \
             }								\
@@ -434,55 +442,113 @@ extern "C" {
             return NULL;                    \
         }
 
-#   define thrd_local_delete(type, var)         \
-        void var##_delete(void) {               \
-            if (thrd_##var##_tls == 0) {        \
-                void *ptr = tss_get(thrd_##var##_tss);  \
-                if (ptr != NULL)                \
-                    C11_FREE(ptr);              \
-                tss_delete(thrd_##var##_tss);   \
-                thrd_##var##_tss = 0;           \
-                thrd_##var##_tls = 0;           \
-            }                                   \
+#   define thrd_local_del(type, var, initial, prefix)   \
+        prefix void var##_del(void) {       \
+            if (thrd_##var##_tls != 0) {    \
+                thrd_##var##_tls = 0;       \
+                C11_FREE(tss_get(thrd_##var##_tss));    \
+                tss_delete(thrd_##var##_tss);           \
+                thrd_##var##_tss = -1;      \
+            }                               \
+        }
+
+#   define thrd_local_setup(type, var, initial, prefix)     \
+        static type thrd_##var##_buffer;                    \
+        prefix int thrd_##var##_tls = 0;                    \
+        prefix tss_t thrd_##var##_tss = 0;                  \
+        thrd_local_del(type, var, initial, prefix)          \
+        prefix FORCEINLINE void var##_update(type value) {  \
+            *var() = value;                                 \
+        }                                                   \
+        prefix FORCEINLINE bool is_##var##_empty(void) {    \
+            return *(type *)tss_get(thrd_##var##_tss) == initial;     \
         }
 
     /* Initialize and setup thread local storage `var name` as functions. */
-#   define thrd_local(type, var)            \
-        static type thrd_##var##_buffer;    \
-        int thrd_##var##_tls = 0;           \
-        tss_t thrd_##var##_tss = 0;         \
-        thrd_local_delete(type, var)        \
-        thrd_local_get(type, var)
+#   define thrd_local(type, var, initial)       \
+        thrd_local_setup(type, var, initial, )  \
+        thrd_local_get(type, var, initial, )
 
-#   define thrd_local_proto(type, var, prefix) \
-        prefix int thrd_##var##_tls;        \
-        prefix tss_t thrd_##var##_tss;      \
-        prefix type* var(void);             \
-        prefix void var##_delete(void);
+#   define thrd_local_plain(type, var, initial) \
+        thrd_local_setup(type, var, initial, )  \
+        thrd_local_get(type, var, initial, )
 
-#   define thrd_local_return(type, var)    return (type *)tss_get(thrd_##var##_tss);
+#   define thrd_static(type, var, initial)      \
+        static type *var(void);                 \
+        static void var##_del(void);            \
+        static bool is_##var##_empty(void);     \
+        thrd_local_setup(type, var, initial, static)  \
+        thrd_local_get(type, var, initial, static)
 
-    /* Creates a compile time thread local storage variable */
-#   define thrd_local_create(type, var) thrd_local_proto(type, var, C_API)
+#   define thrd_static_plain(type, var, initial)    thrd_static(type, var, initial)
+
+#   define thrd_local_proto(type, var, prefix)  \
+        prefix int thrd_##var##_tls;            \
+        prefix tss_t thrd_##var##_tss;          \
+        prefix type var(void);                 \
+        prefix void var##_del(void);            \
+        prefix void var##_update(type value);  \
+        prefix bool is_##var##_empty(void);
+
+    /* Creates a `extern` compile time emulated/explict thread-local storage variable, pointer of type */
+#   define thrd_local_extern(type, var) thrd_local_proto(type *, var, C_API)
+    /* Creates a `extern` compile time emulated/explict thread-local storage variable, non-pointer of type */
+#   define thrd_local_external(type, var) thrd_local_proto(type, var, C_API)
 #else
-#   define thrd_local_return(type, var)    return (type *)thrd_##var##_tls;
-#   define thrd_local_get(type, var)        \
-        type* var(void) {                   \
-            if (thrd_##var##_tls == NULL)   \
+#   define thrd_local_return(type, var)    return (type)thrd_##var##_tls;
+#   define thrd_local_get(type, var, initial, prefix)       \
+        prefix FORCEINLINE type var(void) {     \
+            if (thrd_##var##_tls == initial) {  \
                 thrd_##var##_tls = &thrd_##var##_buffer;    \
-            thrd_local_return(type, var)    \
+                atexit(var##_del);              \
+            }                                   \
+            thrd_local_return(type, var)        \
         }
 
-#   define thrd_local(type, var)                        \
+#   define thrd_local_setup(type, var, initial, prefix)         \
+        prefix thread_local type thrd_##var##_tls = initial;    \
+        prefix FORCEINLINE void var##_del(void) {               \
+            thrd_##var##_tls = NULL;                            \
+        }                                                       \
+        prefix FORCEINLINE void var##_update(type value) {      \
+            thrd_##var##_tls = value;                           \
+        }                                                       \
+        prefix FORCEINLINE bool is_##var##_empty(void) {        \
+            return thrd_##var##_tls == initial;                 \
+        }
+
+    /* Initialize and setup thread local storage `var name` as functions. */
+#   define thrd_local(type, var, initial)               \
         static thread_local type thrd_##var##_buffer;   \
-        thread_local type* thrd_##var##_tls = NULL;     \
-        thrd_local_get(type, var)
+        thrd_local_setup(type *, var, initial, )        \
+        thrd_local_get(type *, var, initial, )
 
-#   define thrd_local_proto(type, var, prefix)      \
-        prefix thread_local type* thrd_##var##_tls; \
-        prefix type* var(void);
+#   define thrd_local_plain(type, var, initial)         \
+        static thread_local type thrd_##var##_buffer;   \
+        thrd_local_setup(type, var, initial, )          \
+        thrd_local_get(type, var, initial, )
 
-#   define thrd_local_create(type, var) thrd_local_proto(type, var, C_API)
+#   define thrd_static(type, var, initial)              \
+        static thread_local type thrd_##var##_buffer;   \
+        thrd_local_setup(type *, var, initial, static)  \
+        thrd_local_get(type *, var, initial, static)
+
+#   define thrd_static_plain(type, var, initial)        \
+        static thread_local type thrd_##var##_buffer;   \
+        thrd_local_setup(type, var, initial, static)    \
+        thrd_local_get(type, var, initial, static)
+
+#   define thrd_local_proto(type, var, prefix)          \
+        prefix thread_local type thrd_##var##_tls;      \
+        prefix void var##_del(void);                    \
+        prefix void var##_update(type value);           \
+        prefix bool is_##var##_empty(void);             \
+        prefix type var(void);
+
+    /* Creates a native `extern` compile time thread-local storage variable, pointer of type */
+#   define thrd_local_extern(type, var) thrd_local_proto(type *, var, C_API)
+    /* Creates a native `extern` compile time thread-local storage variable, non-pointer of type */
+#   define thrd_local_external(type, var) thrd_local_proto(type, var, C_API)
 #endif
 #endif /* thrd_local */
 
@@ -501,7 +567,8 @@ typedef enum {
 } pool_error_t;
 
 typedef enum {
-    pool_graceful       = 1
+    pool_graceful       = 1,
+    pool_kill           = 3
 } thrd_destroy_flags_t;
 
 /**
@@ -527,8 +594,8 @@ int thrd_add(thrd_pool_t *pool, void (*routine)(void *), void *arg);
  * @param pool  Thread pool to destroy.
  * @param flags Flags for shutdown
  *
- * Known values for flags are 0 (default) and `pool_graceful` in
- * which case the thread pool doesn't accept any new tasks but
+ * Known values for flags are 0 (default), `pool_kill` sends signal to immediately terminate,
+ * and `pool_graceful` in which case the thread pool doesn't accept any new tasks but
  * processes all pending tasks before shutdown.
  */
 int thrd_destroy(thrd_pool_t *pool, int flags);
