@@ -5,11 +5,8 @@
 #   define emulate_tls 1
 #endif
 
-#ifndef __TINYC__
-#   define __TINYC__ 1
-#endif
-
 #include "cthread.h"
+#include "catomic.h"
 #include <stdio.h>
 #include <stddef.h>
 #include <stdarg.h>

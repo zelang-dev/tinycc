@@ -119,7 +119,7 @@ if (WIN32)
 endif()
 
 if(UNIX)
-  add_definitions(-Wall -O2 -lpthread -Wdeclaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
+  add_definitions(-Wall -O2 -lpthread -Wno-declaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
   if(NOT APPLE)
     add_definitions( -Wno-format-truncation -Wno-stringop-truncation )
   elseif(APPLE)
@@ -325,48 +325,48 @@ add_custom_command(
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
 set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
-set( EXTRA_O ${TCC_DIR}/lib/tcov.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
+set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
 
 set( I386_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
  ${TCC_DIR}/lib/alloca-bt.S ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
 
 set( X86_64_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
  ${TCC_DIR}/lib/alloca-bt.S ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
 
 set( ARM_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/armeabi.c
  ${TCC_DIR}/lib/alloca.S ${TCC_DIR}/lib/armflush.c
  ${TCC_DIR}/lib/stdatomic.c ${TCC_DIR}/lib/atomic.S
- ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
+ ${TCC_DIR}/lib/builtin.c ${BT_O} )
 
 set( ARM64_O
  ${TCC_DIR}/lib/lib-arm64.c ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
 
 set( RISCV64_O
  ${TCC_DIR}/lib/lib-arm64.c ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${TCC_DIR}/lib/runmain.c )
+ ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
 
 set( WIN_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/win32/lib/crt1.c
  ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
  ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c
- ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c ${TCC_DIR}/lib/runmain.c )
+ ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
 
 set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
 
-set( OBJ-i386 ${I386_O} ${DSO_O} )
-set( OBJ-x86_64 ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${DSO_O} )
-set( OBJ-x86_64-osx ${X86_64_O} ${TCC_DIR}/lib/va_list.c )
-set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
-set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${WIN_O} )
-set( OBJ-arm64 ${ARM64_O} ${DSO_O} )
-set( OBJ-arm64-osx ${ARM64_O} )
-set( OBJ-arm ${ARM_O} ${DSO_O} )
+set( OBJ-i386 ${I386_O} ${BCHECK_O} ${DSO_O} )
+set( OBJ-x86_64 ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} ${DSO_O} )
+set( OBJ-x86_64-osx ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} )
+set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
+set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
+set( OBJ-arm64 ${ARM64_O} ${BCHECK_O} ${DSO_O} )
+set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
+set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
 
 set( OBJ-arm-fpa ${ARM_O} ${DSO_O} )
 set( OBJ-arm-fpa-ld ${ARM_O} ${DSO_O} )
@@ -374,7 +374,7 @@ set( OBJ-arm-vfp ${ARM_O} ${DSO_O} )
 set( OBJ-arm-eabi ${ARM_O} ${DSO_O} )
 set( OBJ-arm-eabihf ${ARM_O} ${DSO_O} )
 set( OBJ-arm-wince ${ARM_O} ${WIN_O} )
-set( OBJ-riscv64 ${RISCV64_O} ${DSO_O} )
+set( OBJ-riscv64 ${RISCV64_O} ${BCHECK_O} ${DSO_O} )
 
 if (WIN32)
   if( ${TARGET_ARCH} STREQUAL i386 )
@@ -408,6 +408,7 @@ else()
 endif()
 
 # compile C files to object files
+list(REMOVE_ITEM LIB_SRCFILES ${EXTRA_O})
 list(APPEND LIB_SRCFILES ${TCC_DIR}/threads/cmalloc.c)
 file(MAKE_DIRECTORY ${LIB_DIR})
 foreach(LIB_SRCFILE ${LIB_SRCFILES})
@@ -423,6 +424,10 @@ foreach(LIB_SRCFILE ${LIB_SRCFILES})
         COMMENT "Compiling Runtime Library (${LIB_SRCFILE})")
     list(APPEND LIB_OBJFILES ${LIB_DIR}/${LIB_SRCFILE_NOEXT}.o)
 endforeach()
+
+if(UNIX)
+    list(REMOVE_ITEM EXTRA_O ${TCC_DIR}/lib/bt-dll.c)
+endif()
 
 if(WIN32)
     add_custom_command(
@@ -457,10 +462,6 @@ add_custom_target(
     COMMENT "Linking Runtime Library"
     SOURCES ${LIB_SRCFILES})
 install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
-if(UNIX)
-    list(REMOVE_ITEM EXTRA_O ${TCC_DIR}/lib/bt-dll.c)
-endif()
 
 foreach(EXTRA_SRCFILE ${EXTRA_O})
     get_filename_component(EXTRA_SRCFILE_NOEXT ${EXTRA_SRCFILE} NAME_WE)
@@ -554,13 +555,21 @@ foreach(X ${TCC_X})
             list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/tcov.c )
     endif()
 
+    if(UNIX AND
+        (${X} STREQUAL x86_64-osx OR ${X} STREQUAL arm OR ${X} STREQUAL arm64 OR ${X} STREQUAL riscv64 OR ${X} STREQUAL arm64-osx ))
+            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/bcheck.c )
+            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/bt-log.c )
+            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/bt-exe.c )
+            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/tcov.c )
+    endif()
+
     # compile C files to object files
     file(MAKE_DIRECTORY ${LIB_DIR})
     foreach(CROSS_SRCFILE ${CROSS_SRCFILES})
         get_filename_component(CROSS_SRCFILE_NOEXT ${CROSS_SRCFILE} NAME_WE)
         add_custom_command(
             OUTPUT ${LIB_DIR}/${X}-${CROSS_SRCFILE_NOEXT}.o
-            COMMAND ${tcc_cross} -w ${CROSS_DEFINES} ${TCC_INCLUDE_DIRS}
+            COMMAND ${tcc_cross} -w ${CROSS_DEFINES}
                 -L ${LIB_DIR}
                 -c ${CROSS_SRCFILE}
                 -o ${LIB_DIR}/${X}-${CROSS_SRCFILE_NOEXT}.o
@@ -578,7 +587,7 @@ foreach(X ${TCC_X})
         OR ${X} STREQUAL arm-wince)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_pthread.o
-                COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+                COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT
                     -L ${LIB_DIR}
                     -c ${TCC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/${X}_pthread.o
@@ -590,7 +599,7 @@ foreach(X ${TCC_X})
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_pthread.o)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_cthread.o
-                COMMAND ${tcc_cross} -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DHAVE_CONFIG_H ${TCC_INCLUDE_DIRS}
+                COMMAND ${tcc_cross} -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DHAVE_CONFIG_H
                         -L ${LIB_DIR}
                         -c ${TCC_DIR}/threads/cthread.c
                         -o ${LIB_DIR}/${X}_cthread.o

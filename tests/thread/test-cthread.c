@@ -70,7 +70,7 @@ static int test_error(void) {
 /* Thread function: Compile time thread-local storage */
 static int thread_test_local_storage(void *aArg) {
     int thread = *(int *)aArg;
-    C11_FREE(aArg);
+    ZE_FREE(aArg);
 
     int data = thread + rand();
     *gLocalVar() = data;
@@ -90,7 +90,7 @@ void run_emulated_tls(void) {
    // assert(thrd_gLocalVar_tls == sizeof(int));
 
     for (int i = 0; i < THREAD_COUNT; i++) {
-        int *n = C11_MALLOC(sizeof * n);  // Holds a thread serial number
+        int *n = ZE_MALLOC(sizeof * n);  // Holds a thread serial number
             *n = i;
         /* Start a child thread that modifies gLocalVar */
         thrd_create(t + i, thread_test_local_storage, n);
