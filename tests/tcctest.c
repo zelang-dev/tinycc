@@ -112,7 +112,9 @@ static int onetwothree = 123;
 #define onetwothree4 onetwothree
 #define onetwothree xglue(onetwothree,4)
 
+#ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 #ifdef C99_MACROS
 #define dprintf(level,...) printf(__VA_ARGS__)
@@ -253,7 +255,7 @@ void macro_test(void)
         glue(a <, <= 2);
         printf("a=%d\n", a);
     }
-    
+
     /* macro function with argument outside the macro string */
 #define MF_s MF_hello
 #define MF_hello(msg) printf("%s\n",msg)
@@ -262,7 +264,7 @@ void macro_test(void)
 
     MF_s("hi");
     MF_t("hi");
-    
+
     /* test macro substitution inside args (should not eat stream) */
     printf("qq=%d\n", qq(qq)(2));
 
@@ -323,7 +325,7 @@ void recursive_macro_test(void)
     printf("%d\n", ELFW(ST_INFO)(STB_WEAK, ELFW(ST_TYPE)(123)));
 
 #define WRAP(x) x
-    
+
 #define print_num(x) print_num(__FILE__,__LINE__,x)
     print_num(123);
     WRAP(print_num(123));
@@ -567,7 +569,7 @@ void goto_test()
     /* This needs to parse as label, not as start of decl.  */
  typedef_and_label:
  s_loop:
-    if (i >= 10) 
+    if (i >= 10)
         goto s_end;
     printf("%d", i);
     i++;
@@ -830,10 +832,10 @@ void expr_test()
     printf("%d\n", ~12);
     printf("%d\n", -12);
     printf("%d\n", +12);
-    printf("%d %d %d %d\n", 
-           isid('a'), 
-           isid('g'), 
-           isid('T'), 
+    printf("%d %d %d %d\n",
+           isid('a'),
+           isid('g'),
+           isid('T'),
            isid('('));
 }
 
@@ -1117,7 +1119,7 @@ void struct_test()
            sizeof(altest6), __alignof__(altest6));
     printf("altest7 sizeof=%d alignof=%d\n",
            sizeof(altest7), __alignof__(altest7));
-           
+
     /* empty structures (GCC extension) */
     printf("sizeof(struct empty) = %d\n", sizeof(struct empty));
     printf("alignof(struct empty) = %d\n", __alignof__(struct empty));
@@ -1142,17 +1144,17 @@ void char_short_test()
 
     var1 = 0x01020304;
     var2 = 0xfffefdfc;
-    printf("s8=%d %d\n", 
+    printf("s8=%d %d\n",
            *(signed char *)&var1, *(signed char *)&var2);
-    printf("u8=%d %d\n", 
+    printf("u8=%d %d\n",
            *(unsigned char *)&var1, *(unsigned char *)&var2);
-    printf("s16=%d %d\n", 
+    printf("s16=%d %d\n",
            *(short *)&var1, *(short *)&var2);
-    printf("u16=%d %d\n", 
+    printf("u16=%d %d\n",
            *(unsigned short *)&var1, *(unsigned short *)&var2);
-    printf("s32=%d %d\n", 
+    printf("s32=%d %d\n",
            *(int *)&var1, *(int *)&var2);
-    printf("u32=%d %d\n", 
+    printf("u32=%d %d\n",
            *(unsigned int *)&var1, *(unsigned int *)&var2);
     *(signed char *)&var1 = 0x08;
     printf("var1=%x\n", var1);
@@ -1295,7 +1297,7 @@ void bool_test()
         static int v1 = 34 ? : -1; /* constant case */
         static int v2 = 0 ? : -1; /* constant case */
         int a = 30;
-        
+
         printf("%d %d\n", v1, v2);
         printf("%d %d\n", a - 30 ? : a * 2, a + 1 ? : a * 2);
     }
@@ -1458,8 +1460,8 @@ static int tentative_ar[];
 static int tentative_ar[] = {1,2,3};
 
 //int cinit1; /* a global variable can be defined several times without error ! */
-int cinit1; 
-int cinit1; 
+int cinit1;
+int cinit1;
 int cinit1 = 0;
 int *cinit2 = (int []){3, 2, 1};
 
@@ -1497,7 +1499,7 @@ void compound_literal_test(void)
 
     for(i=0;i<3;i++) {
         p = (int []){1, 2, 4 + i};
-        printf("%d %d %d\n", 
+        printf("%d %d %d\n",
                p[0],
                p[1],
                p[2]);
@@ -1537,7 +1539,7 @@ char invalid_function_def()[] {return 0;}
 void num(int n)
 {
     char *tab, *p;
-    tab = (char*)malloc(20); 
+    tab = (char*)malloc(20);
     p = tab;
     while (1) {
         *p = 48 + (n % 10);
@@ -1578,7 +1580,7 @@ void struct_assign_test(void)
       struct structa1 lsta1, lsta2;
       int i;
     } s = {{1,2}, {3,4}}, *ps;
-    
+
     ps = &s;
     ps->i = 4;
 
@@ -1638,9 +1640,9 @@ void cast_test()
     printf("%d\n", a);
     a = (scast = 65536) + 1;
     printf("%d\n", a);
-    
+
     printf("sizeof(c) = %d, sizeof((int)c) = %d\n", sizeof(c), sizeof((int)c));
-    
+
     /* test cast from unsigned to signed short to int */
     b = 0xf000;
     d = (short)b;
@@ -1648,7 +1650,7 @@ void cast_test()
     b = 0xf0f0;
     d = (char)b;
     printf("((unsigned)(char)0x%08x) = 0x%08x\n", b, d);
-    
+
     /* test implicit int casting for array accesses */
     c = 0;
     tab[1] = 2;
@@ -1695,7 +1697,7 @@ char sinit8[] = "hello" "trala";
 
 struct structinit1 sinit9 = { 1, 2, 3 };
 struct structinit1 sinit10 = { .f2 = 2, 3, .f1 = 1 };
-struct structinit1 sinit11 = { .f2 = 2, 3, .f1 = 1, 
+struct structinit1 sinit11 = { .f2 = 2, 3, .f1 = 1,
 #ifdef ALL_ISOC99
                                .farray[0] = 10,
                                .farray[1] = 11,
@@ -1816,34 +1818,34 @@ void init_test(void)
     struct bf_SS bfaa_finit[3] = { [1].bit = 1 };
     struct bf_SS bfaa_fvinit[] = { [2].bit = 1 };
     struct b2_SS bf_finit2 = {0xFFF000FFF000FLL, 0x123};
-    
+
     printf("sinit1=%d\n", sinit1);
     printf("sinit2=%d\n", sinit2);
-    printf("sinit3=%d %d %d %d\n", 
+    printf("sinit3=%d %d %d %d\n",
            sizeof(sinit3),
            sinit3[0],
            sinit3[1],
            sinit3[2]
            );
     printf("sinit6=%d\n", sizeof(sinit6));
-    printf("sinit7=%d %d %d %d\n", 
+    printf("sinit7=%d %d %d %d\n",
            sizeof(sinit7),
            sinit7[0],
            sinit7[1],
            sinit7[2]
            );
     printf("sinit8=%s\n", sinit8);
-    printf("sinit9=%d %d %d\n", 
+    printf("sinit9=%d %d %d\n",
            sinit9.f1,
            sinit9.f2,
            sinit9.f3
            );
-    printf("sinit10=%d %d %d\n", 
+    printf("sinit10=%d %d %d\n",
            sinit10.f1,
            sinit10.f2,
            sinit10.f3
            );
-    printf("sinit11=%d %d %d %d %d %d\n", 
+    printf("sinit11=%d %d %d %d %d %d\n",
            sinit11.f1,
            sinit11.f2,
            sinit11.f3,
@@ -1854,7 +1856,7 @@ void init_test(void)
 
     for(i=0;i<3;i++)
         for(j=0;j<2;j++)
-            printf("[%d][%d] = %d %d %d\n", 
+            printf("[%d][%d] = %d %d %d\n",
                    i, j, sinit4[i][j], sinit5[i][j], linit4[i][j]);
     printf("linit1=%d\n", linit1);
     printf("linit2=%d\n", linit2);
@@ -1863,7 +1865,7 @@ void init_test(void)
 
     printf("sinit12=%s\n", sinit12);
     printf("sinit13=%d %s %s %s\n",
-           sizeof(sinit13), 
+           sizeof(sinit13),
            sinit13[0],
            sinit13[1],
            sinit13[2]);
@@ -1877,7 +1879,7 @@ void init_test(void)
     printf("\n");
     for(i=0;i<10;i++) printf(" %d", linit15[i]);
     printf("\n");
-    printf("%d %d %d %d\n", 
+    printf("%d %d %d %d\n",
            linit16.a1,
            linit16.a2,
            linit16.a3,
@@ -2096,13 +2098,13 @@ void bitfield_test(void)
     printf("%d %d\n", sa, ca);
 
     st1.f1 = 7;
-    if (st1.f1 == -1) 
+    if (st1.f1 == -1)
         printf("st1.f1 == -1\n");
-    else 
+    else
         printf("st1.f1 != -1\n");
-    if (st1.f2 == -1) 
+    if (st1.f2 == -1)
         printf("st1.f2 == -1\n");
-    else 
+    else
         printf("st1.f2 != -1\n");
 
     struct sbf2 {
@@ -2423,7 +2425,7 @@ void lloptest(long long a, long long b)
            a + b,
            a - b,
            a * b);
-    
+
     if (b != 0) {
         printf("arith1: " LONG_LONG_FORMAT " " LONG_LONG_FORMAT "\n",
            a / b,
@@ -2444,7 +2446,7 @@ void lloptest(long long a, long long b)
            a > b,
            a >= b,
            a <= b);
-    
+
     printf("utest: %d %d %d %d %d %d\n",
            ua == ub,
            ua != ub,
@@ -2520,7 +2522,7 @@ long long llfunc1(int a)
 }
 
 struct S {
-    int id; 
+    int id;
     char item;
 };
 
@@ -2550,8 +2552,8 @@ void longlong_test(void)
     a = ia;
     b = ua;
     printf(LONG_LONG_FORMAT " " LONG_LONG_FORMAT "\n", a, b);
-    printf(LONG_LONG_FORMAT " " LONG_LONG_FORMAT " " LONG_LONG_FORMAT " %Lx\n", 
-           (long long)1, 
+    printf(LONG_LONG_FORMAT " " LONG_LONG_FORMAT " " LONG_LONG_FORMAT " %Lx\n",
+           (long long)1,
            (long long)-2,
            1LL,
            0x1234567812345679);
@@ -2677,7 +2679,7 @@ void vprintf1(const char *fmt, ...)
 
     va_start(aq, fmt);
     va_copy(ap, aq);
-    
+
     p = fmt;
     for(;;) {
         c = *p;
@@ -2963,10 +2965,10 @@ void c99_vla_test_1(int size1, int size2)
     int tab1[size][2], tab2[10][2];
     void *tab1_ptr, *tab2_ptr, *bad_ptr;
 
-    /* "size" should have been 'captured' at tab1 declaration, 
+    /* "size" should have been 'captured' at tab1 declaration,
         so modifying it should have no effect on VLA behaviour. */
     size = size-1;
-    
+
     printf("Test C99 VLA 1 (sizeof): ");
     printf("%s\n", (sizeof tab1 == size1 * size2 * 2 * sizeof(int)) ? "PASSED" : "FAILED");
     tab1_ptr = tab1;
@@ -3119,7 +3121,7 @@ void sizeof_test(void)
     t <<= 16;
     t <<= 16;
     t++;
-    /* This checks that sizeof really can be used to manipulate 
+    /* This checks that sizeof really can be used to manipulate
        uintptr_t objects, without truncation.  */
     t2 = t & -sizeof(uintptr_t);
     printf ("%lu %lu\n", t, t2);
@@ -3185,15 +3187,15 @@ void statement_expr_test(void)
     /* Basic stmt expr test */
     a = 0;
     for(i=0;i<10;i++) {
-        a += 1 + 
-            ( { int b, j; 
-                b = 0; 
-                for(j=0;j<5;j++) 
-                    b += j; b; 
+        a += 1 +
+            ( { int b, j;
+                b = 0;
+                for(j=0;j<5;j++)
+                    b += j; b;
             } );
     }
     printf("a=%d\n", a);
-    
+
     /* Test that symbols aren't freed prematurely.
        With SYM_DEBUG valgrind will show a read from a freed
        symbol, and tcc will show an (invalid) warning on the initialization
@@ -4038,7 +4040,7 @@ void __attribute__((weak)) weak_test(void)
 	printf("weak_fpa=%d\n",&weak_fpa ? weak_fpa() : 123);
 	printf("weak_fpb=%d\n",&weak_fpb ? weak_fpb() : 123);
 	printf("weak_fpc=%d\n",&weak_fpc ? weak_fpc() : 123);
-	
+
 	printf("weak_asm_f1=%d\n", weak_asm_f1 != NULL);
 	printf("weak_asm_f2=%d\n", weak_asm_f2 != NULL);
 	printf("weak_asm_f3=%d\n", weak_asm_f3 != NULL);
@@ -4379,7 +4381,8 @@ void whitespace_test(void)
     char *str;
     int tcc_test = 1;
 
-#if 1
+
+#if 1
     pri\
 ntf("whitspace:\n");
 #endif
@@ -4402,7 +4405,8 @@ ntf("min=%d\n", 4);
 ";
     printf("len1=%d str[0]=%d\n", strlen(str), str[0]);
 #endif
-    printf("len1=%d\n", strlen("a
+    printf("len1=%d\n", strlen("
+a
 "));
 #else
     printf("len1=1\nlen1=1 str[0]=10\nlen1=3\n");

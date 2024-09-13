@@ -29,8 +29,10 @@ set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 
 if(WIN32)
     if(CMAKE_SIZEOF_VOID_P MATCHES "8")
+        set(CMAKE_INSTALLER_DIR "C:/Program Files/")
         set(CMAKE_INSTALL_PREFIX "C:/Program Files/${PROJECT_NAME}")
     else()
+        set(CMAKE_INSTALLER_DIR "C:/Program Files (x86)/")
         set(CMAKE_INSTALL_PREFIX "C:/Program Files (x86)/${PROJECT_NAME}")
     endif()
 endif()
@@ -62,7 +64,6 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY tcc)
 
 enable_testing()
 set( CORE_FILES
-    ${TCC_DIR}/threads/rpmalloc.c
     ${TCC_DIR}/tcctools.c
     ${TCC_DIR}/libtcc.c
     ${TCC_DIR}/tccpp.c
@@ -71,32 +72,25 @@ set( CORE_FILES
     ${TCC_DIR}/tccelf.c
     ${TCC_DIR}/tccasm.c
     ${TCC_DIR}/tccrun.c
-    ${TCC_DIR}/tcc.h
-    ${TCC_DIR}/config.h
-    ${TCC_DIR}/libtcc.h
-    ${TCC_DIR}/tcctok.h )
+    ${TCC_DIR}/threads/rpmalloc.c )
 
 set( I386_FILES ${CORE_FILES}
     ${TCC_DIR}/i386-gen.c
     ${TCC_DIR}/i386-link.c
-    ${TCC_DIR}/i386-asm.c
-    ${TCC_DIR}/i386-asm.h
-    ${TCC_DIR}/i386-tok.h )
+    ${TCC_DIR}/i386-asm.c )
 
 set( I386_WIN32_FILES ${I386_FILES} ${TCC_DIR}/tccpe.c )
 set( X86_64_FILES ${CORE_FILES}
     ${TCC_DIR}/x86_64-gen.c
     ${TCC_DIR}/x86_64-link.c
-    ${TCC_DIR}/i386-asm.c
-    ${TCC_DIR}/x86_64-asm.h )
+    ${TCC_DIR}/i386-asm.c )
 
 set( X86_64_WIN32_FILES ${X86_64_FILES} ${TCC_DIR}/tccpe.c )
 set( X86_64_OSX_FILES ${X86_64_FILES} ${TCC_DIR}/tccmacho.c )
 set( ARM_FILES ${CORE_FILES}
     ${TCC_DIR}/arm-gen.c
     ${TCC_DIR}/arm-link.c
-    ${TCC_DIR}/arm-asm.c
-    ${TCC_DIR}/arm-tok.h )
+    ${TCC_DIR}/arm-asm.c )
 
 set( ARM_WINCE_FILES ${ARM_FILES} ${TCC_DIR}/tccpe.c )
 set( ARM64_FILES ${CORE_FILES} ${TCC_DIR}/arm64-gen.c ${TCC_DIR}/arm64-link.c ${TCC_DIR}/arm64-asm.c )
@@ -119,7 +113,7 @@ if (WIN32)
 endif()
 
 if(UNIX)
-  add_definitions(-Wall -O2 -lpthread -Wno-declaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
+  add_definitions(-Wall -O2 -lpthread -Wno-declaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas -Wl,-rpath=${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
   if(NOT APPLE)
     add_definitions( -Wno-format-truncation -Wno-stringop-truncation )
   elseif(APPLE)
@@ -141,6 +135,13 @@ file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 file(STRINGS "VERSION" TCC_VERSION)
 list(GET TCC_VERSION 0 TCC_VERSION)
 configure_file(config.h.in ${TCC_DIR}/config.h)
+if(WIN32)
+    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env.bat)
+    configure_file(cmake_env.bat.in ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env.bat)
+else()
+    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env)
+    configure_file(cmake_env.sh.in ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env)
+endif()
 configure_file(config.texi.in config.texi)
 
 include_directories(${CMAKE_BINARY_DIR})
@@ -150,7 +151,18 @@ set(CPACK_PACKAGE_VERSION ${TCC_VERSION})
 set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/COPYING.txt)
 set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
 set(CPACK_NSIS_MENU_LINKS "share/doc/tcc/tinycc-docs.html"
-     "Tiny C Compiler Reference Documentation" "share/.tcc.bat" "Tiny C Command Prompt")
+     "Tiny C Compiler Reference Documentation" "share/tcc_prompt.bat" "Tiny C Command Prompt")
+
+set(CPACK_PACKAGE_CONTACT "lstubbs@zelang.dev")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Lawrence Stubbs <${CPACK_PACKAGE_CONTACT}>")
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)
+SET(CPACK_COMPONENT_LIBRARIES_DESCRIPTION "C Scripting Everywhere - The Smallest ANSI C compiler")
+set(CPACK_PACKAGE_DESCRIPTION ${CPACK_COMPONENT_LIBRARIES_DESCRIPTION})
+
+set(CPACK_RPM_PACKAGE_LICENSE "LGPL")
+set(CPACK_RPM_PACKAGE_URL ${CPACK_PACKAGE_VENDOR})
+set(CPACK_RPM_PACKAGE_ARCHITECTURE "noarch")
 include(CPack)
 
 # Set target and sources
@@ -249,6 +261,7 @@ elseif (UNIX)
                 "TCC_TARGET_X86_64="
                 "TCC_TARGET_MACHO=1")
         endif()
+        target_compile_definitions( -flat_namespace -undefined warning )
     else()
         if( ${TARGET_ARCH} STREQUAL riscv64 )
             target_compile_definitions(libtcc PUBLIC
@@ -302,7 +315,7 @@ set_target_properties(libtcc PROPERTIES
 # TCC compiler as executable
 
 if(WIN32)
-    add_definitions(-W2 -MT -GS- -nologo -D_CRT_SECURE_NO_DEPRECATE)
+    add_definitions(-Zi -W2 -MT -GS- -nologo -D_CRT_SECURE_NO_DEPRECATE)
 endif()
 
 add_executable(tcc ${TCC_DIR}/tcc.c)
@@ -318,6 +331,16 @@ add_dependencies(c2str libtcc)
 add_custom_command(
     OUTPUT ${TCC_DIR}/tccdefs_.h
     COMMAND c2str ${TCC_DIR}/include/tccdefs.h tccdefs_.h)
+
+if(WIN32 AND BUILD_SHARED_LIBS)
+    add_custom_command(
+        OUTPUT libtcc.def
+        COMMAND tcc -impdef libtcc -o libtcc.def
+        MAIN_DEPENDENCY tcc
+        VERBATIM
+        COMMENT "Create Windows Import DLL Library (${LIB_DIR}/libtcc.def)")
+    install(FILES libtcc.def DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 
 ################################################################################
 # Runtime Library (libtcc1-xx.a)
@@ -479,16 +502,12 @@ foreach(EXTRA_SRCFILE ${EXTRA_O})
 endforeach()
 
 # cross compiler targets and cross libtcc1.a to build
-if(WIN32 AND ${TARGET_ARCH} STREQUAL x86_64)
-    set(TCC_X i386 i386-win32 x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
-elseif(WIN32 AND ${TARGET_ARCH} STREQUAL i386)
-    set(TCC_X i386 arm)
-elseif(${TARGET_ARCH} STREQUAL i386)
-    set(TCC_X i386-win32 arm)
-elseif(${TARGET_ARCH} STREQUAL arm)
-    set(TCC_X i386 i386-win32)
+if(${TARGET_ARCH} STREQUAL x86_64)
+    set(TCC_X i386 i386-win32 x86_64-win32 x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
+elseif(${TARGET_ARCH} STREQUAL i386 OR ${TARGET_ARCH} STREQUAL arm)
+    set(TCC_X i386 i386-win32 arm arm-wince)
 else()
-    set(TCC_X i386 x86_64 i386-win32 x86_64-win32 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
+    set(TCC_X i386 i386-win32 x86_64-win32 x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
 endif()
 
 set(CROSS_TARGET_i386 TCC_TARGET_I386 CONFIG_TCC_CROSSPREFIX=\"i386-\"
@@ -631,12 +650,17 @@ if(WIN32)
     install(FILES tcclib.h libtcc.h DESTINATION include)
     install(DIRECTORY include/ DESTINATION include)
     install(DIRECTORY win32/include/ DESTINATION include)
-    install(FILES .tcc.bat .tccVar.bat .tccVar32.bat DESTINATION ${CMAKE_INSTALL_DATADIR})
+    install(FILES tcc_prompt.bat DESTINATION ${CMAKE_INSTALL_DATADIR})
+    install(FILES cmake_tcc.bat tcc_env.bat DESTINATION bin)
 else()
     install(FILES libtcc.h tcclib.h DESTINATION include)
     install(DIRECTORY include/ DESTINATION lib/tcc/include)
     install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32/include)
     install(DIRECTORY include/ DESTINATION lib/tcc/win32/include)
+    install(FILES cmake_tcc tcc_env
+        PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
+        DESTINATION bin )
 endif()
 
+install(FILES tcc.cmake DESTINATION share)
 install(FILES tinycc-docs.html DESTINATION ${CMAKE_INSTALL_DOCDIR})

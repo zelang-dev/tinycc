@@ -69,3 +69,7 @@ src/config.h
 tests/mt.c
 .vscode/
 config.h
+tcc_env
+tcc_env.*
+cmake_env.bat
+cmake_env.sh

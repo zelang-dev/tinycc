@@ -1,9 +1,7 @@
 /* Test program for cthread. */
 
-#include "cthread.h"
+#include "thrd.h"
 
-#include <stddef.h>
-#include <stdio.h>
 #include <time.h>
 #include <assert.h>
 
@@ -49,6 +47,7 @@ void run_tls(void) {
     assert(*gLocalVar() == 1);
     assert(++*gLocalVar() == 2);
     assert(--*gLocalVar() == 1);
+    gLocalVar_del();
 }
 
 static int

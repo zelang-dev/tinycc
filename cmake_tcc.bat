@@ -1,0 +1,3 @@
+@echo off
+call tcc_env.bat
+cmake .. -DCMAKE_TOOLCHAIN_FILE=%CMAKE_TOOLCHAIN_FILE% -DSYSTEM_NAME=%1 -DHOST_ARCH=%2

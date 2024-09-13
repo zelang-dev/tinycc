@@ -1,9 +1,4 @@
-/*
- * Simple Test program for libtcc
- *
- * libtcc can be useful to use tcc as a "backend" for a code generator.
- */
-#include <stdlib.h>
+#include "rpmalloc.h"
 #include <stdio.h>
 #include <string.h>
 #include "libtcc.h"

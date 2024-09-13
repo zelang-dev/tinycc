@@ -1,7 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 set(EXESUF)
-set(TCC_CFLAGS -s -r -w -I. -I${CMAKE_SOURCE_DIR} -I${CMAKE_SOURCE_DIR}/tests -I${CMAKE_SOURCE_DIR}/include -B${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+set(TCC_CFLAGS -w -I. -I${CMAKE_SOURCE_DIR} -I${CMAKE_SOURCE_DIR}/tests -I${CMAKE_SOURCE_DIR}/include -B${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 set(TCC_MATH_LDFLAGS)
 set(LIBTCC_LDFLAGS)
 if(WIN32)
@@ -208,22 +208,30 @@ set(PP
  pp-counter
 )
 
-set(CFLAGS ${TCC_CFLAGS} ${TCC_MATH_LDFLAGS} ${LIBTCC_LDFLAGS})
+set(TCC_CFLAGS ${TCC_CFLAGS} ${TCC_MATH_LDFLAGS} ${LIBTCC_LDFLAGS})
 foreach(testpp ${PP})
   add_test(NAME ${testpp} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/pp
-           COMMAND tcc ${CFLAGS} -run -E ${testpp}.c  arg1 arg2 | ${DIFF} - ${testpp}.expect)
+           COMMAND tcc ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -run -E ${testpp}.c  arg1 arg2 | ${DIFF} - ${testpp}.expect)
 endforeach()
 
 foreach(testfile ${TESTS2})
   add_test(NAME ${testfile} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests2
-           COMMAND tcc ${CFLAGS} -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
+           COMMAND tcc ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
 endforeach()
 
 set( TEST_DIR ${CMAKE_SOURCE_DIR}/tests )
 add_custom_target(
     tcctest ALL
-    COMMAND tcc ${TEST_DIR}/tcctest.c ${CFLAGS} -o ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
+    COMMAND tcc ${TEST_DIR}/tcctest.c ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
     BYPRODUCTS ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
     SOURCES ${TEST_DIR}/tcctest.c )
 
 add_test(NAME tcctest COMMAND tcctest WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
+add_custom_target(
+    libtcc_test ALL
+    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${CMAKE_SOURCE_DIR}/libtcc.c ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
+    SOURCES ${TEST_DIR}/libtcc_test.c )
+
+add_test(NAME libtcc_test COMMAND libtcc_test WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
