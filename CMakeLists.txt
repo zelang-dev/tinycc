@@ -534,7 +534,7 @@ set(CROSS_TARGET_arm-wince TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDF
 
 set(CROSS_TARGET_arm TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT
  CONFIG_TCC_CROSSPREFIX=\"arm-\"
- CONFIG_TCC_CRTPREFIX=\"sr/arm-linux-gnueabi/lib\"
+ CONFIG_TCC_CRTPREFIX=\"/usr/arm-linux-gnueabi/lib\"
  CONFIG_TCC_LIBPATHS=\"{B}:/usr/arm-linux-gnueabi/lib:/usr/lib/arm-linux-gnueabi\"
  CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/arm-linux-gnueablude/include:/usr/include\")
 
