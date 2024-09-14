@@ -7,6 +7,9 @@ on:
 jobs:
   build-windows:
     name: Windows (${{ matrix.config.target }})
+    permissions:
+        contents: write
+        packages: write
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -35,7 +38,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: built/Package/tcc-0.9.28rc-${{ matrix.config.build }}.exe
-          asset_name: TinyCC-0.9.28rc_cross-compiler-${{ matrix.config.build }}.exe
+          asset_name: TinyCC-Installer-${{ matrix.config.build }}.exe
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
@@ -44,11 +47,15 @@ jobs:
 
   build-macos:
     name: macOS
-    runs-on: macos-11
+    permissions:
+        contents: write
+        packages: write
+    runs-on: macos-12
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Find includes
         run: |
+            brew install automake libtool
             gcc -v -xc++ /dev/null -fsyntax-only
             sudo ln -s /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
       - name: Configure & build
@@ -58,21 +65,25 @@ jobs:
             cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTING=OFF ..
             cmake --build .
       - name: Create DMG Installer from Release
-        run: cpack -G DMG Release
+        run: |
+            cd build
+            cpack -G DragNDrop
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/xxx.dmg
-          asset_name: TinyCC-0.9.28rc_cross-compiler-xxx.dmg
-          tag: ${{ github.ref }}
+          file: built/Package/tcc-0.9.28rc-Darwin.dmg
+          asset_name: TinyCC-Installer-Darwin.dmg
           overwrite: true
           file_glob: true
           body: "Tiny CC macOS Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
                 i386-linux, x86_64-linux, i386-win32, x86_64-win64, arm, arm64, riscv64, arm-wince, arm64-osx."
 
-  build-linux:
+  build-ubuntu:
     name: Linux ${{ matrix.target }}
+    permissions:
+        contents: write
+        packages: write
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -101,8 +112,99 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/xxx.deb
-          asset_name: TinyCC-0.9.28rc_cross-compiler-xxx.deb
+          file: built/Package/tcc-0.9.28rc-Linux.deb
+          asset_name: TinyCC-Installer-Linux.deb
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
+          body: "Tiny CC DEB Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
+                i386-linux, i386-win32, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
+
+  build-centos:
+    name: CentOS
+    permissions:
+        contents: write
+        packages: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    container: quay.io/centos/centos:stream9
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Prepare
+        run: |
+          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint -y
+      - name: Configure & build
+        run: |
+            mkdir build
+            cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D LIBUV_BUILD_TESTS=OFF
+            cmake --build .
+      - name: Create RPM Installer from Release
+        run: |
+            cd build
+            cpack -G RPM
+      - name: Upload RPM binary artifacts
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: built/Package/tcc-0.9.28rc-Linux.rpm
+          asset_name: TinyCC-Installer-Linux.rpm
+          tag: ${{ github.ref }}
+          overwrite: true
+          file_glob: true
+          body: "Tiny CC RPM Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
+                i386-linux, i386-win32, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
+
+  build-qemu:
+    name: ${{ matrix.target }}
+    permissions:
+        contents: write
+        packages: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: armhf
+            arch: armv7
+          - target: arm64
+            arch: aarch64
+          - target: ppc64el
+            arch: ppc64le
+          - target: riscv64
+            arch: riscv64
+          - target: s390x
+            arch: s390x
+    steps:
+      - uses: actions/checkout@v4
+      - uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.arch }}
+          distro:  ubuntu_latest
+          githubToken: ${{ github.token }}
+          setup: |
+            mkdir -p built/Package
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y --no-install-recommends cmake build-essential
+          env: |
+            # Valgrind on arm will fail if the stack size is larger than 8MB.
+            # Set QEMUs stack size to 8MB since Github runners use 16MB default.
+            QEMU_STACK_SIZE: 8388608
+          run: |
+            mkdir build
+            cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D LIBUV_BUILD_TESTS=OFF
+            cmake --build .
+            cpack -G DEB
+      - name: Upload ${{ matrix.arch }} DEB binary artifacts
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: built/Package/tcc-0.9.28rc-${{ matrix.target }}.deb
+          asset_name: TinyCC-Installer_${{ matrix.target }}.deb
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
