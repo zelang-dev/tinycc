@@ -510,46 +510,51 @@ else()
     set(TCC_X i386 i386-win32 x86_64-win32 x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
 endif()
 
-set(CROSS_TARGET_i386 TCC_TARGET_I386 CONFIG_TCC_CROSSPREFIX=\"i386-\"
+set(CROSS_TARGET_i386 TCC_TARGET_I386
+ CONFIG_TCC_CROSSPREFIX=\"i386-\"
  CONFIG_TCC_CRTPREFIX=\"/usr/i686-linux-gnu/lib\"
- CONFIG_TCC_LIBPATHS=\"{B}:/usr/i686-linux-gnu/lib\"
+ CONFIG_TCC_LIBPATHS=\"{B}:/usr/i686-linux-gnu/lib:/usr/lib/i386-linux-gnu\"
  CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/i686-linux-gnu/include:/usr/include\")
 
-set(CROSS_TARGET_x86_64 CONFIG_TRIPLET=\"x86_64-linux-gnu\"
- TCC_TARGET_X86_64 CONFIG_TCC_CROSSPREFIX=\"x86_64-\")
+set(CROSS_TARGET_x86_64 TCC_TARGET_X86_64
+ CONFIG_TRIPLET=\"x86_64-linux-gnu\"
+ CONFIG_TCC_CROSSPREFIX=\"x86_64-\")
 
 set(CROSS_TARGET_i386-win32 TCC_TARGET_I386 TCC_TARGET_PE
- CONFIG_TCC_CROSSPREFIX=\"i386-win32-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/win32/include\")
+ CONFIG_TCC_CROSSPREFIX=\"i386-win32-\"
+ CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\")
 
 set(CROSS_TARGET_x86_64-win32 TCC_TARGET_X86_64 TCC_TARGET_PE
- CONFIG_TCC_CROSSPREFIX=\"x86_64-win32-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/win32/include\")
+ CONFIG_TCC_CROSSPREFIX=\"x86_64-win32-\"
+ CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\")
 
-set(CROSS_TARGET_x86_64-osx TCC_TARGET_X86_64 TCC_TARGET_MACHO
- CONFIG_TCC_CROSSPREFIX=\"x86_64-osx-\")
+set(CROSS_TARGET_arm-wince TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT TCC_TARGET_PE
+ CONFIG_TCC_CROSSPREFIX=\"arm-wince-\"
+ CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\")
 
 set(CROSS_TARGET_arm TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT
  CONFIG_TCC_CROSSPREFIX=\"arm-\"
  CONFIG_TCC_CRTPREFIX=\"sr/arm-linux-gnueabi/lib\"
- CONFIG_TCC_LIBPATHS=\"{B}:/usr/arm-linux-gnueabi/lib\"
+ CONFIG_TCC_LIBPATHS=\"{B}:/usr/arm-linux-gnueabi/lib:/usr/lib/arm-linux-gnueabi\"
  CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/arm-linux-gnueablude/include:/usr/include\")
 
-set(CROSS_TARGET_arm64 TCC_TARGET_ARM64 CONFIG_TCC_CROSSPREFIX=\"arm64-\"
+set(CROSS_TARGET_arm64 TCC_TARGET_ARM64
+ CONFIG_TCC_CROSSPREFIX=\"arm64-\"
  CONFIG_TCC_CRTPREFIX=\"/usr/aarch64-linux-gnu/lib\"
- CONFIG_TBPATHS=\"{B}:/usr/aarch64-linux-gnu/lib\"
+ CONFIG_TCC_LIBPATHS=\"{B}:/usr/aarch64-linux-gnu/lib:/usr/lib/aarch64-linux-gnu\"
  CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/aarch64-linux-gnu/include:/usr/include\")
 
-set(CROSS_TARGET_arm-wince TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT TCC_TARGET_PE
- CONFIG_TCC_CROSSPREFIX=\"arm-wince-\" CONFIG_TCCDIR=\"/usr/local/lib/tcc/win32\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/win32/include\")
-
-set(CROSS_TARGET_riscv64 TCC_TARGET_RISCV64 CONFIG_TCC_CROSSPREFIX=\"riscv64-\"
+set(CROSS_TARGET_riscv64 TCC_TARGET_RISCV64
+ CONFIG_TCC_CROSSPREFIX=\"riscv64-\"
  CONFIG_TCC_CRTPREFIX=\"/usr/riscv64-linux-gnu/lib\"
- COTCC_LIBPATHS=\"{B}:/usr/riscv64-linux-gnu/lib\"
+ CONFIG_TCC_LIBPATHS=\"{B}:/usr/riscv64-linux-gnu/lib:/usr/lib/riscv64-linux-gnu\"
  CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/riscv64-linux-gnu/include:/usr/include\")
 
-set(CROSS_TARGET_arm64-osx TCC_TARGET_ARM64 TCC_TARGET_MACHO CONFIG_TCC_CROSSPREFIX=\"arm64-osx-\")
+set(CROSS_TARGET_x86_64-osx TCC_TARGET_X86_64 TCC_TARGET_MACHO
+ CONFIG_TCC_CROSSPREFIX=\"x86_64-osx-\")
+
+set(CROSS_TARGET_arm64-osx TCC_TARGET_ARM64 TCC_TARGET_MACHO
+ CONFIG_TCC_CROSSPREFIX=\"arm64-osx-\")
 
 set(CROSS_DEFINES -Wall -O2 -Wdeclaration-after-statement -fno-strict-aliasing
  -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-format-truncation -Wno-stringopcation)
