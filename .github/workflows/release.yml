@@ -37,7 +37,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/tcc_0.9.28rc_${{ matrix.config.build }}.exe
+          file: built/Package/tcc-0.9.28rc-${{ matrix.config.build }}.exe
           asset_name: TinyCC_Installer-${{ matrix.config.build }}.exe
           tag: ${{ github.ref }}
           overwrite: true
