@@ -37,8 +37,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/tcc-0.9.28rc-${{ matrix.config.build }}.exe
-          asset_name: TinyCC-Installer-${{ matrix.config.build }}.exe
+          file: built/Package/tcc_0.9.28rc_${{ matrix.config.build }}.exe
+          asset_name: TinyCC_Installer-${{ matrix.config.build }}.exe
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
@@ -72,12 +72,12 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/tcc-0.9.28rc-Darwin.dmg
-          asset_name: TinyCC-Installer-Darwin.dmg
+          file: built/Package/tcc_0.9.28rc_Darwin.dmg
+          asset_name: TinyCC_Installer-Darwin.dmg
           overwrite: true
           file_glob: true
           body: "Tiny CC macOS Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, x86_64-linux, i386-win32, x86_64-win64, arm, arm64, riscv64, arm-wince, arm64-osx."
+                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
 
   build-ubuntu:
     name: Linux ${{ matrix.target }}
@@ -91,7 +91,7 @@ jobs:
         include:
           - target: amd64
             flags: -m64
-        #  - target: x86
+        #  - target: i686
         #    flags: -m32
     steps:
       - uses: actions/checkout@v4
@@ -112,13 +112,13 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/tcc-0.9.28rc-Linux.deb
-          asset_name: TinyCC-Installer-Linux.deb
+          file: built/Package/tcc_0.9.28rc_amd64.deb
+          asset_name: TinyCC_Installer-Linux.deb
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
           body: "Tiny CC DEB Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, i386-win32, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
+                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
 
   build-centos:
     name: CentOS
@@ -149,13 +149,13 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/tcc-0.9.28rc-Linux.rpm
-          asset_name: TinyCC-Installer-Linux.rpm
+          file: built/Package/tcc_0.9.28rc_amd64.rpm
+          asset_name: TinyCC_Installer-Linux.rpm
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
           body: "Tiny CC RPM Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, i386-win32, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
+                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
 
   build-qemu:
     name: ${{ matrix.target }}
@@ -203,10 +203,10 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/tcc-0.9.28rc-${{ matrix.target }}.deb
-          asset_name: TinyCC-Installer_${{ matrix.target }}.deb
+          file: built/Package/tcc_0.9.28rc_-${{ matrix.target }}.deb
+          asset_name: TinyCC_Installer_${{ matrix.target }}.deb
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
           body: "Tiny CC DEB Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, i386-win32, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
+                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx."
