@@ -68,7 +68,9 @@ void exit(int code)
     __run_on_exit(code);
     f.fp = 0;
     f.ip = exit;
+#ifndef _WIN32
     __rt_exit(&f, code);
+#endif
 }
 
 #ifndef _WIN32

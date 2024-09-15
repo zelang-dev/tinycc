@@ -1,3 +1,2 @@
 #!/bin/bash
-exec tcc_env
 cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE -DCMAKE_BUILD_TYPE=$1 -DSYSTEM_NAME=$2 -DHOST_ARCH=$3

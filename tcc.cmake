@@ -1,10 +1,6 @@
 
 message(STATUS "Using toolchain file: ${CMAKE_TOOLCHAIN_FILE}")
-
-if(SYSTEM_NAME STREQUAL Native)
-    include(TargetArch)
-    target_architecture(TARGET_ARCH)
-    list(LENGTH TARGET_ARCH cmake_target_arch_len)
+if(SYSTEM_NAME STREQUAL Native AND HOST_ARCH)
     if (WIN32)
         set(SYSTEM_NAME Windows)
     elseif (APPLE)
@@ -14,13 +10,12 @@ if(SYSTEM_NAME STREQUAL Native)
     else()
         set(SYSTEM_NAME Generic)
     endif()
-    set(HOST_ARCH ${TARGET_ARCH})
+    set(IS_NATIVE TRUE)
 elseif(NOT HOST_ARCH AND NOT SYSTEM_NAME)
-    message(SEND_ERROR "-D HOST_ARCH required to be specified:
-i386, x86_64, i386-win32, x86_64-win32, x86_64-osx, arm, arm64, riscv64, arm-wince, arm64-osx
-
--D SYSTEM_NAME required to be specified:
-Native, Windows, Linux, GNU, Generic, Android, FreeBSD, Darwin")
+    message(SEND_ERROR "
+-D SYSTEM_NAME required to be specified: Native, Windows, Linux, GNU, Generic, Android, FreeBSD, Darwin
+-D HOST_ARCH required to be specified: i386, x86_64, arm, arm64, riscv64
+")
 endif()
 
 set(CMAKE_SYSTEM_NAME ${SYSTEM_NAME})
@@ -37,17 +32,28 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL Darwin)
         set(COMPILER_PREFIX ${HOST_ARCH}-osx)
     endif()
 endif()
-find_program(CMAKE_C_COMPILER NAMES ${COMPILER_PREFIX}-tcc PATHS ENV PATH NO_DEFAULT_PATH)
+
+set(EXT )
+if(WIN32)
+    set(EXT .exe)
+endif()
+
+if(IS_NATIVE STREQUAL TRUE)
+    set(program "$ENV{CC}")
+else()
+    set(program "$ENV{CPATH}/${COMPILER_PREFIX}-tcc${EXT}")
+endif()
+
+find_program(CMAKE_C_COMPILER NAMES ${program} PATHS ENV PATH NO_DEFAULT_PATH)
 
 set(TOOLCHAIN_PREFIX ${COMPILER_PREFIX})
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
-if(BUILD_SHARED_LIBS)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -shared -w ")
-else()
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static -w ")
-endif()
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -L\"$ENV{LIBRARY_PATH}\" -I\"$ENV{C_INCLUDE_PATH}\"")
 
 message (STATUS "Using compiler: ${CMAKE_C_COMPILER}")
+message (STATUS "Using architecture: ${HOST_ARCH}")
+message (STATUS "Using library directory: $ENV{LIBRARY_PATH}")
+message (STATUS "Using toolchain prefix: ${TOOLCHAIN_PREFIX}")

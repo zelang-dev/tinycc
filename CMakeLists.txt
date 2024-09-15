@@ -54,6 +54,17 @@ target_architecture(TARGET_ARCH)
 list(LENGTH TARGET_ARCH cmake_target_arch_len)
 message("Target architecture type: ${TARGET_ARCH}")
 
+set(NATIVE_ARCH ${TARGET_ARCH})
+if(WIN32)
+    if(${TARGET_ARCH} STREQUAL arm)
+        set(NATIVE_ARCH ${TARGET_ARCH}-wince)
+    else()
+        set(NATIVE_ARCH ${TARGET_ARCH}-win32)
+    endif()
+elseif(APPLE)
+    set(NATIVE_ARCH ${TARGET_ARCH}-osx)
+endif()
+
 set(TCC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(LIB_DIR ${CMAKE_CURRENT_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
@@ -315,7 +326,7 @@ set_target_properties(libtcc PROPERTIES
 # TCC compiler as executable
 
 if(WIN32)
-    add_definitions(-Zi -W2 -MT -GS- -nologo -D_CRT_SECURE_NO_DEPRECATE)
+    add_definitions(-W2 -MT -GS- -nologo -D_CRT_SECURE_NO_DEPRECATE)
 endif()
 
 add_executable(tcc ${TCC_DIR}/tcc.c)
@@ -348,7 +359,8 @@ endif()
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
 set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
-set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bcheck.c )
+set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${BCHECK_O} )
+set( CROSS_EXTRA_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/tcov.c )
 
 set( I386_O
  ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
@@ -567,7 +579,7 @@ foreach(X ${TCC_X})
     if(${X} STREQUAL i386-win32
         OR ${X} STREQUAL x86_64-win32
         OR ${X} STREQUAL arm-wince)
-            set(CROSS_INCLUDE ${TCC_DIR}/include -I${TCC_DIR}/win32/include -I${TCC_DIR}/win32/include/winapi)
+            set(CROSS_INCLUDE ${TCC_DIR}/include -I${TCC_DIR}/win32/include -I${TCC_DIR}/win32/include/winapi -DWIN32)
     endif()
     add_executable(${tcc_cross} ${TCC_DIR}/tcc.c)
     target_compile_definitions(${tcc_cross} PUBLIC ${CROSS_TARGET})
@@ -581,10 +593,7 @@ foreach(X ${TCC_X})
 
     if(UNIX AND
         (${X} STREQUAL x86_64-osx OR ${X} STREQUAL arm OR ${X} STREQUAL arm64 OR ${X} STREQUAL riscv64 OR ${X} STREQUAL arm64-osx ))
-            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/bcheck.c )
-            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/bt-log.c )
-            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/bt-exe.c )
-            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/tcov.c )
+            list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
     endif()
 
     # compile C files to object files
@@ -641,7 +650,7 @@ foreach(X ${TCC_X})
         ${tcc_cross} -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a ${CROSS_OBJFILES}
         DEPENDS ${CROSS_OBJFILES}
         BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a
-        COMMENT "Cross Linking Runtime Library - ${X}" )
+        COMMENT "Cross Linking Archive Runtime Library - ${X}" )
     add_dependencies(${tcc_cross} libtcc)
     install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
     set(CROSS_OBJFILES "")
@@ -662,7 +671,7 @@ else()
     install(DIRECTORY include/ DESTINATION lib/tcc/include)
     install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32/include)
     install(DIRECTORY include/ DESTINATION lib/tcc/win32/include)
-    install(FILES cmake_tcc tcc_env
+    install(FILES cmake_tcc tcc_env tcc_prompt
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin )
 endif()
