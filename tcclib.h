@@ -77,5 +77,4 @@ const char *dlerror(void);
 void *dlsym(void *handle, char *symbol);
 int dlclose(void *handle);
 
-#include "rpmalloc.h"
 #endif /* _TCCLIB_H */
