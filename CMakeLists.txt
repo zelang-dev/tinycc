@@ -535,18 +535,15 @@ set(CROSS_TARGET_x86_64 TCC_TARGET_X86_64
 
 set(CROSS_TARGET_i386-win32 TCC_TARGET_I386 TCC_TARGET_PE
  CONFIG_TCC_CROSSPREFIX=\"i386-win32-\"
- CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/lib/tcc/win32\")
+ CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\")
 
 set(CROSS_TARGET_x86_64-win32 TCC_TARGET_X86_64 TCC_TARGET_PE
  CONFIG_TCC_CROSSPREFIX=\"x86_64-win32-\"
- CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/lib/tcc/win32\")
+ CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\")
 
 set(CROSS_TARGET_arm-wince TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT TCC_TARGET_PE
  CONFIG_TCC_CROSSPREFIX=\"arm-wince-\"
- CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
- CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/lib/tcc/win32\")
+ CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\")
 
 set(CROSS_TARGET_arm TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT
  CONFIG_TCC_CROSSPREFIX=\"arm-\"
@@ -664,20 +661,28 @@ endforeach()
 
 add_subdirectory(tests)
 
+file(GLOB WIN32_DEFS win32/lib/*.def)
 if(WIN32)
-    file(GLOB WIN32_DEFS win32/lib/*.def)
-    install(FILES ${WIN32_DEFS} DESTINATION lib)
     install(DIRECTORY win32/include/ DESTINATION include)
+    install(DIRECTORY include/ DESTINATION include)
+    install(DIRECTORY include/ DESTINATION lib/include)
+    install(FILES tcclib.h DESTINATION lib/include)
+    install(FILES tcclib.h DESTINATION include)
+    install(FILES ${WIN32_DEFS} DESTINATION lib)
+    install(FILES libtcc.h DESTINATION lib)
     install(FILES tcc_prompt.bat DESTINATION ${CMAKE_INSTALL_DATADIR})
     install(FILES cmake_tcc.bat tcc_env.bat DESTINATION bin)
 else()
-    install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32)
+    install(DIRECTORY include/ DESTINATION lib/tcc/include)
+    install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32/include)
+    install(FILES tcclib.h DESTINATION lib/tcc/win32/include)
+    install(FILES tcclib.h DESTINATION lib/tcc/include)
+    install(FILES ${WIN32_DEFS} DESTINATION lib/tcc/win32/lib)
+    install(FILES libtcc.h DESTINATION include)
     install(FILES cmake_tcc tcc_env tcc_prompt
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin )
 endif()
 
-install(DIRECTORY include/ DESTINATION include)
-install(FILES libtcc.h tcclib.h DESTINATION include)
 install(FILES tcc.cmake DESTINATION share)
 install(FILES tinycc-docs.html DESTINATION ${CMAKE_INSTALL_DOCDIR})

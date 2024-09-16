@@ -11,10 +11,13 @@ if(SYSTEM_NAME STREQUAL Native AND HOST_ARCH)
         set(SYSTEM_NAME Generic)
     endif()
     set(IS_NATIVE TRUE)
-elseif(NOT HOST_ARCH AND NOT SYSTEM_NAME)
-    message(SEND_ERROR "
--D SYSTEM_NAME required to be specified: Native, Windows, Linux, GNU, Generic, Android, FreeBSD, Darwin
--D HOST_ARCH required to be specified: i386, x86_64, arm, arm64, riscv64
+elseif(NOT HOST_ARCH OR NOT SYSTEM_NAME OR NOT CMAKE_BUILD_TYPE)
+    message(SEND_ERROR "the `cmake_tcc . . .` missing:
+- `BUILD_TYPE` required to be specified: Debug, Release, ...
+- `SYSTEM_NAME` required to be specified: Native, Windows, Linux, GNU, Generic, Android, FreeBSD, Darwin, ...
+- `HOST_ARCH` required to be specified: i386, x86_64, arm, arm64, riscv64, ...
+
+Note: Native is for regular `tcc` compiler, otherwise cross compiler.
 ")
 endif()
 
