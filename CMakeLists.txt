@@ -468,7 +468,7 @@ endif()
 if(WIN32)
     add_custom_command(
         OUTPUT ${LIB_DIR}/pthread.o
-        COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+        COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
                     -c ${TCC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/pthread.o
@@ -480,7 +480,7 @@ endif()
 
 add_custom_command(
     OUTPUT ${LIB_DIR}/cthread.o
-    COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT ${TCC_INCLUDE_DIRS}
+    COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB ${TCC_INCLUDE_DIRS}
             -L ${LIB_DIR}
             -c ${TCC_DIR}/threads/cthread.c
             -o ${LIB_DIR}/cthread.o
@@ -623,7 +623,7 @@ foreach(X ${TCC_X})
         OR ${X} STREQUAL arm-wince)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_pthread.o
-                COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT
+                COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB
                     -L ${LIB_DIR}
                     -c ${TCC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/${X}_pthread.o
@@ -635,7 +635,7 @@ foreach(X ${TCC_X})
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_pthread.o)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_cthread.o
-                COMMAND ${tcc_cross} -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DHAVE_CONFIG_H
+                COMMAND ${tcc_cross} -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB -DHAVE_CONFIG_H
                         -L ${LIB_DIR}
                         -c ${TCC_DIR}/threads/cthread.c
                         -o ${LIB_DIR}/${X}_cthread.o
