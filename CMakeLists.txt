@@ -238,7 +238,7 @@ endif()
 target_compile_definitions(libtcc
     PRIVATE ONE_SOURCE=0
     PUBLIC "${NATIVE_TARGET}="
-    PUBLIC TCC_LIBTCC1=\"libtcc1-${TARGET_ARCH}.a\"
+    PUBLIC TCC_LIBTCC1=\"libtcc1.a\"
     PRIVATE CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
 
@@ -344,18 +344,8 @@ add_custom_command(
     OUTPUT ${TCC_DIR}/tccdefs_.h
     COMMAND c2str ${TCC_DIR}/include/tccdefs.h tccdefs_.h)
 
-if(WIN32 AND BUILD_SHARED_LIBS)
-    add_custom_command(
-        OUTPUT libtcc.def
-        COMMAND tcc -impdef libtcc -o libtcc.def
-        MAIN_DEPENDENCY tcc
-        VERBATIM
-        COMMENT "Create Windows Import DLL Library (${LIB_DIR}/libtcc.def)")
-    install(FILES libtcc.def DESTINATION ${CMAKE_INSTALL_LIBDIR})
-endif()
-
 ################################################################################
-# Runtime Library (libtcc1-xx.a)
+# Runtime Library (libtcc1.a)
 
 set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
@@ -492,12 +482,22 @@ list(APPEND LIB_OBJFILES ${LIB_DIR}/cthread.o)
 # link all objects files to archive file
 add_custom_target(
     libarchive ALL
-    tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a ${LIB_OBJFILES}
+    tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a ${LIB_OBJFILES}
     DEPENDS ${LIB_OBJFILES}
-    BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a
+    BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a
     COMMENT "Linking Runtime Library"
     SOURCES ${LIB_SRCFILES})
-install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1-${TARGET_ARCH}.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+if(WIN32 AND BUILD_SHARED_LIBS)
+    add_custom_command(
+        OUTPUT libtcc.def
+        COMMAND tcc -impdef libtcc -o libtcc.def
+        MAIN_DEPENDENCY ${LIB_OBJFILES}
+        VERBATIM
+        COMMENT "Create Windows Import DLL Library (${LIB_DIR}/libtcc.def)")
+    install(FILES libtcc.def DESTINATION ${CMAKE_INSTALL_LIBDIR})
+endif()
 
 foreach(EXTRA_SRCFILE ${EXTRA_O})
     get_filename_component(EXTRA_SRCFILE_NOEXT ${EXTRA_SRCFILE} NAME_WE)
