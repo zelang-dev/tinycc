@@ -16,11 +16,11 @@ if(WIN32)
     endforeach()
 
     add_custom_target(
-        t_dlfcn ALL
-        COMMAND tcc ${DL_DIR}/test.c ${CFLAGS} -B ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} -o ${CMAKE_BINARY_DIR}/t_dlfcn.exe
+        test_win_dl ALL
+        COMMAND tcc ${DL_DIR}/test.c ${CFLAGS} -B ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} -o ${CMAKE_BINARY_DIR}/test_win_dl.exe
         DEPENDS ${DL_DLLFILES}
-        BYPRODUCTS ${CMAKE_BINARY_DIR}/t_dlfcn.exe
+        BYPRODUCTS ${CMAKE_BINARY_DIR}/test_win_dl.exe
         SOURCES ${DL_DIR}/test.c )
 
-    add_test(NAME t_dlfcn COMMAND t_dlfcn WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    add_test(NAME test_win_dl COMMAND test_win_dl WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 endif()
