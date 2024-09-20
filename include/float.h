@@ -5,6 +5,7 @@
 
 /* IEEE float */
 #define FLT_MANT_DIG 24
+#define FLT_EVAL_METHOD 0 // C11 5.2.4.2.2p9
 #define FLT_DIG 6
 #define FLT_ROUNDS 1
 #define FLT_EPSILON 1.19209290e-07F
@@ -14,6 +15,7 @@
 #define FLT_MAX_EXP 128
 #define FLT_MAX 3.40282347e+38F
 #define FLT_MAX_10_EXP 38
+#define FLT_TRUE_MIN 0x1p-149
 
 /* IEEE double */
 #define DBL_MANT_DIG 53
@@ -25,6 +27,7 @@
 #define DBL_MAX_EXP 1024
 #define DBL_MAX 1.7976931348623157e+308
 #define DBL_MAX_10_EXP 308
+#define DBL_TRUE_MIN 0x0.0000000000001p-1022
 
 /* horrible intel long double */
 #if defined __i386__ || defined __x86_64__

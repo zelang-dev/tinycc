@@ -14,6 +14,7 @@ else()
 endif()
 
 add_subdirectory(thread)
+add_subdirectory(cc)
 if( ${TARGET_ARCH} STREQUAL i386 )
     set(TCC_CFLAGS ${TCC_CFLAGS} -fno-PIC -fno-PIE -Wl,-z,notext )
 elseif( ${TARGET_ARCH} STREQUAL arm_eabi
