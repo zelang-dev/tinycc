@@ -16,29 +16,29 @@ add_custom_target(
     COMMAND tcc ${TH_DIR}/test-cthread.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
     BYPRODUCTS ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
     SOURCES ${TH_DIR}/test-cthread.c )
-add_test(NAME pool-cthread COMMAND pool-cthread WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+add_test(NAME test-cthread COMMAND test-cthread WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 
 add_custom_target(
-    pool-test_shutdown ALL
-    COMMAND tcc ${TH_DIR}/pool-test_shutdown.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/pool-test_shutdown${EXESUF}
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/pool-test_shutdown${EXESUF}
-    SOURCES ${TH_DIR}/pool-test_shutdown.c )
-add_test(NAME pool-test_shutdown COMMAND pool-test_shutdown WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    test_pool-shutdown ALL
+    COMMAND tcc ${TH_DIR}/test_pool-shutdown.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-shutdown${EXESUF}
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-shutdown${EXESUF}
+    SOURCES ${TH_DIR}/test_pool-shutdown.c )
+add_test(NAME test_pool-shutdown COMMAND test_pool-shutdown WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
-    pool-test_heavy ALL
-    COMMAND tcc ${TH_DIR}/pool-test_heavy.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/pool-test_heavy${EXESUF}
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/pool-test_heavy${EXESUF}
-    SOURCES ${TH_DIR}/pool-test_heavy.c )
-add_test(NAME pool-test_heavy COMMAND pool-test_heavy WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    test_pool-heavy ALL
+    COMMAND tcc ${TH_DIR}/test_pool-heavy.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-heavy${EXESUF}
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-heavy${EXESUF}
+    SOURCES ${TH_DIR}/test_pool-heavy.c )
+add_test(NAME test_pool-heavy COMMAND test_pool-heavy WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
-    pool-test_wait ALL
-    COMMAND tcc ${TH_DIR}/pool-test_wait.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/pool-test_wait${EXESUF}
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/pool-test_wait${EXESUF}
-    SOURCES ${TH_DIR}/pool-test_wait.c )
-add_test(NAME pool-test_wait COMMAND pool-test_wait WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+    test_pool-wait ALL
+    COMMAND tcc ${TH_DIR}/test_pool-wait.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-wait${EXESUF}
+    BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-wait${EXESUF}
+    SOURCES ${TH_DIR}/test_pool-wait.c )
+add_test(NAME test_pool-wait COMMAND test_pool-wait WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
     test-atomicity ALL

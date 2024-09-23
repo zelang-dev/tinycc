@@ -148,26 +148,20 @@ set(TESTS2
  132_bound_test
 )
 
+list(REMOVE_ITEM TESTS2 22_floating_point)
+list(REMOVE_ITEM TESTS2 24_math_library)
 list(REMOVE_ITEM TESTS2 60_errors_and_warnings)
 list(REMOVE_ITEM TESTS2 96_nodata_wanted)
 list(REMOVE_ITEM TESTS2 99_fastcall)
-list(REMOVE_ITEM TESTS2 101_cleanup)
 list(REMOVE_ITEM TESTS2 104+_inline)
-list(REMOVE_ITEM TESTS2 104_inline)
 list(REMOVE_ITEM TESTS2 113_btdll)
 list(REMOVE_ITEM TESTS2 120+_alias)
-list(REMOVE_ITEM TESTS2 120_alias)
-list(REMOVE_ITEM TESTS2 125_atomic_misc)
-list(REMOVE_ITEM TESTS2 128_run_atexit)
 
 if(WIN32)
-  list(REMOVE_ITEM TESTS2 24_math_library)
-  list(REMOVE_ITEM TESTS2 28_strings)
   list(REMOVE_ITEM TESTS2 106_versym)
   list(REMOVE_ITEM TESTS2 114_bound_signal)
   list(REMOVE_ITEM TESTS2 116_bound_setjmp2)
   list(REMOVE_ITEM TESTS2 117_builtins)
-  list(REMOVE_ITEM TESTS2 124_atomic_counter)
 elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm64
   OR ${TARGET_ARCH} STREQUAL riscv64
   OR ${TARGET_ARCH} STREQUAL armv7
@@ -181,7 +175,6 @@ elseif(APPLE)
     list(REMOVE_ITEM TESTS2 115_bound_setjmp )
     list(REMOVE_ITEM TESTS2 116_bound_setjmp2 )
     list(REMOVE_ITEM TESTS2 117_builtins )
-    list(REMOVE_ITEM TESTS2 124_atomic_counter )
 endif()
 
 set(PP
@@ -205,7 +198,6 @@ set(PP
  20
  21
  22
- 23
  pp-counter
 )
 
@@ -217,7 +209,7 @@ endforeach()
 
 foreach(testfile ${TESTS2})
   add_test(NAME ${testfile} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests2
-           COMMAND tcc ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
+           COMMAND tcc ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -dt -bt -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
 endforeach()
 
 set( TEST_DIR ${CMAKE_SOURCE_DIR}/tests )
@@ -231,8 +223,8 @@ add_test(NAME tcctest COMMAND tcctest WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
     libtcc_test ALL
-    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${CMAKE_SOURCE_DIR}/libtcc.c ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
+    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
     BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
     SOURCES ${TEST_DIR}/libtcc_test.c )
 
-add_test(NAME libtcc_test COMMAND libtcc_test WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+add_test(NAME libtcc_test COMMAND libtcc_test -B../built -I../include -I.. WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

@@ -74,7 +74,7 @@ int main()
                                     OP1(func,v,e1,e2) && OP2(func,v,e1,e2) && \
                                     OP4(func,v,e1,e2) && OP8(func,v,e1,e2)    \
                                     ? "SUCCESS" : "FAIL");
- 
+
 int main()
 {
     atomic_char c;

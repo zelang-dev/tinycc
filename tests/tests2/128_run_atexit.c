@@ -1,4 +1,4 @@
-#include <stdio.h>
+#include "thrd.h"
 
 int atexit(void (*function)(void));
 int on_exit(void (*function)(int, void *), void *arg);
@@ -48,12 +48,12 @@ int main(int argc, char **argv)
 {
     test();
     return 1;
-} 
+}
 
 #elif defined test_128_exit
 int main(int argc, char **argv)
 {
     test();
     exit(2);
-} 
+}
 #endif
