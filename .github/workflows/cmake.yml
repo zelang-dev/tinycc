@@ -2,7 +2,7 @@ name: cmake build and run ctest
 
 on:
   pull_request:
-    branches: [ mob ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:

@@ -2,7 +2,7 @@ name: platforms - armv7, aarch64, riscv64, etc...
 
 on:
   pull_request:
-    branches: [ mob ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
