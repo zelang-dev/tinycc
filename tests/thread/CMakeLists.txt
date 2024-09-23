@@ -1,9 +1,9 @@
-include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${INC_DIR})
 
 set( TH_DIR ${CMAKE_CURRENT_SOURCE_DIR} )
-set(TH_CFLAGS -w -B ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} -I${CMAKE_SOURCE_DIR}/include)
+set(TH_CFLAGS -w -B ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} -I${INC_DIR})
 if(WIN32)
-  set(TH_CFLAGS ${TH_CFLAGS} -I${CMAKE_SOURCE_DIR}/win32/include -I${CMAKE_SOURCE_DIR}/win32/include/winapi)
+  set(TH_CFLAGS ${TH_CFLAGS} -I${WIN_DIR}/include -I${WIN_DIR}/include/winapi)
   set(EXESUF .exe )
   set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 else()

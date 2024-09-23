@@ -1,4 +1,4 @@
-include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
+include_directories(${SRC_DIR} ${CMAKE_BINARY_DIR})
 
 if(WIN32)
     set( DL_DIR ${CMAKE_CURRENT_SOURCE_DIR} )
@@ -7,7 +7,7 @@ if(WIN32)
      testdll2
      testdll3 )
 
-    set(CFLAGS -I${CMAKE_SOURCE_DIR}/include -I${CMAKE_SOURCE_DIR}/win32/include -I${CMAKE_SOURCE_DIR}/win32/include/winapi -B${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+    set(CFLAGS -I${INC_DIR} -I${WIN_DIR}/include -I${WIN_DIR}/include/winapi -B${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
     foreach(DL_SRCFILE ${DL_SRCFILES})
         add_custom_command(
             OUTPUT ${CMAKE_BINARY_DIR}/${DL_SRCFILE}.dll

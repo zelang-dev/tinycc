@@ -1,11 +1,11 @@
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 set(EXESUF)
-set(TCC_CFLAGS -w -I. -I${CMAKE_SOURCE_DIR} -I${CMAKE_SOURCE_DIR}/tests -I${CMAKE_SOURCE_DIR}/include -B${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+set(TCC_CFLAGS -w -I. -I${SRC_DIR} -I${TCC_DIR}/tests -I${INC_DIR} -B${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
 set(TCC_MATH_LDFLAGS)
 set(LIBTCC_LDFLAGS)
 if(WIN32)
-  set(TCC_CFLAGS ${TCC_CFLAGS} -I${CMAKE_SOURCE_DIR}/win32/include -I${CMAKE_SOURCE_DIR}/win32/include/winapi )
+  set(TCC_CFLAGS ${TCC_CFLAGS} -I${WIN_DIR}/include -I${WIN_DIR}/include/winapi )
   set(EXESUF .exe )
   set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
   add_subdirectory(dll)
@@ -212,7 +212,7 @@ foreach(testfile ${TESTS2})
            COMMAND tcc ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -dt -bt -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
 endforeach()
 
-set( TEST_DIR ${CMAKE_SOURCE_DIR}/tests )
+set( TEST_DIR ${TCC_DIR}/tests )
 add_custom_target(
     tcctest ALL
     COMMAND tcc ${TEST_DIR}/tcctest.c ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
@@ -227,4 +227,4 @@ add_custom_target(
     BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
     SOURCES ${TEST_DIR}/libtcc_test.c )
 
-add_test(NAME libtcc_test COMMAND libtcc_test -B../built -I../include -I.. WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+add_test(NAME libtcc_test COMMAND libtcc_test -B../built -I../include -I../src WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

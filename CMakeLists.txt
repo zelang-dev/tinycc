@@ -1,6 +1,12 @@
-cmake_minimum_required(VERSION 2.6...3.14)
+cmake_minimum_required(VERSION 3.0...3.14)
 
-project(tcc LANGUAGES C)
+project(
+    tcc
+    VERSION 0.9.29
+    DESCRIPTION "C Scripting Everywhere - The Smallest ANSI C compiler."
+    HOMEPAGE_URL "https://github.com/zelang-dev/tinycc/"
+    LANGUAGES C
+)
 
 set(C_STANDARD 90)
 
@@ -66,50 +72,53 @@ elseif(APPLE)
     set(NATIVE_ARCH ${TARGET_ARCH}-osx)
 endif()
 
-set(TCC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(TCC_DIR ${CMAKE_SOURCE_DIR})
+set(INC_DIR ${TCC_DIR}/include)
+set(SRC_DIR ${TCC_DIR}/src)
+set(WIN_DIR ${SRC_DIR}/win32)
 set(LIB_DIR ${CMAKE_CURRENT_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/built")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${TCC_DIR}/built")
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${TCC_DIR}/built")
 set(CPACK_PACKAGE_DIRECTORY "${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/Package")
 set(CPACK_PACKAGE_FILE_NAME ${CPACK_PACKAGE_NAME})
 set(CPACK_PACKAGE_INSTALL_DIRECTORY tcc)
 
 enable_testing()
 set( CORE_FILES
-    ${TCC_DIR}/tcctools.c
-    ${TCC_DIR}/libtcc.c
-    ${TCC_DIR}/tccpp.c
-    ${TCC_DIR}/tccgen.c
-    ${TCC_DIR}/tccdbg.c
-    ${TCC_DIR}/tccelf.c
-    ${TCC_DIR}/tccasm.c
-    ${TCC_DIR}/tccrun.c
-    ${TCC_DIR}/threads/rpmalloc.c )
+    ${SRC_DIR}/tcctools.c
+    ${SRC_DIR}/libtcc.c
+    ${SRC_DIR}/tccpp.c
+    ${SRC_DIR}/tccgen.c
+    ${SRC_DIR}/tccdbg.c
+    ${SRC_DIR}/tccelf.c
+    ${SRC_DIR}/tccasm.c
+    ${SRC_DIR}/tccrun.c
+    ${SRC_DIR}/threads/rpmalloc.c )
 
 set( I386_FILES ${CORE_FILES}
-    ${TCC_DIR}/i386-gen.c
-    ${TCC_DIR}/i386-link.c
-    ${TCC_DIR}/i386-asm.c )
+    ${SRC_DIR}/i386-gen.c
+    ${SRC_DIR}/i386-link.c
+    ${SRC_DIR}/i386-asm.c )
 
-set( I386_WIN32_FILES ${I386_FILES} ${TCC_DIR}/tccpe.c )
+set( I386_WIN32_FILES ${I386_FILES} ${SRC_DIR}/tccpe.c )
 set( X86_64_FILES ${CORE_FILES}
-    ${TCC_DIR}/x86_64-gen.c
-    ${TCC_DIR}/x86_64-link.c
-    ${TCC_DIR}/i386-asm.c )
+    ${SRC_DIR}/x86_64-gen.c
+    ${SRC_DIR}/x86_64-link.c
+    ${SRC_DIR}/i386-asm.c )
 
-set( X86_64_WIN32_FILES ${X86_64_FILES} ${TCC_DIR}/tccpe.c )
-set( X86_64_OSX_FILES ${X86_64_FILES} ${TCC_DIR}/tccmacho.c )
+set( X86_64_WIN32_FILES ${X86_64_FILES} ${SRC_DIR}/tccpe.c )
+set( X86_64_OSX_FILES ${X86_64_FILES} ${SRC_DIR}/tccmacho.c )
 set( ARM_FILES ${CORE_FILES}
-    ${TCC_DIR}/arm-gen.c
-    ${TCC_DIR}/arm-link.c
-    ${TCC_DIR}/arm-asm.c )
+    ${SRC_DIR}/arm-gen.c
+    ${SRC_DIR}/arm-link.c
+    ${SRC_DIR}/arm-asm.c )
 
-set( ARM_WINCE_FILES ${ARM_FILES} ${TCC_DIR}/tccpe.c )
-set( ARM64_FILES ${CORE_FILES} ${TCC_DIR}/arm64-gen.c ${TCC_DIR}/arm64-link.c ${TCC_DIR}/arm64-asm.c )
-set( ARM64_WIN32_FILES ${ARM64_FILES} ${TCC_DIR}/tccpe.c )
-set( ARM64_OSX_FILES ${ARM64_FILES} ${TCC_DIR}/tccmacho.c )
-set( C67_FILES ${CORE_FILES} ${TCC_DIR}/c67-gen.c ${TCC_DIR}/c67-link.c ${TCC_DIR}/tcccoff.c )
-set( RISCV64_FILES ${CORE_FILES} ${TCC_DIR}/riscv64-gen.c ${TCC_DIR}/riscv64-link.c ${TCC_DIR}/riscv64-asm.c )
+set( ARM_WINCE_FILES ${ARM_FILES} ${SRC_DIR}/tccpe.c )
+set( ARM64_FILES ${CORE_FILES} ${SRC_DIR}/arm64-gen.c ${SRC_DIR}/arm64-link.c ${SRC_DIR}/arm64-asm.c )
+set( ARM64_WIN32_FILES ${ARM64_FILES} ${SRC_DIR}/tccpe.c )
+set( ARM64_OSX_FILES ${ARM64_FILES} ${SRC_DIR}/tccmacho.c )
+set( C67_FILES ${CORE_FILES} ${SRC_DIR}/c67-gen.c ${SRC_DIR}/c67-link.c ${SRC_DIR}/tcccoff.c )
+set( RISCV64_FILES ${CORE_FILES} ${SRC_DIR}/riscv64-gen.c ${SRC_DIR}/riscv64-link.c ${SRC_DIR}/riscv64-asm.c )
 
 # Set C compiler flags.
 include( CheckCCompilerFlag )
@@ -118,8 +127,8 @@ if( HAVE_NOSTRICTALIASING )
   add_definitions( -fno-strict-aliasing )
 endif( HAVE_NOSTRICTALIASING )
 
-set (TCC_INCLUDE_DIRS -I${TCC_DIR}/include)
-set (TCC_CROSS_INCLUDE_DIRS -I${TCC_DIR}/win32/include -I${TCC_DIR}/win32/include/winapi)
+set (TCC_INCLUDE_DIRS -I${INC_DIR})
+set (TCC_CROSS_INCLUDE_DIRS -I${WIN_DIR}/include -I${WIN_DIR}/include/winapi)
 if (WIN32)
     list(APPEND TCC_INCLUDE_DIRS ${TCC_CROSS_INCLUDE_DIRS})
 endif()
@@ -141,18 +150,15 @@ if(UNIX)
   endif()
 endif()
 
-file(READ ${TCC_DIR}/VERSION TCC_UNSTRIPPED_VERSION)
-string(STRIP ${TCC_UNSTRIPPED_VERSION} TCC_VERSION)
+set(TCC_VERSION ${PROJECT_VERSION})
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h)
-file(STRINGS "VERSION" TCC_VERSION)
-list(GET TCC_VERSION 0 TCC_VERSION)
-configure_file(config.h.in ${TCC_DIR}/config.h)
+configure_file(config.h.in ${SRC_DIR}/config.h)
 if(WIN32)
-    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env.bat)
-    configure_file(cmake_env.bat.in ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env.bat)
+    file(WRITE ${TCC_DIR}/tcc_env.bat)
+    configure_file(cmake_env.bat.in ${TCC_DIR}/tcc_env.bat)
 else()
-    file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env)
-    configure_file(cmake_env.sh.in ${CMAKE_CURRENT_SOURCE_DIR}/tcc_env)
+    file(WRITE ${TCC_DIR}/tcc_env)
+    configure_file(cmake_env.sh.in ${TCC_DIR}/tcc_env)
 endif()
 configure_file(config.texi.in config.texi)
 
@@ -160,8 +166,8 @@ include_directories(${CMAKE_BINARY_DIR})
 
 set(CPACK_PACKAGE_VENDOR "https://github.com/zelang-dev/tinycc")
 set(CPACK_PACKAGE_VERSION ${TCC_VERSION})
-set(CPACK_RESOURCE_FILE_LICENSE ${CMAKE_CURRENT_SOURCE_DIR}/COPYING.txt)
-set(CPACK_RESOURCE_FILE_README ${CMAKE_CURRENT_SOURCE_DIR}/README.md)
+set(CPACK_RESOURCE_FILE_LICENSE ${TCC_DIR}/COPYING.txt)
+set(CPACK_RESOURCE_FILE_README ${TCC_DIR}/README.md)
 set(CPACK_NSIS_MENU_LINKS "share/doc/tcc/tinycc-docs.html"
      "Tiny C Compiler Reference Documentation" "share/tcc_prompt.bat" "Tiny C Command Prompt")
 
@@ -317,7 +323,7 @@ elseif (UNIX)
 endif()
 
 target_include_directories(libtcc
-    PUBLIC ${TCC_DIR}
+    PUBLIC ${SRC_DIR}
     PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/tcc-config)
 set_target_properties(libtcc PROPERTIES
     PREFIX ""
@@ -330,66 +336,66 @@ if(WIN32)
     add_definitions(-W2 -MT -GS- -nologo -D_CRT_SECURE_NO_DEPRECATE)
 endif()
 
-add_executable(tcc ${TCC_DIR}/tcc.c)
+add_executable(tcc ${SRC_DIR}/tcc.c)
 target_link_libraries(tcc PUBLIC libtcc)
 install(TARGETS libtcc DESTINATION ${CMAKE_INSTALL_LIBDIR})
 install(TARGETS tcc RUNTIME)
 
-add_executable(c2str ${TCC_DIR}/conftest.c)
+add_executable(c2str ${SRC_DIR}/conftest.c)
 target_compile_definitions(c2str PUBLIC C2STR)
 install(TARGETS c2str RUNTIME)
 
 add_dependencies(c2str libtcc)
 add_custom_command(
-    OUTPUT ${TCC_DIR}/tccdefs_.h
-    COMMAND c2str ${TCC_DIR}/include/tccdefs.h tccdefs_.h)
+    OUTPUT ${SRC_DIR}/tccdefs_.h
+    COMMAND c2str ${INC_DIR}/tccdefs.h tccdefs_.h)
 
 ################################################################################
 # Runtime Library (libtcc1.a)
 
-set( BCHECK_O ${TCC_DIR}/lib/bcheck.c )
-set( B_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/bt-dll.c )
-set( BT_O ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/tcov.c )
-set( EXTRA_O ${TCC_DIR}/lib/runmain.c ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-dll.c ${TCC_DIR}/lib/bt-log.c ${BCHECK_O} )
-set( CROSS_EXTRA_O ${BCHECK_O} ${TCC_DIR}/lib/bt-exe.c ${TCC_DIR}/lib/bt-log.c ${TCC_DIR}/lib/tcov.c )
+set( BCHECK_O ${SRC_DIR}/lib/bcheck.c )
+set( B_O ${BCHECK_O} ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-log.c ${SRC_DIR}/lib/bt-dll.c )
+set( BT_O ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-log.c ${SRC_DIR}/lib/runmain.c ${SRC_DIR}/lib/tcov.c )
+set( EXTRA_O ${SRC_DIR}/lib/runmain.c ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-dll.c ${SRC_DIR}/lib/bt-log.c ${BCHECK_O} )
+set( CROSS_EXTRA_O ${BCHECK_O} ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-log.c ${SRC_DIR}/lib/tcov.c )
 
 set( I386_O
- ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
- ${TCC_DIR}/lib/alloca-bt.S ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${SRC_DIR}/lib/libtcc1.c ${SRC_DIR}/lib/alloca.S
+ ${SRC_DIR}/lib/alloca-bt.S ${SRC_DIR}/lib/stdatomic.c
+ ${SRC_DIR}/lib/atomic.S ${SRC_DIR}/lib/builtin.c ${BT_O} )
 
 set( X86_64_O
- ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/alloca.S
- ${TCC_DIR}/lib/alloca-bt.S ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${SRC_DIR}/lib/libtcc1.c ${SRC_DIR}/lib/alloca.S
+ ${SRC_DIR}/lib/alloca-bt.S ${SRC_DIR}/lib/stdatomic.c
+ ${SRC_DIR}/lib/atomic.S ${SRC_DIR}/lib/builtin.c ${BT_O} )
 
 set( ARM_O
- ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/lib/armeabi.c
- ${TCC_DIR}/lib/alloca.S ${TCC_DIR}/lib/armflush.c
- ${TCC_DIR}/lib/stdatomic.c ${TCC_DIR}/lib/atomic.S
- ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${SRC_DIR}/lib/libtcc1.c ${SRC_DIR}/lib/armeabi.c
+ ${SRC_DIR}/lib/alloca.S ${SRC_DIR}/lib/armflush.c
+ ${SRC_DIR}/lib/stdatomic.c ${SRC_DIR}/lib/atomic.S
+ ${SRC_DIR}/lib/builtin.c ${BT_O} )
 
 set( ARM64_O
- ${TCC_DIR}/lib/lib-arm64.c ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${SRC_DIR}/lib/lib-arm64.c ${SRC_DIR}/lib/stdatomic.c
+ ${SRC_DIR}/lib/atomic.S ${SRC_DIR}/lib/builtin.c ${BT_O} )
 
 set( RISCV64_O
- ${TCC_DIR}/lib/lib-arm64.c ${TCC_DIR}/lib/stdatomic.c
- ${TCC_DIR}/lib/atomic.S ${TCC_DIR}/lib/builtin.c ${BT_O} )
+ ${SRC_DIR}/lib/lib-arm64.c ${SRC_DIR}/lib/stdatomic.c
+ ${SRC_DIR}/lib/atomic.S ${SRC_DIR}/lib/builtin.c ${BT_O} )
 
 set( WIN_O
- ${TCC_DIR}/lib/libtcc1.c ${TCC_DIR}/win32/lib/crt1.c
- ${TCC_DIR}/win32/lib/crt1w.c ${TCC_DIR}/win32/lib/wincrt1.c
- ${TCC_DIR}/win32/lib/wincrt1w.c ${TCC_DIR}/win32/lib/dllcrt1.c
- ${TCC_DIR}/win32/lib/dllmain.c ${TCC_DIR}/win32/lib/dlfcn.c )
+ ${SRC_DIR}/lib/libtcc1.c ${WIN_DIR}/lib/crt1.c
+ ${WIN_DIR}/lib/crt1w.c ${WIN_DIR}/lib/wincrt1.c
+ ${WIN_DIR}/lib/wincrt1w.c ${WIN_DIR}/lib/dllcrt1.c
+ ${WIN_DIR}/lib/dllmain.c ${WIN_DIR}/lib/dlfcn.c )
 
-set( DSO_O ${TCC_DIR}/lib/dsohandle.c )
+set( DSO_O ${SRC_DIR}/lib/dsohandle.c )
 
 set( OBJ-i386 ${I386_O} ${BCHECK_O} ${DSO_O} )
-set( OBJ-x86_64 ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} ${DSO_O} )
-set( OBJ-x86_64-osx ${X86_64_O} ${TCC_DIR}/lib/va_list.c ${BCHECK_O} )
-set( OBJ-i386-win32 ${I386_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
-set( OBJ-x86_64-win32 ${X86_64_O} ${TCC_DIR}/win32/lib/chkstk.S ${B_O} ${WIN_O} )
+set( OBJ-x86_64 ${X86_64_O} ${SRC_DIR}/lib/va_list.c ${BCHECK_O} ${DSO_O} )
+set( OBJ-x86_64-osx ${X86_64_O} ${SRC_DIR}/lib/va_list.c ${BCHECK_O} )
+set( OBJ-i386-win32 ${I386_O} ${WIN_DIR}/lib/chkstk.S ${B_O} ${WIN_O} )
+set( OBJ-x86_64-win32 ${X86_64_O} ${WIN_DIR}/lib/chkstk.S ${B_O} ${WIN_O} )
 set( OBJ-arm64 ${ARM64_O} ${BCHECK_O} ${DSO_O} )
 set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
 set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
@@ -435,7 +441,7 @@ endif()
 
 # compile C files to object files
 list(REMOVE_ITEM LIB_SRCFILES ${EXTRA_O})
-list(APPEND LIB_SRCFILES ${TCC_DIR}/threads/cmalloc.c)
+list(APPEND LIB_SRCFILES ${SRC_DIR}/threads/cmalloc.c)
 file(MAKE_DIRECTORY ${LIB_DIR})
 foreach(LIB_SRCFILE ${LIB_SRCFILES})
     get_filename_component(LIB_SRCFILE_NOEXT ${LIB_SRCFILE} NAME_WE)
@@ -452,7 +458,7 @@ foreach(LIB_SRCFILE ${LIB_SRCFILES})
 endforeach()
 
 if(UNIX)
-    list(REMOVE_ITEM EXTRA_O ${TCC_DIR}/lib/bt-dll.c)
+    list(REMOVE_ITEM EXTRA_O ${SRC_DIR}/lib/bt-dll.c)
 endif()
 
 if(WIN32)
@@ -460,11 +466,11 @@ if(WIN32)
         OUTPUT ${LIB_DIR}/pthread.o
         COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
-                    -c ${TCC_DIR}/threads/deps/pthread-JMP.c
+                    -c ${SRC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/pthread.o
-        MAIN_DEPENDENCY ${TCC_DIR}/threads/deps/pthread-JMP.c
+        MAIN_DEPENDENCY ${SRC_DIR}/threads/deps/pthread-JMP.c
         VERBATIM
-        COMMENT "Compiling Runtime Library (${TCC_DIR}/threads/deps/pthread-JMP.c)")
+        COMMENT "Compiling Runtime Library (${SRC_DIR}/threads/deps/pthread-JMP.c)")
     list(APPEND LIB_OBJFILES ${LIB_DIR}/pthread.o)
 endif()
 
@@ -472,11 +478,11 @@ add_custom_command(
     OUTPUT ${LIB_DIR}/cthread.o
     COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB ${TCC_INCLUDE_DIRS}
             -L ${LIB_DIR}
-            -c ${TCC_DIR}/threads/cthread.c
+            -c ${SRC_DIR}/threads/cthread.c
             -o ${LIB_DIR}/cthread.o
-    MAIN_DEPENDENCY ${TCC_DIR}/threads/cthread.c
+    MAIN_DEPENDENCY ${SRC_DIR}/threads/cthread.c
     VERBATIM
-    COMMENT "Compiling Runtime Library (${TCC_DIR}/threads/cthread.c)")
+    COMMENT "Compiling Runtime Library (${SRC_DIR}/threads/cthread.c)")
 list(APPEND LIB_OBJFILES ${LIB_DIR}/cthread.o)
 
 # link all objects files to archive file
@@ -578,20 +584,20 @@ foreach(X ${TCC_X})
     set(tcc_cross ${X}-tcc)
     set(CROSS_SRCFILES ${OBJ-${X}})
     set(CROSS_TARGET ${CROSS_TARGET_${X}})
-    set(CROSS_INCLUDE ${TCC_DIR}/include)
+    set(CROSS_INCLUDE ${INC_DIR})
     if(${X} STREQUAL i386-win32
         OR ${X} STREQUAL x86_64-win32
         OR ${X} STREQUAL arm-wince)
-            set(CROSS_INCLUDE ${TCC_DIR}/include -I${TCC_DIR}/win32/include -I${TCC_DIR}/win32/include/winapi)
+            set(CROSS_INCLUDE ${INC_DIR} -I${WIN_DIR}/include -I${WIN_DIR}/include/winapi)
     endif()
-    add_executable(${tcc_cross} ${TCC_DIR}/tcc.c)
+    add_executable(${tcc_cross} ${SRC_DIR}/tcc.c)
     target_compile_definitions(${tcc_cross} PUBLIC ${CROSS_TARGET})
     install(TARGETS ${tcc_cross} RUNTIME)
 
     if(WIN32 AND
         (NOT ${X} STREQUAL arm-wince OR NOT ${X} STREQUAL i386-win32 OR NOT ${X} STREQUAL x86_64-win32))
             list(REMOVE_ITEM CROSS_SRCFILES ${B_O})
-            list(REMOVE_ITEM CROSS_SRCFILES ${TCC_DIR}/lib/tcov.c )
+            list(REMOVE_ITEM CROSS_SRCFILES ${SRC_DIR}/lib/tcov.c )
     endif()
 
     if(UNIX AND
@@ -625,25 +631,25 @@ foreach(X ${TCC_X})
                 OUTPUT ${LIB_DIR}/${X}_pthread.o
                 COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB
                     -L ${LIB_DIR}
-                    -c ${TCC_DIR}/threads/deps/pthread-JMP.c
+                    -c ${SRC_DIR}/threads/deps/pthread-JMP.c
                     -o ${LIB_DIR}/${X}_pthread.o
                     -I ${CROSS_INCLUDE}
-                MAIN_DEPENDENCY ${TCC_DIR}/threads/deps/pthread-JMP.c
+                MAIN_DEPENDENCY ${SRC_DIR}/threads/deps/pthread-JMP.c
                 DEPENDS ${tcc_cross}
                 VERBATIM
-                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/threads/deps/pthread-JMP.c)")
+                COMMENT "Cross Compiling Runtime Library (${SRC_DIR}/threads/deps/pthread-JMP.c)")
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_pthread.o)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_cthread.o
                 COMMAND ${tcc_cross} -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB -DHAVE_CONFIG_H
                         -L ${LIB_DIR}
-                        -c ${TCC_DIR}/threads/cthread.c
+                        -c ${SRC_DIR}/threads/cthread.c
                         -o ${LIB_DIR}/${X}_cthread.o
                         -I ${CROSS_INCLUDE}
-                MAIN_DEPENDENCY ${TCC_DIR}/threads/cthread.c
+                MAIN_DEPENDENCY ${SRC_DIR}/threads/cthread.c
                 DEPENDS ${tcc_cross}
                 VERBATIM
-                COMMENT "Cross Compiling Runtime Library (${TCC_DIR}/threads/cthread.c)")
+                COMMENT "Cross Compiling Runtime Library (${SRC_DIR}/threads/cthread.c)")
             list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}_cthread.o)
     endif()
 
@@ -661,24 +667,24 @@ endforeach()
 
 add_subdirectory(tests)
 
-file(GLOB WIN32_DEFS win32/lib/*.def)
+file(GLOB WIN32_DEFS ${WIN_DIR}/lib/*.def)
 if(WIN32)
-    install(DIRECTORY win32/include/ DESTINATION include)
+    install(DIRECTORY ${WIN_DIR}/include/ DESTINATION include)
     install(DIRECTORY include/ DESTINATION include)
     install(DIRECTORY include/ DESTINATION lib/include)
-    install(FILES tcclib.h DESTINATION lib/include)
-    install(FILES tcclib.h DESTINATION include)
     install(FILES ${WIN32_DEFS} DESTINATION lib)
-    install(FILES libtcc.h DESTINATION lib)
+    install(FILES ${SRC_DIR}/tcclib.h DESTINATION lib/include)
+    install(FILES ${SRC_DIR}/tcclib.h DESTINATION include)
+    install(FILES ${SRC_DIR}/libtcc.h DESTINATION lib)
     install(FILES tcc_prompt.bat DESTINATION ${CMAKE_INSTALL_DATADIR})
     install(FILES cmake_tcc.bat tcc_env.bat DESTINATION bin)
 else()
+    install(DIRECTORY ${WIN_DIR}/include/ DESTINATION lib/tcc/win32/include)
     install(DIRECTORY include/ DESTINATION lib/tcc/include)
-    install(DIRECTORY win32/include/ DESTINATION lib/tcc/win32/include)
-    install(FILES tcclib.h DESTINATION lib/tcc/win32/include)
-    install(FILES tcclib.h DESTINATION lib/tcc/include)
     install(FILES ${WIN32_DEFS} DESTINATION lib/tcc/win32/lib)
-    install(FILES libtcc.h DESTINATION include)
+    install(FILES ${SRC_DIR}/tcclib.h DESTINATION lib/tcc/win32/include)
+    install(FILES ${SRC_DIR}/tcclib.h DESTINATION lib/tcc/include)
+    install(FILES ${SRC_DIR}/libtcc.h DESTINATION include)
     install(FILES cmake_tcc tcc_env tcc_prompt
         PERMISSIONS OWNER_EXECUTE OWNER_WRITE OWNER_READ
         DESTINATION bin )
