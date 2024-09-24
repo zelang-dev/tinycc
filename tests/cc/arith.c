@@ -41,8 +41,8 @@ static void test_relative() {
     expect(1, 1 <= 0xFFFFFFFFU);
     expect(1, -1 > 1U);
     expect(1, -1 >= 1U);
-    expect(0, -1L > 1U);
-    expect(0, -1L >= 1U);
+    expect(0, -1LL > 1U);
+    expect(0, -1LL >= 1U);
     expect(0, 1.0 < 0.0);
     expect(1, 0.0 < 1.0);
 }

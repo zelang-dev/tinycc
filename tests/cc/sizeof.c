@@ -11,7 +11,7 @@ static void test_primitives() {
     expect(1, sizeof(bool));
     expect(2, sizeof(short));
     expect(4, sizeof(int));
-    expect(8, sizeof(long));
+    expect(8, sizeof(long long));
 }
 
 static void test_pointers() {
@@ -25,14 +25,14 @@ static void test_unsigned() {
     expect(1, sizeof(unsigned char));
     expect(2, sizeof(unsigned short));
     expect(4, sizeof(unsigned int));
-    expect(8, sizeof(unsigned long));
+    expect(8, sizeof(unsigned long long));
 }
 
 static void test_literals() {
     expect(4, sizeof 1);
     expect(4, sizeof('a'));
     expect(4, sizeof(1.0f));
-    expect(8, sizeof 1L);
+    expect(8, sizeof 1LL);
     expect(8, sizeof 1.0);
     expect(8, sizeof(1.0));
 }

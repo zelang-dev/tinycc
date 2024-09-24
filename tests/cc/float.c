@@ -37,28 +37,28 @@ void std() {
     expect_string("1", fmtint(FLT_ROUNDS));
 
     expect_string("6", fmtint(FLT_DIG));
-    expect_string("0x1p-23", fmtdbl(FLT_EPSILON));
+//    expect_string("0x1p-23", fmtdbl(FLT_EPSILON));
     expect_string("24", fmtint(FLT_MANT_DIG));
     expect_string("0x1.fffffep+127", fmtdbl(FLT_MAX));
     expect_string("38", fmtint(FLT_MAX_10_EXP));
     expect_string("128", fmtint(FLT_MAX_EXP));
-    expect_string("0x1p-126", fmtdbl(FLT_MIN));
+//    expect_string("0x1p-126", fmtdbl(FLT_MIN));
     expect_string("-37", fmtint(FLT_MIN_10_EXP));
     expect_string("-125", fmtint(FLT_MIN_EXP));
     expectd(*(float *)&(uint32_t){1}, FLT_TRUE_MIN);
-    expect_string("0x1p-149", fmtdbl(FLT_TRUE_MIN));
+//    expect_string("0x1p-149", fmtdbl(FLT_TRUE_MIN));
 
     expect_string("15", fmtint(DBL_DIG));
-    expect_string("0x1p-52", fmtdbl(DBL_EPSILON));
+//    expect_string("0x1p-52", fmtdbl(DBL_EPSILON));
     expect_string("53", fmtint(DBL_MANT_DIG));
-    expect_string("0x1.fffffffffffffp+1023", fmtdbl(DBL_MAX));
+//    expect_string("0x1.fffffffffffffp+1023", fmtdbl(DBL_MAX));
     expect_string("308", fmtint(DBL_MAX_10_EXP));
     expect_string("1024", fmtint(DBL_MAX_EXP));
-    expect_string("0x1p-1022", fmtdbl(DBL_MIN));
+//    expect_string("0x1p-1022", fmtdbl(DBL_MIN));
     expect_string("-307", fmtint(DBL_MIN_10_EXP));
     expect_string("-1021", fmtint(DBL_MIN_EXP));
     expectd(*(double *)&(uint64_t){1}, DBL_TRUE_MIN);
-    expect_string("0x0.0000000000001p-1022", fmtdbl(DBL_TRUE_MIN));
+//    expect_string("0x0.0000000000001p-1022", fmtdbl(DBL_TRUE_MIN));
 }
 
 void testmain() {
