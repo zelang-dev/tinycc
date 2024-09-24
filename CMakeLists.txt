@@ -279,7 +279,6 @@ elseif (UNIX)
                 "TCC_TARGET_X86_64="
                 "TCC_TARGET_MACHO=1")
         endif()
-        target_compile_definitions( -flat_namespace -undefined warning )
     else()
         if( ${TARGET_ARCH} STREQUAL riscv64 )
             target_compile_definitions(libtcc PUBLIC
