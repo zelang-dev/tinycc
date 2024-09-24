@@ -22,7 +22,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -A ${{ matrix.arch }} ..
+            cmake -D BUILD_TESTING=ON -A ${{ matrix.arch }} ..
             cmake --build . --config Debug
       - name: Run ctest
         shell: cmd
@@ -47,7 +47,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON ..
             cmake --build .
       - name: Run ctest
         run: |
@@ -80,7 +80,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Run ctest
         run: |

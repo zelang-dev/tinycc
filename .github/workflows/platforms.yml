@@ -51,7 +51,7 @@ jobs:
                 ln -s /usr/include/arm-linux-gnueabihf/asm /usr/include
                 ;;
             esac
-            cmake -DCMAKE_BUILD_TYPE=Debug ..
+            cmake -DCMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON ..
             cmake --build .
             ctest -C Debug
             cat Testing/Temporary/LastTest.log
