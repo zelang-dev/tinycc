@@ -15,7 +15,6 @@
 .gdb_history
 a.out
 tcc_g
-tcc
 tcc_c
 tcc_p
 *-tcc
@@ -64,11 +63,9 @@ tests/tests2/fred.txt
 libtcc.dylib
 build/
 built/
-TCC-BUILT/
 src/config.h
 tests/mt.c
 .vscode/
-config.h
 tcc_env
 tcc_env.*
 cmake_env.bat
