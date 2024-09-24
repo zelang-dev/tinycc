@@ -20,6 +20,7 @@ foreach(test_file ${TCC_TESTS})
         ${test_file_NOEXT} ALL
         COMMAND tcc ${CMAKE_CURRENT_SOURCE_DIR}/${test_file_NOEXT}.c ${CMAKE_CURRENT_SOURCE_DIR}/testmain.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/cc/${test_file_NOEXT}${EXESUF}
         BYPRODUCTS ${CMAKE_BINARY_DIR}/cc/${test_file_NOEXT}${EXESUF}
-        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${test_file_NOEXT}.c )
+        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${test_file_NOEXT}.c
+        DEPENDS libarchive )
     add_test(NAME ${test_file_NOEXT} COMMAND ${test_file_NOEXT} WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/cc)
 endforeach()
