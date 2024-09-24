@@ -495,6 +495,22 @@ add_custom_target(
     SOURCES ${LIB_SRCFILES})
 install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
+add_custom_target(
+    libtcc_o ALL
+    tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${SRC_DIR}/libtcc.c -o ${LIB_DIR}/libtcc.o
+    VERBATIM
+    COMMENT "Compiling (${SRC_DIR}/libtcc.c)"
+    SOURCES ${SRC_DIR}/libtcc.c )
+install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+add_custom_target(
+    libtcc_a ALL
+    tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a ${LIB_DIR}/libtcc.o
+    DEPENDS libtcc_o
+    BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a
+    COMMENT "Linking Archive ${LIB_DIR}/libtcc.o")
+install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
 if(WIN32 AND BUILD_SHARED_LIBS)
     add_custom_command(
         OUTPUT libtcc.def
