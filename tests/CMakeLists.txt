@@ -229,4 +229,4 @@ add_custom_target(
     DEPENDS libtcc_a
     SOURCES ${TEST_DIR}/libtcc_test.c )
 
-add_test(NAME libtcc_test COMMAND libtcc_test -L../built -I../include -I../src WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+add_test(NAME libtcc_test COMMAND libtcc_test -B../built -L../built -I../include -I../src WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

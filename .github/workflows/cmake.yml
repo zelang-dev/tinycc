@@ -29,14 +29,14 @@ jobs:
         run: |
             cd build
             ctest -C Debug
+            cat Testing/Temporary/LastTest.log
       - name: ctest log
         run: |
             cd build
-            cat Testing/Temporary/LastTest.log
 
   build-macos:
     name: macOS
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
       - uses: actions/checkout@v3
       - name: Find includes
@@ -53,9 +53,6 @@ jobs:
         run: |
             cd build
             ctest -C Debug
-      - name: ctest log
-        run: |
-            cd build
             cat Testing/Temporary/LastTest.log
 
   build-linux:
@@ -86,7 +83,4 @@ jobs:
         run: |
             cd build
             ctest -C Debug
-      - name: ctest log
-        run: |
-            cd build
             cat Testing/Temporary/LastTest.log
