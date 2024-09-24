@@ -501,7 +501,6 @@ add_custom_target(
     VERBATIM
     COMMENT "Compiling (${SRC_DIR}/libtcc.c)"
     SOURCES ${SRC_DIR}/libtcc.c )
-install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 add_custom_target(
     libtcc_a ALL
