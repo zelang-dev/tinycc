@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, Win32]
+        arch: [x64]
     steps:
       - uses: ilammy/msvc-dev-cmd@v1
         with:

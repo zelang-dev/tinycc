@@ -10,7 +10,7 @@ if(WIN32)
   set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
   add_subdirectory(dll)
 else()
-  set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_BINARY_DIR})
+  set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
 add_subdirectory(thread)
@@ -204,18 +204,18 @@ set(PP
 set(TCC_CFLAGS ${TCC_CFLAGS} ${TCC_MATH_LDFLAGS} ${LIBTCC_LDFLAGS})
 foreach(testpp ${PP})
   add_test(NAME ${testpp} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/pp
-           COMMAND tcc ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -run -E ${testpp}.c  arg1 arg2 | ${DIFF} - ${testpp}.expect)
+           COMMAND tcc ${TCC_CFLAGS} -run -E ${testpp}.c  arg1 arg2 | ${DIFF} - ${testpp}.expect)
 endforeach()
 
 foreach(testfile ${TESTS2})
   add_test(NAME ${testfile} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests2
-           COMMAND tcc ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -dt -bt -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
+           COMMAND tcc ${TCC_CFLAGS} -dt -bt -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
 endforeach()
 
 set( TEST_DIR ${TCC_DIR}/tests )
 add_custom_target(
     tcctest ALL
-    COMMAND tcc ${TEST_DIR}/tcctest.c ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
+    COMMAND tcc ${TEST_DIR}/tcctest.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
     BYPRODUCTS ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
     DEPENDS libarchive
     SOURCES ${TEST_DIR}/tcctest.c )
@@ -224,9 +224,9 @@ add_test(NAME tcctest COMMAND tcctest WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
     libtcc_test ALL
-    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a ${TCC_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
+    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a
     BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
-    DEPENDS libtcc_a
-    SOURCES ${TEST_DIR}/libtcc_test.c )
+    SOURCES ${TEST_DIR}/libtcc_test.c
+    DEPENDS libarchive)
 
 add_test(NAME libtcc_test COMMAND libtcc_test -B../built -L../built -I../include -I../src WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

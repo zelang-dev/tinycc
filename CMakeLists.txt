@@ -273,11 +273,13 @@ elseif (UNIX)
         if( ${TARGET_ARCH} STREQUAL arm64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM64="
-                "TCC_TARGET_MACHO=1")
+                "TCC_TARGET_MACHO="
+                 -flat_namespace -undefined warning )
         elseif( ${TARGET_ARCH} STREQUAL x86_64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_X86_64="
-                "TCC_TARGET_MACHO=1")
+                "TCC_TARGET_MACHO="
+                 -flat_namespace -undefined warning )
         endif()
     else()
         if( ${TARGET_ARCH} STREQUAL riscv64 )
@@ -494,29 +496,33 @@ add_custom_target(
     SOURCES ${LIB_SRCFILES})
 install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-add_custom_target(
-    libtcc_o ALL
-    tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${SRC_DIR}/libtcc.c -o ${LIB_DIR}/libtcc.o
-    VERBATIM
-    COMMENT "Compiling (${SRC_DIR}/libtcc.c)"
-    SOURCES ${SRC_DIR}/libtcc.c )
-
-add_custom_target(
-    libtcc_a ALL
-    tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a ${LIB_DIR}/libtcc.o
-    DEPENDS libtcc_o
-    BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a
-    COMMENT "Linking Archive ${LIB_DIR}/libtcc.o")
-install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
-
-if(WIN32 AND BUILD_SHARED_LIBS)
-    add_custom_command(
-        OUTPUT libtcc.def
-        COMMAND tcc -impdef libtcc -o libtcc.def
-        MAIN_DEPENDENCY ${LIB_OBJFILES}
+if(WIN32)
+    add_custom_target(
+        libtcc_o ALL
+        tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${SRC_DIR}/libtcc.c -o ${LIB_DIR}/libtcc.o
+        DEPENDS libarchive
         VERBATIM
-        COMMENT "Create Windows Import DLL Library (${LIB_DIR}/libtcc.def)")
-    install(FILES libtcc.def DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        COMMENT "Compiling (${SRC_DIR}/libtcc.c)"
+        SOURCES ${SRC_DIR}/libtcc.c )
+
+    add_custom_target(
+        libtcc_a ALL
+        tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a ${LIB_DIR}/libtcc.o
+        DEPENDS libtcc_o
+        BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a
+        VERBATIM
+        COMMENT "Linking Archive ${LIB_DIR}/libtcc.o")
+    install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+
+    if(BUILD_SHARED_LIBS)
+        add_custom_command(
+            OUTPUT libtcc.def
+            COMMAND tcc -impdef libtcc -o libtcc.def
+            MAIN_DEPENDENCY ${LIB_OBJFILES}
+            VERBATIM
+            COMMENT "Create Windows Import DLL Library (${LIB_DIR}/libtcc.def)")
+        install(FILES libtcc.def DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    endif()
 endif()
 
 foreach(EXTRA_SRCFILE ${EXTRA_O})
