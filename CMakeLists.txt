@@ -146,7 +146,7 @@ if(UNIX)
     set(USR_INCLUDE ${mac_include}/usr/include )
     message(STATUS "OSX include location: ${USR_INCLUDE}")
     list(APPEND TCC_INCLUDE_DIRS -I${USR_INCLUDE} )
-    add_definitions( -DCONFIG_USR_INCLUDE=\"${USR_INCLUDE}\" )
+    add_definitions( -DCONFIG_USR_INCLUDE=\"${USR_INCLUDE}\" -flat_namespace -undefined warning  )
   endif()
 endif()
 
@@ -273,13 +273,11 @@ elseif (UNIX)
         if( ${TARGET_ARCH} STREQUAL arm64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM64="
-                "TCC_TARGET_MACHO="
-                 -flat_namespace -undefined warning )
+                "TCC_TARGET_MACHO=1")
         elseif( ${TARGET_ARCH} STREQUAL x86_64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_X86_64="
-                "TCC_TARGET_MACHO="
-                 -flat_namespace -undefined warning )
+                "TCC_TARGET_MACHO=1")
         endif()
     else()
         if( ${TARGET_ARCH} STREQUAL riscv64 )
