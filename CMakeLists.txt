@@ -623,6 +623,11 @@ foreach(X ${TCC_X})
             list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
     endif()
 
+    if(APPLE AND
+        (${X} STREQUAL i386 ))
+            list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
+    endif()
+
     # compile C files to object files
     file(MAKE_DIRECTORY ${LIB_DIR})
     foreach(CROSS_SRCFILE ${CROSS_SRCFILES})
