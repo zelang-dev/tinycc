@@ -272,10 +272,12 @@ elseif (UNIX)
     if(APPLE)
         if( ${TARGET_ARCH} STREQUAL arm64 )
             target_compile_definitions(libtcc PUBLIC
-                "TCC_TARGET_ARM64=")
+                "TCC_TARGET_ARM64="
+                "TCC_TARGET_MACHO=1")
         elseif( ${TARGET_ARCH} STREQUAL x86_64 )
             target_compile_definitions(libtcc PUBLIC
-                "TCC_TARGET_X86_64=")
+                "TCC_TARGET_X86_64="
+                "TCC_TARGET_MACHO=1")
         endif()
     else()
         if( ${TARGET_ARCH} STREQUAL riscv64 )
