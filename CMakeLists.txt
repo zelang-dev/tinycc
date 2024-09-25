@@ -146,7 +146,7 @@ if(UNIX)
     set(USR_INCLUDE ${mac_include}/usr/include )
     message(STATUS "OSX include location: ${USR_INCLUDE}")
     list(APPEND TCC_INCLUDE_DIRS -I${USR_INCLUDE} )
-    add_definitions( -DCONFIG_USR_INCLUDE=\"${USR_INCLUDE}\" -flat_namespace -undefined warning  )
+    add_definitions(-Wno-incompatible-pointer-types -DCONFIG_USR_INCLUDE=\"${USR_INCLUDE}\")
   endif()
 endif()
 
