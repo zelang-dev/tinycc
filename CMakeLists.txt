@@ -134,7 +134,7 @@ if (WIN32)
 endif()
 
 if(UNIX)
-  add_definitions(-Wall -O2 -lpthread -Wno-declaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
+  add_definitions(-Wall -O2 -Wdeclaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
   if(NOT APPLE)
     add_definitions( -Wno-format-truncation -Wno-stringop-truncation )
   elseif(APPLE)
@@ -146,7 +146,7 @@ if(UNIX)
     set(USR_INCLUDE ${mac_include}/usr/include )
     message(STATUS "OSX include location: ${USR_INCLUDE}")
     list(APPEND TCC_INCLUDE_DIRS -I${USR_INCLUDE} )
-    add_definitions(-Wno-incompatible-pointer-types -DCONFIG_USR_INCLUDE=\"${USR_INCLUDE}\")
+    add_definitions(-fheinous-gnu-extensions -Wno-string-plus-int -Wno-deprecated-declarations -Wno-incompatible-pointer-types -DCONFIG_USR_INCLUDE=\"${USR_INCLUDE}\")
   endif()
 endif()
 
@@ -272,12 +272,10 @@ elseif (UNIX)
     if(APPLE)
         if( ${TARGET_ARCH} STREQUAL arm64 )
             target_compile_definitions(libtcc PUBLIC
-                "TCC_TARGET_ARM64="
-                "TCC_TARGET_MACHO=1")
+                "TCC_TARGET_ARM64=")
         elseif( ${TARGET_ARCH} STREQUAL x86_64 )
             target_compile_definitions(libtcc PUBLIC
-                "TCC_TARGET_X86_64="
-                "TCC_TARGET_MACHO=1")
+                "TCC_TARGET_X86_64=")
         endif()
     else()
         if( ${TARGET_ARCH} STREQUAL riscv64 )
