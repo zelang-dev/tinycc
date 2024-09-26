@@ -140,7 +140,7 @@ if (WIN32)
 endif()
 
 if(UNIX)
-  add_definitions(-Wall -O2 -Wdeclaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
+  add_definitions(-Wall -O2 -Wnodeclaration-after-statement -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-unknown-pragmas)
   if(NOT APPLE)
     add_definitions( -Wno-format-truncation -Wno-stringop-truncation )
   elseif(APPLE)
@@ -608,7 +608,7 @@ set(CROSS_TARGET_arm64-osx TCC_TARGET_ARM64 TCC_TARGET_MACHO
  CONFIG_TCC_CROSSPREFIX=\"arm64-osx-\"
  CONFIG_TCC_LIBPATHS=\"{B}/lib\")
 
-set(CROSS_DEFINES -Wall -O2 -Wdeclaration-after-statement -fno-strict-aliasing
+set(CROSS_DEFINES -Wall -O2 -Wnodeclaration-after-statement -fno-strict-aliasing
  -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-format-truncation -Wno-stringopcation)
 
 foreach(X ${TCC_X})

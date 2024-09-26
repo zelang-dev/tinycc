@@ -1319,7 +1319,7 @@ typedef unsigned char           c89atomic_bool;
             #define c89atomic_thread_fence(order) __asm__ __volatile__("lock; addl $0, (%%esp)" ::: "memory", "cc")
         #elif defined(C89ATOMIC_X64)
             #define c89atomic_thread_fence(order) __asm__ __volatile__("lock; addq $0, (%%rsp)" ::: "memory", "cc")
-        #else
+        #elif !defined(__TINYC__)
             #error Unsupported architecture. Please submit a feature request.
         #endif
 
@@ -1330,10 +1330,12 @@ typedef unsigned char           c89atomic_bool;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
             #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
-                return (c89atomic_uint8)atomic_compare_exchange_strong((atomic_uchar *)dst, (unsigned char*)&expected, (unsigned char)desired);
+                result = (c89atomic_uint8)atomic_compare_exchange_strong((atomic_uchar *)dst, (unsigned char*)&expected, (unsigned char)desired);
             #else
                 __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint8)atomic_compare_exchange_strong((atomic_uchar *)dst, (unsigned char *)&expected, (unsigned char)desired);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1347,10 +1349,12 @@ typedef unsigned char           c89atomic_bool;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
             #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
-                return (c89atomic_uint16)atomic_compare_exchange_strong((atomic_ushort *)dst, (unsigned short*)&expected, (unsigned short)desired);
+                result = (c89atomic_uint16)atomic_compare_exchange_strong((atomic_ushort *)dst, (unsigned short*)&expected, (unsigned short)desired);
             #else
                 __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint16)atomic_compare_exchange_strong((atomic_ushort *)dst, (unsigned short *)&expected, (unsigned short)desired);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1364,10 +1368,12 @@ typedef unsigned char           c89atomic_bool;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
             #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
-                return (c89atomic_uint32)atomic_compare_exchange_strong((atomic_int *)dst, (unsigned int*)&expected, (unsigned int)desired);
+                result = (c89atomic_uint32)atomic_compare_exchange_strong((atomic_int *)dst, (unsigned int*)&expected, (unsigned int)desired);
             #else
                 __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint32)atomic_compare_exchange_strong((atomic_int *)dst, (unsigned int *)&expected, (unsigned int)desired);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1389,13 +1395,15 @@ typedef unsigned char           c89atomic_bool;
             c89atomic_uint32 resultEAX;
             c89atomic_uint32 resultEDX;
             #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
-                return (c89atomic_uint64)atomic_compare_exchange_strong((atomic_ulong *)dst, (unsigned long*)&expected, (unsigned long)desired);
+                result = (c89atomic_uint64)atomic_compare_exchange_strong((atomic_ulong *)dst, (unsigned long*)&expected, (unsigned long)desired);
             #else
                 __asm__ __volatile__("push %%ebx; xchg %5, %%ebx; lock; cmpxchg8b %0; pop %%ebx" : "+m"(*dst), "=a"(resultEAX), "=d"(resultEDX) : "a"(expected & 0xFFFFFFFF), "d"(expected >> 32), "r"(desired & 0xFFFFFFFF), "c"(desired >> 32) : "cc");
                 result = ((c89atomic_uint64)resultEDX << 32) | resultEAX;
             #endif
         #elif defined(C89ATOMIC_X64)
             __asm__ __volatile__("lock; cmpxchg %3, %0" : "+m"(*dst), "=a"(result) : "a"(expected), "d"(desired) : "cc");
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint64)atomic_compare_exchange_strong((atomic_ulong *)dst, (unsigned long *)&expected, (unsigned long)desired);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1413,10 +1421,12 @@ typedef unsigned char           c89atomic_bool;
 
         #if defined(C89ATOMIC_X86) || defined(C89ATOMIC_X64)
             #if defined(__TINYC__) && defined(_WIN32) && defined(__arm__) && !defined(_MSC_VER)
-                return (c89atomic_uint8)atomic_exchange_explicit((atomic_uchar *)dst, (unsigned char)src, order);
+                result = (c89atomic_uint8)atomic_exchange_explicit((atomic_uchar *)dst, (unsigned char)src, order);
             #else
                 __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint8)atomic_exchange_explicit((atomic_uchar *)dst, (unsigned char)src, order);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1436,6 +1446,8 @@ typedef unsigned char           c89atomic_bool;
             #else
                 __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint16)atomic_exchange_explicit((atomic_ushort *)dst, (unsigned short)src, order);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1455,6 +1467,8 @@ typedef unsigned char           c89atomic_bool;
             #else
                 __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint32)atomic_exchange_explicit((atomic_uint *)dst, (unsigned int)src, order);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1478,6 +1492,8 @@ typedef unsigned char           c89atomic_bool;
             #else
                 __asm__ __volatile__("lock; xchg %1, %0" : "+m"(*dst), "=a"(result) : "a"(src));
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint64)atomic_exchange_explicit((atomic_ulong *)dst, (unsigned long)src, order);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1499,6 +1515,8 @@ typedef unsigned char           c89atomic_bool;
             #else
                 __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint8)atomic_fetch_add_explicit((atomic_uchar *)dst, (unsigned char)src, order);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1518,6 +1536,8 @@ typedef unsigned char           c89atomic_bool;
             #else
                 __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint16)atomic_fetch_add_explicit((atomic_ushort *)dst, (unsigned short)src, order);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1537,6 +1557,8 @@ typedef unsigned char           c89atomic_bool;
             #else
                 __asm__ __volatile__("lock; xadd %1, %0" : "+m"(*dst), "=a"(result) : "a"(src) : "cc");
             #endif
+        #elif defined(__TINYC__)
+            result = (c89atomic_uint16)atomic_fetch_add_explicit((atomic_uint *)dst, (unsigned int)src, order);
         #else
             #error Unsupported architecture. Please submit a feature request.
         #endif
@@ -1570,6 +1592,8 @@ typedef unsigned char           c89atomic_bool;
             #endif
 
             return result;
+        #elif defined(__TINYC__)
+            return (c89atomic_uint64)atomic_fetch_add_explicit((atomic_ulong *)dst, (unsigned long)src, order);
         #endif
         }
 
