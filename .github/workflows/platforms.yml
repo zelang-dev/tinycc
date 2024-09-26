@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-        #  - target: armhf
-        #    arch: armv7
+          - target: armhf
+            arch: armv7
           - target: arm64
             arch: aarch64
           - target: riscv64
