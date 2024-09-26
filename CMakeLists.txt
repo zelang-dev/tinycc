@@ -62,13 +62,19 @@ list(LENGTH TARGET_ARCH cmake_target_arch_len)
 message("Target architecture type: ${TARGET_ARCH}")
 
 set(NATIVE_ARCH ${TARGET_ARCH})
+set(DLLSUF .so)
+set(LIBSUF .a)
 if(WIN32)
+    set(DLLSUF .dll)
+    set(LIBSUF .lib)
     if(${TARGET_ARCH} STREQUAL arm)
         set(NATIVE_ARCH ${TARGET_ARCH}-wince)
     else()
         set(NATIVE_ARCH ${TARGET_ARCH}-win32)
     endif()
 elseif(APPLE)
+    set(DLLSUF .dylib)
+    set(LIBSUF .dylib)
     set(NATIVE_ARCH ${TARGET_ARCH}-osx)
 endif()
 
@@ -219,10 +225,10 @@ else()
     set( NATIVE_TARGET TCC_TARGET_ARM )
     set( CODE_GENERATOR_SRCS ${ARM_FILES} )
   elseif( APPLE AND ${TARGET_ARCH} STREQUAL arm64 )
-    set( NATIVE_TARGET TCC_TARGET_MACHO )
+    set( NATIVE_TARGET "CONFIG_NO_CODESIGN")
     set( CODE_GENERATOR_SRCS ${ARM64_OSX_FILES} )
   elseif( APPLE AND ${TARGET_ARCH} STREQUAL x86_64 )
-    set( NATIVE_TARGET TCC_TARGET_MACHO )
+    set( NATIVE_TARGET "CONFIG_NO_CODESIGN")
     set( CODE_GENERATOR_SRCS ${X86_64_OSX_FILES} )
   endif()
 endif( WIN32 AND NOT CYGWIN )
@@ -234,11 +240,18 @@ find_package (Threads)
 
 if(BUILD_SHARED_LIBS)
     add_library(libtcc SHARED ${CODE_GENERATOR_SRCS})
-    target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
-    set(CFG_BUILD )
+    if(WIN32)
+        target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
+    elseif(APPLE)
+        target_compile_options(libtcc PUBLIC -shared -install_name libtcc.dylib -o libtcc.dylib)
+    endif()
 else()
     add_library(libtcc STATIC ${CODE_GENERATOR_SRCS})
-    set(CFG_BUILD -s -DCONFIG_TCC_STATIC)
+    if(WIN32)
+        target_compile_definitions(libtcc PUBLIC CONFIG_TCC_STATIC)
+    else()
+        target_compile_options(libtcc PUBLIC -static)
+    endif()
 endif()
 
 target_compile_definitions(libtcc
@@ -271,7 +284,7 @@ if(WIN32)
 elseif (UNIX)
     if(APPLE)
         if( ${TARGET_ARCH} STREQUAL arm64 )
-            target_compile_definitions(libtcc PUBLIC
+            target_compile_definitions(libtcc PRIVATE
                 "TCC_TARGET_ARM64="
                 "TCC_TARGET_MACHO=1")
         elseif( ${TARGET_ARCH} STREQUAL x86_64 )
@@ -494,7 +507,7 @@ add_custom_target(
     SOURCES ${LIB_SRCFILES})
 install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-if(WIN32)
+if(WIN32 OR APPLE)
     add_custom_target(
         libtcc_o ALL
         tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${SRC_DIR}/libtcc.c -o ${LIB_DIR}/libtcc.o
@@ -505,14 +518,14 @@ if(WIN32)
 
     add_custom_target(
         libtcc_a ALL
-        tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a ${LIB_DIR}/libtcc.o
+        tcc -ar rcs ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF} ${LIB_DIR}/libtcc.o
         DEPENDS libtcc_o
-        BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a
+        BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF}
         VERBATIM
-        COMMENT "Linking Archive ${LIB_DIR}/libtcc.o")
-    install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
+        COMMENT "Linking Archive ${LIB_DIR}/libtcc.o" )
+    install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF} DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
-    if(BUILD_SHARED_LIBS)
+    if(WIN32 AND BUILD_SHARED_LIBS)
         add_custom_command(
             OUTPUT libtcc.def
             COMMAND tcc -impdef libtcc -o libtcc.def

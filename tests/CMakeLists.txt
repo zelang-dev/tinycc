@@ -224,7 +224,7 @@ add_test(NAME tcctest COMMAND tcctest WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
 add_custom_target(
     libtcc_test ALL
-    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc.a
+    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF}
     BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
     SOURCES ${TEST_DIR}/libtcc_test.c
     DEPENDS libarchive)
