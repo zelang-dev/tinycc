@@ -636,7 +636,7 @@ foreach(X ${TCC_X})
             list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
     endif()
 
-    if(APPLE AND
+    if((APPLE OR NATIVE_ARCH STREQUAL aarch64 OR NATIVE_ARCH STREQUAL armv7 OR NATIVE_ARCH STREQUAL arm64 )AND
         (${X} STREQUAL i386 OR ${X} STREQUAL x86_64 ))
             list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
     endif()
