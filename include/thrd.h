@@ -6,6 +6,7 @@
 #endif
 
 #include "cthread.h"
+#include "stdatomic.h"
 #include "catomic.h"
 #include <stdio.h>
 #include <stddef.h>
