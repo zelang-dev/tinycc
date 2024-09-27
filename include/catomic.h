@@ -59,6 +59,41 @@ typedef unsigned int            c89atomic_uint32;
 typedef unsigned char           c89atomic_bool;
 /* End Sized Types */
 
+#if defined(_WIN32) || defined(__APPLE__)
+#   define make_atomic(type, var)  typedef volatile type var;
+#else
+#   define make_atomic(type, var)  typedef volatile _Atomic(type)var;
+#endif
+
+#ifndef _STDATOMIC_H
+    make_atomic(c89atomic_flag, atomic_flag)
+    make_atomic(c89atomic_bool, atomic_bool)
+    make_atomic(c89atomic_int8, atomic_char)
+    make_atomic(c89atomic_int8, atomic_schar)
+    make_atomic(c89atomic_uint8, atomic_uchar)
+    make_atomic(c89atomic_int16, atomic_short)
+    make_atomic(c89atomic_uint16, atomic_ushort)
+    make_atomic(c89atomic_int32, atomic_int)
+    make_atomic(c89atomic_uint32, atomic_uint)
+    make_atomic(signed long, atomic_long)
+    make_atomic(unsigned long, atomic_ulong)
+    make_atomic(c89atomic_int64, atomic_llong)
+    make_atomic(c89atomic_uint64, atomic_ullong)
+    make_atomic(intptr_t, atomic_intptr_t)
+    make_atomic(uintptr_t, atomic_uintptr_t)
+    make_atomic(intmax_t, atomic_intmax_t)
+    make_atomic(uintmax_t, atomic_uintmax_t)
+#endif
+
+#if !defined(_STDATOMIC_H) && (defined(_WIN32) || defined(__APPLE__))
+    make_atomic(size_t, atomic_size_t)
+    make_atomic(ptrdiff_t, atomic_ptrdiff_t)
+#elif !defined(_STDATOMIC_H)
+    make_atomic(__SIZE_TYPE__, atomic_size_t)
+    make_atomic(__PTRDIFF_TYPE__, atomic_ptrdiff_t)
+#endif
+make_atomic(void *, atomic_ptr_t)
+
 #if defined(__TINYC__) || defined(_MSC_VER)
 #   define c89atomic_is_lock_free(obj) (sizeof((obj)) <= sizeof(void *))
 #endif
@@ -2602,20 +2637,10 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
 #endif
     }
 
-#define make_atomic(type, var)  typedef volatile type var;
 #define atomic_cas_32(obj, expected, desired) c89atomic_cas_32((atomic_int *)obj, (c89atomic_int32 *)expected, (c89atomic_int32)desired)
 #define atomic_cas(obj, expected, desired) c89atomic_cas_64((atomic_llong *)obj, (c89atomic_int64 *)expected, (c89atomic_int64)desired)
 #define atomic_swap(obj, expected, desired) c89atomic_swap((atomic_ptr_t *)obj, (void **)expected, (void *)desired)
 #else
-
-#if defined(__APPLE__)
-#   define make_atomic(type, var)  typedef volatile type var;
-#else
-#   define make_atomic(type, var)  typedef volatile _Atomic(type)var;
-#endif
-
-make_atomic(void *, atomic_ptr_t)
-
 #if defined(_STDATOMIC_H)
 #   define atomic_cas_32(P, E, D)   atomic_compare_exchange_strong((P), (E), (D))
 #   define atomic_cas(P, E, D)  atomic_compare_exchange_strong((P), (E), (D))
@@ -2624,27 +2649,6 @@ make_atomic(void *, atomic_ptr_t)
 #   define atomic_cas_32(P, E, D)  __atomic_compare_exchange_n((P), (E), (D), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #   define atomic_cas(P, E, D)  __atomic_compare_exchange_n((P), (E), (D), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 #   define atomic_swap(P, E, D)    __atomic_compare_exchange_n((P), (E), (D), 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
-#endif
-#ifndef _STDATOMIC_H
-    make_atomic(c89atomic_flag, atomic_flag)
-    make_atomic(c89atomic_bool, atomic_bool)
-    make_atomic(c89atomic_int8, atomic_char)
-    make_atomic(c89atomic_int8, atomic_schar)
-    make_atomic(c89atomic_uint8, atomic_uchar)
-    make_atomic(c89atomic_int16, atomic_short)
-    make_atomic(c89atomic_uint16, atomic_ushort)
-    make_atomic(c89atomic_int32, atomic_int)
-    make_atomic(c89atomic_uint32, atomic_uint)
-    make_atomic(signed long, atomic_long)
-    make_atomic(unsigned long, atomic_ulong)
-    make_atomic(c89atomic_int64, atomic_llong)
-    make_atomic(c89atomic_uint64, atomic_ullong)
-    make_atomic(intptr_t, atomic_intptr_t)
-    make_atomic(uintptr_t, atomic_uintptr_t)
-    make_atomic(__SIZE_TYPE__, atomic_size_t)
-    make_atomic(__PTRDIFF_TYPE__, atomic_ptrdiff_t)
-    make_atomic(intmax_t, atomic_intmax_t)
-    make_atomic(uintmax_t, atomic_uintmax_t)
 #endif
 #endif
 
