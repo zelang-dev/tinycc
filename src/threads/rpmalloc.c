@@ -242,6 +242,12 @@ static int _rpmalloc_initialized = 0;
 
 static int _rpmalloc_shuting_down = 0;
 
+#if defined(__TINYC__)
+#   if defined(_WIN32)
+#       include <intrin.h>
+#   endif
+#   include "stdatomic.h"
+#endif
 #include "../include/catomic.h"
 
 #ifdef _WIN32
@@ -767,6 +773,8 @@ get_thread_id(void) {
 #    if defined(__MACH__)
     // tpidr_el0 likely unused, always return 0 on iOS
     __asm__ volatile ("mrs %0, tpidrro_el0" : "=r" (tid));
+#   elif defined(__TINYC__)
+    tid = (uintptr_t)pthread_self();
 #    else
     __asm__ volatile ("mrs %0, tpidr_el0" : "=r" (tid));
 #    endif
@@ -812,7 +820,7 @@ _rpmalloc_spin(void) {
 #endif
 #elif defined(__x86_64__) || defined(__i386__)
     __asm__ volatile("pause" ::: "memory");
-#elif defined(__aarch64__) || (defined(__arm__) && __ARM_ARCH >= 7)
+#elif !defined(__TINYC__) && defined(__aarch64__) || (defined(__arm__) && __ARM_ARCH >= 7)
     __asm__ volatile("yield" ::: "memory");
 #elif defined(__powerpc__) || defined(__powerpc64__)
     // No idea if ever been compiled in such archs but ... as precaution
