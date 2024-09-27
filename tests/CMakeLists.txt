@@ -13,8 +13,8 @@ else()
   set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
-add_subdirectory(thread)
 add_subdirectory(cc)
+add_subdirectory(thread)
 if( ${TARGET_ARCH} STREQUAL i386 )
     set(TCC_CFLAGS ${TCC_CFLAGS} -fno-PIC -fno-PIE -Wl,-z,notext )
 elseif( ${TARGET_ARCH} STREQUAL arm_eabi

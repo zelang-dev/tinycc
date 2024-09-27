@@ -6,11 +6,6 @@
 #endif
 
 #include "cthread.h"
-
-#if defined(__arm__) || defined(__TARGET_ARCH_ARM) || defined(__riscv) || defined(__aarch64__)
-#include "stdatomic.h"
-#endif
-
 #include "catomic.h"
 #include <stdio.h>
 #include <stddef.h>
