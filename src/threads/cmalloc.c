@@ -773,6 +773,8 @@ get_thread_id(void) {
 #    if defined(__MACH__)
     // tpidr_el0 likely unused, always return 0 on iOS
     __asm__ volatile ("mrs %0, tpidrro_el0" : "=r" (tid));
+#   elif defined(__TINYC__)
+    tid = (uintptr_t)pthread_self();
 #    else
     __asm__ volatile ("mrs %0, tpidr_el0" : "=r" (tid));
 #    endif
