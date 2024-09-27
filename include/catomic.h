@@ -66,7 +66,6 @@ typedef unsigned char           c89atomic_bool;
 #endif
 
 #ifndef _STDATOMIC_H
-    make_atomic(c89atomic_flag, atomic_flag)
     make_atomic(c89atomic_bool, atomic_bool)
     make_atomic(c89atomic_int8, atomic_char)
     make_atomic(c89atomic_int8, atomic_schar)
@@ -2571,30 +2570,12 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     c89atomic_flag_clear_explicit(pSpinlock, c89atomic_memory_order_release);
 }
 
-#ifdef _WIN32
-    typedef volatile void *atomic_ptr_t;
 #ifndef _STDATOMIC_H
-    typedef volatile c89atomic_flag atomic_flag;
-    typedef volatile c89atomic_bool atomic_bool;
-    typedef volatile c89atomic_int8 atomic_char;
-    typedef volatile c89atomic_int8 atomic_schar;
-    typedef volatile c89atomic_uint8 atomic_uchar;
-    typedef volatile c89atomic_int16 atomic_short;
-    typedef volatile c89atomic_uint16 atomic_ushort;
-    typedef volatile c89atomic_int32 atomic_int;
-    typedef volatile c89atomic_uint32 atomic_uint;
-    typedef volatile signed long atomic_long;
-    typedef volatile unsigned long atomic_ulong;
-    typedef volatile c89atomic_int64 atomic_llong;
-    typedef volatile c89atomic_uint64 atomic_ullong;
-    typedef volatile intptr_t atomic_intptr_t;
-    typedef volatile uintptr_t atomic_uintptr_t;
-    typedef volatile size_t atomic_size_t;
-    typedef volatile ptrdiff_t atomic_ptrdiff_t;
-    typedef volatile intmax_t atomic_intmax_t;
-    typedef volatile uintmax_t atomic_uintmax_t;
+    make_atomic(c89atomic_flag, atomic_flag)
 #endif
 
+#ifdef _WIN32
+    typedef volatile void *atomic_ptr_t;
     static C89ATOMIC_INLINE c89atomic_bool c89atomic_cas_32(atomic_uint *a, c89atomic_uint32 *cmp, c89atomic_uint32 set) {
 #if defined(__TINYC__) && defined(_WIN32) && (defined(__arm__) || defined(__i386__)) && !defined(_MSC_VER)
         return (c89atomic_bool)atomic_compare_exchange_strong((atomic_uint *)a, (unsigned int *)&cmp, set);
