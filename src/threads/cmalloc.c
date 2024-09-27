@@ -289,7 +289,7 @@ static FORCEINLINE int64_t atomic_add64(atomic64_t *val, int64_t add) {
     return c89atomic_fetch_add_explicit_64((volatile c89atomic_uint64 *)val, add, memory_order_relaxed) + add;
 }
 
-#ifdef __arm__
+#if (defined(__arm__) || defined(__TARGET_ARCH_ARM) || defined(__riscv) || defined(__aarch64__))
 static FORCEINLINE void *atomic_load_ptr(atomic_ptr_t *src) {
     return (void *)atomic_load_explicit(src, memory_order_relaxed);
 }
