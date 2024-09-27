@@ -2774,7 +2774,7 @@ static C89ATOMIC_INLINE void c89atomic_spinlock_unlock(volatile c89atomic_spinlo
     c89atomic_exchange_64((atomic_ullong *)obj, (c89atomic_uint64)desired)
 /* swaps a value with the value of an atomic object */
 #define atomic_exchange_explicit(obj, desired, order)	        \
-    c89atomic_exchange_explicit_64((atomic_ullong *)obj, (c89atomic_uint64)(c89atomic_uint64)desired, order)
+    c89atomic_exchange_explicit_64((atomic_ullong *)obj, (c89atomic_uint64)desired, order)
 
 /* swaps a value with an atomic object if the old value is what is expected, otherwise reads the old value */
 #define atomic_compare_exchange_weak(obj, expected, desired)    atomic_cas((atomic_ullong *)obj, expected, desired)

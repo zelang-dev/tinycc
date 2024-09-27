@@ -289,6 +289,7 @@ static FORCEINLINE int64_t atomic_add64(atomic64_t *val, int64_t add) {
     return c89atomic_fetch_add_explicit_64((volatile c89atomic_uint64 *)val, add, memory_order_relaxed) + add;
 }
 
+#ifdef __arm__
 static FORCEINLINE void *atomic_load_ptr(atomic_ptr_t *src) {
     return (void *)atomic_load_explicit(src, memory_order_relaxed);
 }
@@ -304,6 +305,23 @@ static FORCEINLINE void *atomic_exchange_ptr_acquire(atomic_ptr_t *dst, void *va
 static FORCEINLINE int atomic_cas_ptr(atomic_ptr_t *dst, void *val, void *ref) {
     return (int)atomic_swap(dst, &ref, val);
 }
+#else
+static FORCEINLINE void *atomic_load_ptr(atomic_ptr_t *src) {
+    return (void *)c89atomic_load_explicit_64((volatile c89atomic_uint64 *)src, memory_order_relaxed);
+}
+static FORCEINLINE void atomic_store_ptr(atomic_ptr_t *dst, void *val) {
+    c89atomic_store_explicit_64((volatile c89atomic_uint64 *)dst, (c89atomic_uint64)val, memory_order_relaxed);
+}
+static FORCEINLINE void atomic_store_ptr_release(atomic_ptr_t *dst, void *val) {
+    c89atomic_store_explicit_64((volatile c89atomic_uint64 *)dst, (c89atomic_uint64)val, memory_order_release);
+}
+static FORCEINLINE void *atomic_exchange_ptr_acquire(atomic_ptr_t *dst, void *val) {
+    return (void *)c89atomic_exchange_explicit_64((volatile c89atomic_uint64 *)dst, (c89atomic_uint64)val, memory_order_acquire);
+}
+static FORCEINLINE int atomic_cas_ptr(atomic_ptr_t *dst, void *val, void *ref) {
+    return (int)atomic_swap((volatile c89atomic_uint64 *)dst, (c89atomic_uint64 *)&ref, (c89atomic_uint64)val);
+}
+#endif
 
 #if defined(__TINYC__) || !defined(_WIN32)
 int rpmalloc_tls_create(tls_t *key, tls_dtor_t dtor) {
@@ -827,6 +845,8 @@ _rpmalloc_spin(void) {
     __asm__ volatile("or 27,27,27");
 #elif defined(__sparc__)
     __asm__ volatile("rd %ccr, %g0 \n\trd %ccr, %g0 \n\trd %ccr, %g0");
+#elif defined(_WIN32)
+    usleep(0);
 #else
     struct timespec ts = {0};
     nanosleep(&ts, 0);
