@@ -67,7 +67,7 @@ set(LIBSUF .a)
 if(WIN32)
     set(DLLSUF .dll)
     set(LIBSUF .lib)
-    if(${TARGET_ARCH} STREQUAL arm)
+    if(${TARGET_ARCH} STREQUAL armv7 OR ${TARGET_ARCH} STREQUAL arm)
         set(NATIVE_ARCH ${TARGET_ARCH}-wince)
     else()
         set(NATIVE_ARCH ${TARGET_ARCH}-win32)
@@ -198,6 +198,7 @@ if( WIN32 AND NOT CYGWIN )
     set( NATIVE_TARGET TCC_X86_64 )
     set( CODE_GENERATOR_SRCS ${X86_64_WIN32_FILES} )
   elseif( ${TARGET_ARCH} STREQUAL arm
+    OR ${TARGET_ARCH} STREQUAL armv7
     OR ${TARGET_ARCH} STREQUAL arm64 )
         set( NATIVE_TARGET TCC_TARGET_ARM )
         set( CODE_GENERATOR_SRCS ${ARM_WINCE_FILES} )
@@ -296,37 +297,39 @@ elseif (UNIX)
         if( ${TARGET_ARCH} STREQUAL riscv64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_RISCV64="
-                "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"riscv64-linux-gnu\")
         elseif( ${TARGET_ARCH} STREQUAL arm64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM64="
-                "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"aarch64-linux-gnu\")
         elseif( ${TARGET_ARCH} STREQUAL i386 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_I386="
-                "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"i386-linux-gnu\")
         elseif( ${TARGET_ARCH} STREQUAL x86_64 )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_X86_64="
-                "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"x86_64-linux-gnu\")
-        elseif( ${TARGET_ARCH} STREQUAL armv7 )
+        elseif( ${TARGET_ARCH} STREQUAL arm )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM="
                 "TCC_ARM_VFP="
                 "TCC_ARM_EABI="
                 "TCC_ARM_HARDFLOAT="
-                "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"arm-linux-gnueabi\")
+        elseif( ${TARGET_ARCH} STREQUAL armv7 )
+            target_compile_definitions(libtcc PUBLIC
+                "TCC_CPU_VERSION=7"
+                "TCC_TARGET_ARM="
+                "TCC_ARM_VFP="
+                "TCC_ARM_EABI="
+                "TCC_ARM_HARDFLOAT="
+                CONFIG_TRIPLET=\"arm-linux-gnueabihf\")
         elseif( ${TARGET_ARCH} STREQUAL arm_eabi )
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM="
                 "TCC_ARM_VFP="
                 "TCC_ARM_EABI="
-                "CONFIG_USE_LIBGCC="
                 CONFIG_TRIPLET=\"arm-linux-gnueabi\")
         endif()
     endif()
@@ -412,12 +415,14 @@ set( OBJ-arm64 ${ARM64_O} ${BCHECK_O} ${DSO_O} )
 set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
 set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
 
+set( OBJ-armv7 ${ARM_O} ${DSO_O} )
 set( OBJ-arm-fpa ${ARM_O} ${DSO_O} )
 set( OBJ-arm-fpa-ld ${ARM_O} ${DSO_O} )
 set( OBJ-arm-vfp ${ARM_O} ${DSO_O} )
 set( OBJ-arm-eabi ${ARM_O} ${DSO_O} )
 set( OBJ-arm-eabihf ${ARM_O} ${DSO_O} )
 set( OBJ-arm-wince ${ARM_O} ${WIN_O} )
+set( OBJ-armv7-wince ${ARM_O} ${WIN_O} )
 set( OBJ-riscv64 ${RISCV64_O} ${BCHECK_O} ${DSO_O} )
 
 if (WIN32)
@@ -425,9 +430,10 @@ if (WIN32)
     set( LIB_SRCFILES ${OBJ-i386-win32} )
   elseif( ${TARGET_ARCH} STREQUAL x86_64 )
     set( LIB_SRCFILES ${OBJ-x86_64-win32} )
-  elseif( ${TARGET_ARCH} STREQUAL arm64
-    OR ${TARGET_ARCH} STREQUAL arm )
-        set( LIB_SRCFILES ${OBJ-arm-wince} )
+  elseif( ${TARGET_ARCH} STREQUAL arm )
+    set( LIB_SRCFILES ${OBJ-arm-wince} )
+  elseif( ${TARGET_ARCH} STREQUAL armv7 )
+    set( LIB_SRCFILES ${OBJ-armv7-wince} )
   endif()
 else()
   if( NOT APPLE AND ${TARGET_ARCH} STREQUAL riscv64 )
@@ -443,7 +449,7 @@ else()
   elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL arm )
     set( LIB_SRCFILES ${OBJ-arm} )
   elseif( NOT APPLE AND ${TARGET_ARCH} STREQUAL armv7 )
-    set( LIB_SRCFILES ${OBJ-eabihf} )
+    set( LIB_SRCFILES ${OBJ-armv7} )
   elseif( APPLE AND ${TARGET_ARCH} STREQUAL arm64 )
     set( LIB_SRCFILES ${OBJ-arm64-osx} )
   elseif( APPLE AND ${TARGET_ARCH} STREQUAL x86_64 )
@@ -553,11 +559,11 @@ endforeach()
 
 # cross compiler targets and cross libtcc1.a to build
 if(${TARGET_ARCH} STREQUAL x86_64)
-    set(TCC_X i386 i386-win32 x86_64-win32 x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
+    set(TCC_X i386 i386-win32 x86_64-win32 x86_64 x86_64-osx armv7 arm64 riscv64 armv7-wince arm64-osx)
 elseif(${TARGET_ARCH} STREQUAL i386 OR ${TARGET_ARCH} STREQUAL arm)
     set(TCC_X i386 i386-win32 arm arm-wince)
 else()
-    set(TCC_X i386 i386-win32 x86_64-win32 x86_64 x86_64-osx arm arm64 riscv64 arm-wince arm64-osx)
+    set(TCC_X i386 i386-win32 x86_64-win32 x86_64 x86_64-osx armv7 arm64 riscv64 armv7-wince arm64-osx)
 endif()
 
 set(CROSS_TARGET_i386 TCC_TARGET_I386
@@ -587,6 +593,16 @@ set(CROSS_TARGET_arm TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT
  CONFIG_TCC_CRTPREFIX=\"/usr/arm-linux-gnueabi/lib\"
  CONFIG_TCC_LIBPATHS=\"{B}:/usr/arm-linux-gnueabi/lib:/usr/lib/arm-linux-gnueabi\"
  CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/arm-linux-gnueablude/include:/usr/include\")
+
+set(CROSS_TARGET_armv7-wince TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT TCC_TARGET_PE
+ CONFIG_TCC_CROSSPREFIX=\"armv7-wince-\"
+ CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\")
+
+set(CROSS_TARGET_armv7 TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT
+ CONFIG_TCC_CROSSPREFIX=\"armv7-\"
+ CONFIG_TCC_CRTPREFIX=\"/usr/arm-linux-gnueabihf/lib\"
+ CONFIG_TCC_LIBPATHS=\"{B}:/usr/arm-linux-gnueabihf/lib:/usr/lib/arm-linux-gnueabihf\"
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/arm-linux-gnueabihf/include:/usr/include\")
 
 set(CROSS_TARGET_arm64 TCC_TARGET_ARM64
  CONFIG_TCC_CROSSPREFIX=\"arm64-\"
@@ -618,7 +634,8 @@ foreach(X ${TCC_X})
     set(CROSS_INCLUDE ${INC_DIR})
     if(${X} STREQUAL i386-win32
         OR ${X} STREQUAL x86_64-win32
-        OR ${X} STREQUAL arm-wince)
+        OR ${X} STREQUAL arm-wince
+        OR ${X} STREQUAL armv7-wince)
             set(CROSS_INCLUDE ${INC_DIR} -I${WIN_DIR}/include -I${WIN_DIR}/include/winapi)
     endif()
     add_executable(${tcc_cross} ${SRC_DIR}/tcc.c)
@@ -626,13 +643,13 @@ foreach(X ${TCC_X})
     install(TARGETS ${tcc_cross} RUNTIME)
 
     if(WIN32 AND
-        (NOT ${X} STREQUAL arm-wince OR NOT ${X} STREQUAL i386-win32 OR NOT ${X} STREQUAL x86_64-win32))
+        (NOT ${X} STREQUAL arm-wince OR NOT ${X} STREQUAL armv7-wince OR NOT ${X} STREQUAL i386-win32 OR NOT ${X} STREQUAL x86_64-win32))
             list(REMOVE_ITEM CROSS_SRCFILES ${B_O})
             list(REMOVE_ITEM CROSS_SRCFILES ${SRC_DIR}/lib/tcov.c )
     endif()
 
     if(UNIX AND
-        (${X} STREQUAL x86_64-osx OR ${X} STREQUAL arm OR ${X} STREQUAL arm64 OR ${X} STREQUAL riscv64 OR ${X} STREQUAL arm64-osx ))
+        (${X} STREQUAL x86_64-osx OR ${X} STREQUAL arm OR ${X} STREQUAL armv7 OR ${X} STREQUAL arm64 OR ${X} STREQUAL riscv64 OR ${X} STREQUAL arm64-osx ))
             list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
     endif()
 
@@ -667,7 +684,8 @@ foreach(X ${TCC_X})
 
     if(${X} STREQUAL i386-win32
         OR ${X} STREQUAL x86_64-win32
-        OR ${X} STREQUAL arm-wince)
+        OR ${X} STREQUAL arm-wince
+        OR ${X} STREQUAL armv7-wince)
             add_custom_command(
                 OUTPUT ${LIB_DIR}/${X}_pthread.o
                 COMMAND ${tcc_cross} -s -w -Ox -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -DHAVE_CONFIG_H -D_REENTRANT -DPTW32_CLEANUP_C -DPTW32_STATIC_LIB

@@ -15,7 +15,7 @@ elseif(NOT HOST_ARCH OR NOT SYSTEM_NAME OR NOT CMAKE_BUILD_TYPE)
     message(SEND_ERROR "the `cmake_tcc . . .` missing:
 - `BUILD_TYPE` required to be specified: Debug, Release, ...
 - `SYSTEM_NAME` required to be specified: Native, Windows, Linux, GNU, Generic, Android, FreeBSD, Darwin, ...
-- `HOST_ARCH` required to be specified: i386, x86_64, arm, arm64, riscv64, ...
+- `HOST_ARCH` required to be specified: i386, x86_64, armv7, arm64, riscv64, ...
 
 Note: Native is for regular `tcc` compiler, otherwise cross compiler.
 ")
@@ -25,7 +25,7 @@ set(CMAKE_SYSTEM_NAME ${SYSTEM_NAME})
 set(COMPILER_PREFIX ${HOST_ARCH})
 list(APPEND CMAKE_TRY_COMPILE_PLATFORM_VARIABLES HOST_ARCH)
 if(CMAKE_SYSTEM_NAME STREQUAL Windows)
-    if(HOST_ARCH STREQUAL arm)
+    if(HOST_ARCH STREQUAL armv7)
         set(COMPILER_PREFIX ${HOST_ARCH}-wince)
     elseif(HOST_ARCH STREQUAL i386 OR HOST_ARCH STREQUAL x86_64)
         set(COMPILER_PREFIX ${HOST_ARCH}-win32)
