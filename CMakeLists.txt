@@ -334,7 +334,7 @@ elseif (UNIX)
         endif()
     endif()
     target_link_libraries(libtcc PUBLIC
-        dl ${CMAKE_THREAD_LIBS_INIT})
+        m dl ${CMAKE_THREAD_LIBS_INIT})
 endif()
 
 target_include_directories(libtcc
