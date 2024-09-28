@@ -465,7 +465,7 @@ foreach(LIB_SRCFILE ${LIB_SRCFILES})
     get_filename_component(LIB_SRCFILE_NOEXT ${LIB_SRCFILE} NAME_WE)
     add_custom_command(
         OUTPUT ${LIB_DIR}/${LIB_SRCFILE_NOEXT}.o
-        COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS}
+        COMMAND tcc -Ox ${CFG_BUILD} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT ${TCC_INCLUDE_DIRS}
                     -L ${LIB_DIR}
                     -c ${LIB_SRCFILE}
                     -o ${LIB_DIR}/${LIB_SRCFILE_NOEXT}.o
@@ -550,7 +550,7 @@ foreach(EXTRA_SRCFILE ${EXTRA_O})
     endif()
     add_custom_target(
         ${EXTRA_SRCFILE_NOEXT} ALL
-        tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
+        tcc -Ox ${CFG_BUILD} ${BFLAGS} -fPIC -fno-omit-frame-pointer -Wno-unused-function -Wno-unused-variable -D_REENTRANT ${TCC_INCLUDE_DIRS} -c ${EXTRA_SRCFILE} -o ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${EXTRA_SRCFILE_NOEXT}.o
         VERBATIM
         COMMENT "Compiling Extra Runtime Library (${EXTRA_SRCFILE})"
         SOURCES ${EXTRA_SRCFILE})
@@ -669,7 +669,7 @@ foreach(X ${TCC_X})
         get_filename_component(CROSS_SRCFILE_NOEXT ${CROSS_SRCFILE} NAME_WE)
         add_custom_command(
             OUTPUT ${LIB_DIR}/${X}-${CROSS_SRCFILE_NOEXT}.o
-            COMMAND ${tcc_cross} -w ${CROSS_DEFINES}
+            COMMAND ${tcc_cross} -w ${CROSS_DEFINES} -D_REENTRANT
                 -L ${LIB_DIR}
                 -c ${CROSS_SRCFILE}
                 -o ${LIB_DIR}/${X}-${CROSS_SRCFILE_NOEXT}.o
