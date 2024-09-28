@@ -423,7 +423,7 @@ set( OBJ-arm-eabi ${ARM_O} ${DSO_O} )
 set( OBJ-arm-eabihf ${ARM_O} ${DSO_O} )
 set( OBJ-arm-wince ${ARM_O} ${WIN_O} )
 set( OBJ-armv7-wince ${ARM_O} ${WIN_O} )
-set( OBJ-riscv64 ${RISCV64_O} ${BCHECK_O} ${DSO_O} )
+set( OBJ-riscv64 ${RISCV64_O} ${DSO_O} )
 
 if (WIN32)
   if( ${TARGET_ARCH} STREQUAL i386 )
