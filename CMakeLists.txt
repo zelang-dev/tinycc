@@ -91,6 +91,7 @@ set(CPACK_PACKAGE_INSTALL_DIRECTORY tcc)
 
 enable_testing()
 set( CORE_FILES
+    ${SRC_DIR}/threads/rpmalloc.c
     ${SRC_DIR}/tcctools.c
     ${SRC_DIR}/libtcc.c
     ${SRC_DIR}/tccpp.c
@@ -98,8 +99,7 @@ set( CORE_FILES
     ${SRC_DIR}/tccdbg.c
     ${SRC_DIR}/tccelf.c
     ${SRC_DIR}/tccasm.c
-    ${SRC_DIR}/tccrun.c
-    ${SRC_DIR}/threads/rpmalloc.c )
+    ${SRC_DIR}/tccrun.c)
 
 set( I386_FILES ${CORE_FILES}
     ${SRC_DIR}/i386-gen.c
@@ -503,6 +503,8 @@ add_custom_command(
     COMMENT "Compiling Runtime Library (${SRC_DIR}/threads/cthread.c)")
 list(APPEND LIB_OBJFILES ${LIB_DIR}/cthread.o)
 
+
+list(REMOVE_ITEM LIB_OBJFILES ${LIB_DIR}/tcctools.o)
 # link all objects files to archive file
 add_custom_target(
     libarchive ALL
