@@ -36,22 +36,6 @@ jobs:
           run: |
             mkdir build
             cd build
-            case "${{ matrix.target }}" in
-                riscv64)
-                ln -s /usr/include/riscv64-linux-gnu/bits /usr/include
-                ln -s /usr/include/riscv64-linux-gnu/sys /usr/include
-                ;;
-                aarch64)
-                ln -s /usr/include/aarch64-linux-gnu/bits /usr/include
-                ln -s /usr/include/aarch64-linux-gnu/sys /usr/include
-                ;;
-                armhf)
-                ln -s /usr/include/arm-linux-gnueabihf/bits /usr/include
-                ln -s /usr/include/arm-linux-gnueabihf/sys /usr/include
-                ln -s /usr/include/arm-linux-gnueabihf/gnu /usr/include
-                ln -s /usr/include/arm-linux-gnueabihf/asm /usr/include
-                ;;
-            esac
             cmake -DCMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON ..
             cmake --build .
             ctest -C Debug --output-on-failure
