@@ -411,7 +411,7 @@ set( OBJ-x86_64 ${X86_64_O} ${SRC_DIR}/lib/va_list.c ${BCHECK_O} ${DSO_O} )
 set( OBJ-x86_64-osx ${X86_64_O} ${SRC_DIR}/lib/va_list.c ${BCHECK_O} )
 set( OBJ-i386-win32 ${I386_O} ${WIN_DIR}/lib/chkstk.S ${B_O} ${WIN_O} )
 set( OBJ-x86_64-win32 ${X86_64_O} ${WIN_DIR}/lib/chkstk.S ${B_O} ${WIN_O} )
-set( OBJ-arm64 ${ARM64_O} ${BCHECK_O} ${DSO_O} )
+set( OBJ-arm64 ${ARM64_O} ${DSO_O} )
 set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
 set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
 
