@@ -54,5 +54,4 @@ jobs:
             esac
             cmake -DCMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON ..
             cmake --build .
-            ctest -C Debug
-            cat Testing/Temporary/LastTest.log
+            ctest -C Debug --output-on-failure

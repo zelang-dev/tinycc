@@ -11,16 +11,15 @@ else()
   set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
-add_custom_target(
-    test-cthread ALL
-    COMMAND tcc ${TH_DIR}/test-cthread.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
-    SOURCES ${TH_DIR}/test-cthread.c )
-add_test(NAME test-cthread COMMAND test-cthread WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
 if(NOT ${TARGET_ARCH} STREQUAL armv7
     AND NOT ${TARGET_ARCH} STREQUAL arm64
     AND NOT ${TARGET_ARCH} STREQUAL riscv64)
+    add_custom_target(
+        test-cthread ALL
+        COMMAND tcc ${TH_DIR}/test-cthread.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
+        BYPRODUCTS ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
+        SOURCES ${TH_DIR}/test-cthread.c )
+    add_test(NAME test-cthread COMMAND test-cthread WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
     add_custom_target(
         test_pool-shutdown ALL
