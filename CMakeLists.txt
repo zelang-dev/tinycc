@@ -371,7 +371,7 @@ add_custom_command(
 set( BCHECK_O ${SRC_DIR}/lib/bcheck.c )
 set( B_O ${BCHECK_O} ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-log.c ${SRC_DIR}/lib/bt-dll.c )
 set( BT_O ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-log.c ${SRC_DIR}/lib/runmain.c ${SRC_DIR}/lib/tcov.c )
-set( EXTRA_O ${SRC_DIR}/lib/runmain.c ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-dll.c ${SRC_DIR}/lib/bt-log.c ${BCHECK_O} )
+set( EXTRA_O ${SRC_DIR}/lib/bt-dll.c ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-log.c ${SRC_DIR}/lib/runmain.c ${BCHECK_O} )
 set( CROSS_EXTRA_O ${BCHECK_O} ${SRC_DIR}/lib/bt-exe.c ${SRC_DIR}/lib/bt-log.c ${SRC_DIR}/lib/tcov.c )
 
 set( I386_O
@@ -413,7 +413,7 @@ set( OBJ-i386-win32 ${I386_O} ${WIN_DIR}/lib/chkstk.S ${B_O} ${WIN_O} )
 set( OBJ-x86_64-win32 ${X86_64_O} ${WIN_DIR}/lib/chkstk.S ${B_O} ${WIN_O} )
 set( OBJ-arm64 ${ARM64_O} ${DSO_O} )
 set( OBJ-arm64-osx ${ARM64_O} ${BCHECK_O} )
-set( OBJ-arm ${ARM_O} ${BCHECK_O} ${DSO_O} )
+set( OBJ-arm ${ARM_O} ${DSO_O} )
 
 set( OBJ-armv7 ${ARM_O} ${DSO_O} )
 set( OBJ-arm-fpa ${ARM_O} ${DSO_O} )
