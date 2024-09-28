@@ -1,8 +1,10 @@
-Tiny C Compiler - C Scripting Everywhere - The Smallest ANSI C compiler
------------------------------------------------------------------------
+# Tiny C Compiler - C Scripting Everywhere - The Smallest ANSI C compiler
 
-Features:
---------
+[![armv7, aarch64, riscv64 ](https://github.com/zelang-dev/tinycc/actions/workflows/platforms.yml/badge.svg?branch=main)](https://github.com/zelang-dev/tinycc/actions/workflows/platforms.yml)
+
+[![Windows, Linux, macOS ](https://github.com/zelang-dev/tinycc/actions/workflows/cmake.yml/badge.svg?branch=main)](https://github.com/zelang-dev/tinycc/actions/workflows/cmake.yml)
+
+## Features
 
 - SMALL! You can compile and execute C code everywhere, for example on
   rescue disks.
@@ -25,24 +27,12 @@ Features:
   line of your C source, and execute it directly from the command
   line.
 
-Documentation:
--------------
+## Documentation
 
-1) Installation on a i386/x86_64/arm/aarch64/riscv64
-   Linux/macOS/FreeBSD/NetBSD/OpenBSD hosts.
+1) Installation uses cmake on a i386/x86_64/arm/aarch64/riscv64 - Windows/Linux/macOS/FreeBSD/NetBSD/OpenBSD hosts.
 
-   ./configure
-   make
-   make test
-   make install
-
-   Notes: For FreeBSD, NetBSD and OpenBSD, gmake should be used instead of make.
-   For Windows read tcc-win32.txt.
-
-makeinfo must be installed to compile the doc.  By default, tcc is
-installed in /usr/local/bin.  ./configure --help  shows configuration
-options.
-
+    cmake ..
+    cmake --build .
 
 2) Introduction
 
@@ -83,14 +73,9 @@ when doing 'make test'.
 
 4) Full Documentation
 
-Please read tcc-doc.html to have all the features of TCC.
+Please read [tinycc-docs.html](tinycc-docs.html) to have all the features of TCC.
 
-Additional information is available for the Windows port in tcc-win32.txt.
 
-License:
--------
+## License
 
-TCC is distributed under the GNU Lesser General Public License (see
-COPYING file).
-
-Fabrice Bellard.
+TCC is distributed under **MIT** and the GNU Lesser General Public License (see COPYING file)

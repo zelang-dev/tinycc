@@ -1,4 +1,4 @@
-name: cmake build and run ctest
+name: Windows, Linux, macOS
 
 on:
   pull_request:
