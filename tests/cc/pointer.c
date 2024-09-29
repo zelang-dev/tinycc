@@ -56,7 +56,11 @@ static void t7() {
 static void subtract() {
     char *p = "abcdefg";
     char *q = p + 5;
+#ifdef __arm__
+    expect(4, sizeof(q - p));
+#else
     expect(8, sizeof(q - p));
+#endif
     expect(5, q - p);
 }
 

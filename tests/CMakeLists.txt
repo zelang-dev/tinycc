@@ -209,7 +209,7 @@ endforeach()
 
 foreach(testfile ${TESTS2})
   add_test(NAME ${testfile} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests2
-           COMMAND tcc ${TCC_CFLAGS} -dt -bt -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
+           COMMAND tcc ${TCC_CFLAGS} -dt -bt -b -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
 endforeach()
 
 set( TEST_DIR ${TCC_DIR}/tests )

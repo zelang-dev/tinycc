@@ -54,11 +54,18 @@ static void test_storage_class() {
 
 static void test_pointer() {
     int *a;
-    expect(8, sizeof(a));
     int *b[5];
-    expect(40, sizeof(b));
     int (*c)[5];
+
+#ifdef __arm__
+    expect(4, sizeof(a));
+    expect(20, sizeof(b));
+    expect(4, sizeof(c));
+#else
+    expect(8, sizeof(a));
+    expect(40, sizeof(b));
     expect(8, sizeof(c));
+#endif
 }
 
 static void test_unusual_order() {

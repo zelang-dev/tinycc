@@ -14,11 +14,11 @@ static void test_primitives() {
     expect(8, sizeof(long long));
 }
 
-static void test_pointers() {
-    expect(8, sizeof(char *));
-    expect(8, sizeof(short *));
-    expect(8, sizeof(int *));
-    expect(8, sizeof(long *));
+static void test_pointers(int s) {
+    expect(s, sizeof(char *));
+    expect(s, sizeof(short *));
+    expect(s, sizeof(int *));
+    expect(s, sizeof(long *));
 }
 
 static void test_unsigned() {
@@ -80,7 +80,11 @@ static void test_constexpr() {
 void testmain() {
     print("sizeof");
     test_primitives();
-    test_pointers();
+#ifdef __arm__
+    test_pointers(4);
+#else
+    test_pointers(8);
+#endif
     test_unsigned();
     test_literals();
     test_arrays();
