@@ -53,11 +53,19 @@ static void test_vars() {
     expect(1, sizeof((b[0])));
     expect(1, sizeof((b)[0]));
     char *c[5];
-    expect(40, sizeof(c));
     char *(*d)[3];
+
+#ifdef __arm__
+    expect(20, sizeof(c));
+    expect(4, sizeof(d));
+    expect(12, sizeof(*d));
+    expect(4, sizeof(**d));
+#else
+    expect(40, sizeof(c));
     expect(8, sizeof(d));
     expect(24, sizeof(*d));
     expect(8, sizeof(**d));
+#endif
     expect(1, sizeof(***d));
     expect(4, sizeof((int)a));
 }
