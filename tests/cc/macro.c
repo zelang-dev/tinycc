@@ -18,11 +18,11 @@ static char *get_timestamp() {
 }
 
 static void special() {
-    //expect_string("test/macro.c", __FILE__);
+//    expect_string("test/macro.c", __FILE__);
     expect(22, __LINE__);
     expect(11, strlen(__DATE__));
     expect(8, strlen(__TIME__));
-    //expect_string("test/macro.c", __BASE_FILE__);
+//    expect_string("test/macro.c", __BASE_FILE__);
 }
 
 #define ZERO 0
@@ -333,11 +333,11 @@ static void funclike() {
     expectf(.123, m8(., 123));
     expect('a', m8(L, 'a'));
 //    expect('a', m8(U, 'a'));
- //   expect('a', m8(u, 'a'));
+//    expect('a', m8(u, 'a'));
     expect_string(L"abc", m8(L, "abc"));
-  //  expect_string(U"abc", m8(U, "abc"));
-   // expect_string(u"abc", m8(u, "abc"));
-  //  expect_string(u8"abc", m8(u8, "abc"));
+//    expect_string(U"abc", m8(U, "abc"));
+//    expect_string(u"abc", m8(u, "abc"));
+//    expect_string(u8"abc", m8(u8, "abc"));
 
 #define m9(x, y, z) x y + z
     expect(8, m9(1,, 7));

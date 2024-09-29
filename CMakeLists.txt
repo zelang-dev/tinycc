@@ -50,7 +50,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_MODULE_PATH})
 set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
 
 cmake_dependent_option(BUILD_TESTING
-  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" OFF
+  "Build the unit tests when BUILD_TESTING is enabled and we are the root project" ON
   "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
 
@@ -234,25 +234,25 @@ else()
   endif()
 endif( WIN32 AND NOT CYGWIN )
 
-find_package (Threads)
+find_package(Threads)
 
 ################################################################################
 # TCC compiler as library
 
 if(BUILD_SHARED_LIBS)
     add_library(libtcc SHARED ${CODE_GENERATOR_SRCS})
-    if(WIN32)
-        target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
+if(WIN32)
+    target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
     elseif(APPLE)
         target_compile_options(libtcc PUBLIC -shared -install_name libtcc.dylib -o libtcc.dylib)
     endif()
 else()
     add_library(libtcc STATIC ${CODE_GENERATOR_SRCS})
-    if(WIN32)
-        target_compile_definitions(libtcc PUBLIC CONFIG_TCC_STATIC)
+if(WIN32)
+    target_compile_definitions(libtcc PUBLIC CONFIG_TCC_STATIC)
     else()
         target_compile_options(libtcc PUBLIC -static)
-    endif()
+endif()
 endif()
 
 target_compile_definitions(libtcc
@@ -333,8 +333,7 @@ elseif (UNIX)
                 CONFIG_TRIPLET=\"arm-linux-gnueabi\")
         endif()
     endif()
-    target_link_libraries(libtcc PUBLIC
-        m dl ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries(libtcc PUBLIC m dl Threads::Threads)
 endif()
 
 target_include_directories(libtcc
@@ -513,6 +512,7 @@ add_custom_target(
     BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a
     COMMENT "Linking Runtime Library"
     SOURCES ${LIB_SRCFILES})
+add_dependencies(libarchive libtcc)
 install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
 if(WIN32 OR APPLE)
@@ -608,7 +608,7 @@ set(CROSS_TARGET_armv7 TCC_TARGET_ARM TCC_ARM_VFP TCC_ARM_EABI TCC_ARM_HARDFLOAT
 
 set(CROSS_TARGET_arm64 TCC_TARGET_ARM64
  CONFIG_TCC_CROSSPREFIX=\"arm64-\"
- CONFIG_TCC_CRTPREFIX=\"/usr/aarch64-linux-gnu/lib\"
+  CONFIG_TCC_CRTPREFIX=\"/usr/aarch64-linux-gnu/lib\"
  CONFIG_TCC_LIBPATHS=\"{B}:/usr/aarch64-linux-gnu/lib:/usr/lib/aarch64-linux-gnu\"
  CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/aarch64-linux-gnu/include:/usr/include\")
 
@@ -623,8 +623,11 @@ set(CROSS_TARGET_x86_64-osx TCC_TARGET_X86_64 TCC_TARGET_MACHO
  CONFIG_TCC_LIBPATHS=\"{B}/lib\")
 
 set(CROSS_TARGET_arm64-osx TCC_TARGET_ARM64 TCC_TARGET_MACHO
+ CONFIG_TRIPLET=\"aarch64-linux-gnu\"
  CONFIG_TCC_CROSSPREFIX=\"arm64-osx-\"
- CONFIG_TCC_LIBPATHS=\"{B}/lib\")
+ CONFIG_TCC_CRTPREFIX=\"/usr/aarch64-linux-gnu/lib\"
+ CONFIG_TCC_LIBPATHS=\"{B}:/usr/aarch64-linux-gnu/lib:/usr/lib/aarch64-linux-gnu\"
+ CONFIG_TCC_SYSINCLUDEPATHS=\"{B}/include:/usr/aarch64-linux-gnu/include:/usr/include\")
 
 set(CROSS_DEFINES -Wall -O2 -Wno-declaration-after-statement -fno-strict-aliasing
  -Wno-pointer-sign -Wno-sign-compare -Wno-unused-result -Wno-format-truncation -Wno-stringopcation)
@@ -642,6 +645,10 @@ foreach(X ${TCC_X})
     endif()
     add_executable(${tcc_cross} ${SRC_DIR}/tcc.c)
     target_compile_definitions(${tcc_cross} PUBLIC ${CROSS_TARGET})
+    add_dependencies(${tcc_cross} c2str)
+    if(UNIX)
+        target_link_libraries(${tcc_cross} PUBLIC m dl Threads::Threads)
+    endif()
     install(TARGETS ${tcc_cross} RUNTIME)
 
     if(WIN32 AND
@@ -681,7 +688,7 @@ foreach(X ${TCC_X})
             VERBATIM
             COMMENT "Cross Compiling Runtime Library (${CROSS_SRCFILE}) for ${X}")
         list(APPEND CROSS_OBJFILES ${LIB_DIR}/${X}-${CROSS_SRCFILE_NOEXT}.o)
-        add_dependencies(${tcc_cross} libtcc)
+        add_dependencies(${tcc_cross} libarchive)
     endforeach()
 
     if(${X} STREQUAL i386-win32
@@ -721,7 +728,7 @@ foreach(X ${TCC_X})
         DEPENDS ${CROSS_OBJFILES}
         BYPRODUCTS ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a
         COMMENT "Cross Linking Archive Runtime Library - ${X}" )
-    add_dependencies(${tcc_cross} libtcc)
+    add_dependencies(${tcc_cross} tcc)
     install(FILES ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/${X}-libtcc1.a DESTINATION ${CMAKE_INSTALL_LIBDIR})
     set(CROSS_OBJFILES "")
 endforeach()

@@ -8,39 +8,40 @@ if(WIN32)
   set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 else()
   set(TCC_MATH_LDFLAGS )
-  set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(LIBTCC_LDFLAGS -pthread -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
 if(NOT ${TARGET_ARCH} STREQUAL armv7
-    AND NOT ${TARGET_ARCH} STREQUAL arm64
+AND NOT ${TARGET_ARCH} STREQUAL arm64
     AND NOT ${TARGET_ARCH} STREQUAL riscv64)
     add_custom_target(
         test-cthread ALL
-        COMMAND tcc ${TH_DIR}/test-cthread.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
+        COMMAND tcc ${TH_DIR}/test-cthread.c ${TH_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
         BYPRODUCTS ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
         SOURCES ${TH_DIR}/test-cthread.c )
     add_test(NAME test-cthread COMMAND test-cthread WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
     add_custom_target(
         test_pool-shutdown ALL
-        COMMAND tcc ${TH_DIR}/test_pool-shutdown.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-shutdown${EXESUF}
+        COMMAND tcc ${TH_DIR}/test_pool-shutdown.c ${TH_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-shutdown${EXESUF}
         BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-shutdown${EXESUF}
         SOURCES ${TH_DIR}/test_pool-shutdown.c )
     add_test(NAME test_pool-shutdown COMMAND test_pool-shutdown WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
     add_custom_target(
         test_pool-heavy ALL
-        COMMAND tcc ${TH_DIR}/test_pool-heavy.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-heavy${EXESUF}
+        COMMAND tcc ${TH_DIR}/test_pool-heavy.c ${TH_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-heavy${EXESUF}
         BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-heavy${EXESUF}
         SOURCES ${TH_DIR}/test_pool-heavy.c )
     add_test(NAME test_pool-heavy COMMAND test_pool-heavy WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
     add_custom_target(
         test_pool-wait ALL
-        COMMAND tcc ${TH_DIR}/test_pool-wait.c ${TH_CFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-wait${EXESUF}
+        COMMAND tcc ${TH_DIR}/test_pool-wait.c ${TH_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-wait${EXESUF}
         BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-wait${EXESUF}
         SOURCES ${TH_DIR}/test_pool-wait.c )
         add_test(NAME test_pool-wait COMMAND test_pool-wait WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
+
     add_custom_target(
         test-atomicity ALL
         COMMAND tcc ${TH_DIR}/test-atomicity.c ${TH_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test-atomicity${EXESUF}

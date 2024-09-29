@@ -222,11 +222,19 @@ add_custom_target(
 
 add_test(NAME tcctest COMMAND tcctest WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
-add_custom_target(
-    libtcc_test ALL
-    COMMAND tcc ${TEST_DIR}/libtcc_test.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF}
-    BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
-    SOURCES ${TEST_DIR}/libtcc_test.c
-    DEPENDS libarchive)
+if(${TARGET_ARCH} STREQUAL armv7
+    OR ${TARGET_ARCH} STREQUAL arm64
+    OR ${TARGET_ARCH} STREQUAL riscv64)
+    add_executable(libtcc_test ${TEST_DIR}/libtcc_test.c)
+    target_link_libraries(libtcc_test PUBLIC m dl libtcc Threads::Threads)
+    add_dependencies(libtcc_test libarchive)
+else()
+    add_custom_target(
+        libtcc_test ALL
+        COMMAND tcc ${TEST_DIR}/libtcc_test.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF}
+        BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
+        SOURCES ${TEST_DIR}/libtcc_test.c
+        DEPENDS libarchive)
+endif()
 
 add_test(NAME libtcc_test COMMAND libtcc_test -B../built -L../built -I../include -I../src WORKING_DIRECTORY ${CMAKE_BINARY_DIR})

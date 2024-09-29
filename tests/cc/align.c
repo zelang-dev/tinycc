@@ -6,9 +6,9 @@
 
 static void test_alignas() {
     expect(1, offsetof(struct { char x; char y; }, y));
-    //expect(4, offsetof(struct { char x; _Alignas(4) char y; }, y));
-    //expect(4, offsetof(struct { char x; _Alignas(int) char y; }, y));
-    //expect(1, offsetof(struct { char x; alignas(0) char y; }, y));
+//    expect(4, offsetof(struct { char x; _Alignas(4) char y; }, y));
+//    expect(4, offsetof(struct { char x; _Alignas(int) char y; }, y));
+//    expect(1, offsetof(struct { char x; alignas(0) char y; }, y));
 }
 
 static void test_alignof() {
