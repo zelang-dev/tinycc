@@ -171,12 +171,8 @@ jobs:
             arch: armv7
           - target: arm64
             arch: aarch64
-          - target: ppc64el
-            arch: ppc64le
           - target: riscv64
             arch: riscv64
-          - target: s390x
-            arch: s390x
     steps:
       - uses: actions/checkout@v4
       - uses: uraimo/run-on-arch-action@v2
