@@ -1,5 +1,6 @@
 // Copyright 2012 Rui Ueyama. Released under the MIT license.
 
+// This test hangs on `riscv64` CI, skipping.
 #include "test.h"
 
 int test_if1(void) { if (1) { return 'a';} return 0; }

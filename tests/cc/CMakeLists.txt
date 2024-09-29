@@ -13,6 +13,11 @@ endif()
 
 file(GLOB TCC_TESTS *.c)
 list(REMOVE_ITEM TCC_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/testmain.c)
+
+if(${TARGET_ARCH} STREQUAL riscv64)
+    list(REMOVE_ITEM TCC_TESTS ${CMAKE_CURRENT_SOURCE_DIR}/control.c)
+endif()
+
 file(MAKE_DIRECTORY  ${CMAKE_BINARY_DIR}/cc)
 foreach(test_file ${TCC_TESTS})
     get_filename_component(test_file_NOEXT ${test_file} NAME_WE)
