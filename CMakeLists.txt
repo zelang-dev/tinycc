@@ -156,6 +156,13 @@ if(UNIX)
   endif()
 endif()
 
+if(UNIX)
+    set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g")
+else()
+    add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+    add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
+endif()
+
 set(TCC_VERSION ${PROJECT_VERSION})
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/config.h)
 configure_file(config.h.in ${SRC_DIR}/config.h)

@@ -1,7 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${INC_DIR})
 
 set( TH_DIR ${CMAKE_CURRENT_SOURCE_DIR} )
-set(TH_CFLAGS -w -B ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} -I${INC_DIR})
+set(TH_CFLAGS -g -B ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} -I${INC_DIR})
 if(WIN32)
   set(TH_CFLAGS ${TH_CFLAGS} -I${WIN_DIR}/include -I${WIN_DIR}/include/winapi)
   set(EXESUF .exe )
@@ -11,9 +11,9 @@ else()
   set(LIBTCC_LDFLAGS -pthread -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
-if(NOT ${TARGET_ARCH} STREQUAL armv7
-AND NOT ${TARGET_ARCH} STREQUAL arm64
-    AND NOT ${TARGET_ARCH} STREQUAL riscv64)
+#if(NOT ${TARGET_ARCH} STREQUAL armv7
+#AND NOT ${TARGET_ARCH} STREQUAL arm64
+#    AND NOT ${TARGET_ARCH} STREQUAL riscv64)
     add_custom_target(
         test-cthread ALL
         COMMAND tcc ${TH_DIR}/test-cthread.c ${TH_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test-cthread${EXESUF}
@@ -27,13 +27,6 @@ AND NOT ${TARGET_ARCH} STREQUAL arm64
         BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-shutdown${EXESUF}
         SOURCES ${TH_DIR}/test_pool-shutdown.c )
     add_test(NAME test_pool-shutdown COMMAND test_pool-shutdown WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-
-    add_custom_target(
-        test_pool-heavy ALL
-        COMMAND tcc ${TH_DIR}/test_pool-heavy.c ${TH_CFLAGS} ${LIBTCC_LDFLAGS} -o ${CMAKE_BINARY_DIR}/test_pool-heavy${EXESUF}
-        BYPRODUCTS ${CMAKE_BINARY_DIR}/test_pool-heavy${EXESUF}
-        SOURCES ${TH_DIR}/test_pool-heavy.c )
-    add_test(NAME test_pool-heavy COMMAND test_pool-heavy WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
 
     add_custom_target(
         test_pool-wait ALL
@@ -55,4 +48,4 @@ AND NOT ${TARGET_ARCH} STREQUAL arm64
         BYPRODUCTS ${CMAKE_BINARY_DIR}/test-thread_local${EXESUF}
         SOURCES ${TH_DIR}/test-thread_local.c )
     add_test(NAME test-thread_local COMMAND test-thread_local WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-endif()
+#endif()

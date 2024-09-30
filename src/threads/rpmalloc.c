@@ -261,7 +261,30 @@ static int _rpmalloc_shuting_down = 0;
 make_atomic(unsigned int, atomic32_t)
 make_atomic(unsigned long long, atomic64_t)
 
-static FORCEINLINE int32_t atomic_load32(atomic32_t * src) {
+#if defined(__TINYC__) && (defined(__arm__) || defined(__aarch64__) || defined(__riscv))
+static FORCEINLINE int32_t atomic_load32(atomic32_t *src) {
+    return atomic_load_explicit((volatile c89atomic_uint32 *)src, memory_order_relaxed);
+}
+static FORCEINLINE void atomic_store32(atomic32_t *dst, int32_t val) {
+    atomic_store_explicit((volatile c89atomic_uint32 *)dst, (c89atomic_uint32)val, memory_order_relaxed);
+}
+static FORCEINLINE int32_t atomic_incr32(atomic32_t *val) {
+    return atomic_fetch_add_explicit((volatile c89atomic_uint32 *)val, 1, memory_order_relaxed) + 1;
+}
+static FORCEINLINE int32_t atomic_decr32(atomic32_t *val) {
+    return atomic_fetch_add_explicit((volatile c89atomic_uint32 *)val, -1, memory_order_relaxed) - 1;
+}
+static FORCEINLINE int32_t atomic_add32(atomic32_t *val, int32_t add) {
+    return atomic_fetch_add_explicit((volatile c89atomic_uint32 *)val, (c89atomic_uint32)add, memory_order_relaxed) + add;
+}
+static FORCEINLINE int atomic_cas32_acquire(atomic32_t *dst, int32_t val, int32_t ref) {
+    return atomic_compare_exchange_weak_explicit((volatile c89atomic_uint32 *)dst, &ref, (c89atomic_uint32)val, memory_order_acquire, memory_order_relaxed);
+}
+static FORCEINLINE void atomic_store32_release(atomic32_t *dst, int32_t val) {
+    atomic_store_explicit((volatile c89atomic_uint32 *)dst, (c89atomic_uint32)val, memory_order_release);
+}
+#else
+static FORCEINLINE int32_t atomic_load32(atomic32_t *src) {
     return c89atomic_load_explicit_32(src, memory_order_relaxed);
 }
 static FORCEINLINE void atomic_store32(atomic32_t *dst, int32_t val) {
@@ -282,14 +305,9 @@ static FORCEINLINE int atomic_cas32_acquire(atomic32_t *dst, int32_t val, int32_
 static FORCEINLINE void atomic_store32_release(atomic32_t *dst, int32_t val) {
     c89atomic_store_explicit_32(dst, val, memory_order_release);
 }
-static FORCEINLINE int64_t atomic_load64(atomic64_t *val) {
-    return c89atomic_load_explicit_64((volatile c89atomic_uint64 *)val, memory_order_relaxed);
-}
-static FORCEINLINE int64_t atomic_add64(atomic64_t *val, int64_t add) {
-    return c89atomic_fetch_add_explicit_64((volatile c89atomic_uint64 *)val, add, memory_order_relaxed) + add;
-}
+#endif
 
-#ifdef __arm__
+#if defined(__arm__)
 static FORCEINLINE void *atomic_load_ptr(atomic_ptr_t *src) {
     return (void *)atomic_load_explicit(src, memory_order_relaxed);
 }
@@ -845,8 +863,8 @@ _rpmalloc_spin(void) {
     __asm__ volatile("or 27,27,27");
 #elif defined(__sparc__)
     __asm__ volatile("rd %ccr, %g0 \n\trd %ccr, %g0 \n\trd %ccr, %g0");
-#elif defined(_WIN32)
-    usleep(0);
+#elif defined(__TINYC__)
+    sched_yield();
 #else
     struct timespec ts = {0};
     nanosleep(&ts, 0);
@@ -1021,7 +1039,7 @@ _rpmalloc_unmap_os(void *address, size_t size, size_t offset, size_t release) {
         if (munmap(address, release)) {
             rpmalloc_assert(0, "Failed to unmap virtual memory block");
         }
-    } else {
+        } else {
 #if defined(MADV_FREE_REUSABLE)
         int ret;
         while ((ret = madvise(address, size, MADV_FREE_REUSABLE)) == -1 && (errno == EAGAIN))
@@ -1037,13 +1055,13 @@ _rpmalloc_unmap_os(void *address, size_t size, size_t offset, size_t release) {
         if (posix_madvise(address, size, POSIX_MADV_DONTNEED)) {
 #endif
             rpmalloc_assert(0, "Failed to madvise virtual memory block as free");
-    }
-}
+        }
+        }
 #endif
 #endif
     if (release)
         _rpmalloc_stat_sub(&_mapped_pages_os, release >> _memory_page_size_shift);
-}
+        }
 
 static void
 _rpmalloc_span_mark_as_subspan_unless_master(span_t * master, span_t * subspan, size_t span_count);
@@ -1557,7 +1575,7 @@ _rpmalloc_global_cache_extract_spans(span_t * *span, size_t span_count, size_t c
     size_t ispan;
     for (ispan = 0; ispan < extract_count; ++ispan) {
         rpmalloc_assert(span[ispan]->span_count == span_count, "Global cache span count mismatch");
-}
+    }
 #endif
 
     atomic_store32_release(&cache->lock, 0);
@@ -1691,7 +1709,7 @@ _rpmalloc_heap_cache_insert(heap_t * heap, span_t * span) {
         _rpmalloc_span_unmap(span);
         _rpmalloc_heap_global_finalize(heap);
         return;
-    }
+}
 #if ENABLE_THREAD_CACHE
     size_t span_count = span->span_count;
     _rpmalloc_stat_inc(&heap->span_use[span_count - 1].spans_to_cache);
@@ -1734,7 +1752,7 @@ _rpmalloc_heap_cache_insert(heap_t * heap, span_t * span) {
     (void)sizeof(heap);
     _rpmalloc_span_unmap(span);
 #endif
-    }
+}
 
 //! Extract the given number of spans from the different cache levels
 static span_t *
@@ -1783,7 +1801,7 @@ _rpmalloc_heap_global_cache_extract(heap_t * heap, size_t span_count) {
     if (span_count == 1) {
         span_cache = &heap->span_cache;
         wanted_count = THREAD_SPAN_CACHE_TRANSFER;
-    } else {
+        } else {
         span_cache = (span_cache_t *)(heap->span_large_cache + (span_count - 2));
         wanted_count = THREAD_SPAN_LARGE_CACHE_TRANSFER;
     }
@@ -1800,13 +1818,13 @@ _rpmalloc_heap_global_cache_extract(heap_t * heap, size_t span_count) {
         _rpmalloc_stat_add64(&heap->global_to_thread, span_count * count * _memory_span_size);
         _rpmalloc_stat_add(&heap->span_use[span_count - 1].spans_from_global, count);
         return span;
-    }
+        }
 #endif
 #endif
     (void)sizeof(heap);
     (void)sizeof(span_count);
     return 0;
-}
+    }
 
 static void
 _rpmalloc_inc_span_statistics(heap_t * heap, size_t span_count, uint32_t class_idx) {
@@ -2023,9 +2041,9 @@ static void _rpmalloc_heap_release(void *heapptr, int first_class, int release_c
                 _rpmalloc_span_unmap(span_cache->span[ispan]);
 #endif
             span_cache->count = 0;
-            }
-#endif
         }
+#endif
+}
 
     if (get_thread_heap_raw() == heap)
         set_thread_heap(0);
@@ -2268,7 +2286,7 @@ _rpmalloc_aligned_allocate(heap_t * heap, size_t alignment, size_t size) {
     if (alignment & (alignment - 1)) {
         errno = EINVAL;
         return 0;
-}
+    }
 #endif
 
     if ((alignment <= SPAN_HEADER_SIZE) && ((size + SPAN_HEADER_SIZE) < _memory_medium_size_limit)) {
@@ -2757,7 +2775,7 @@ rpmalloc_initialize_config(const rpmalloc_config_t * config) {
                     }
                 }
                 _memory_map_granularity = _memory_page_size;
-            }
+}
 #elif defined(__APPLE__) || defined(__NetBSD__)
             _memory_huge_pages = 1;
             _memory_page_size = 2 * 1024 * 1024;
@@ -2765,7 +2783,7 @@ rpmalloc_initialize_config(const rpmalloc_config_t * config) {
 #endif
     }
 #endif
-} else {
+    } else {
         if (_memory_config.enable_huge_pages)
             _memory_huge_pages = 1;
     }
@@ -2835,7 +2853,7 @@ rpmalloc_initialize_config(const rpmalloc_config_t * config) {
             ++_memory_span_size_shift;
         }
         _memory_span_mask = ~(uintptr_t)(_memory_span_size - 1);
-}
+    }
 #endif
 
     _memory_span_map_count = (_memory_config.span_map_count ? _memory_config.span_map_count : DEFAULT_SPAN_MAP_COUNT);
@@ -2899,7 +2917,7 @@ rpmalloc_initialize_config(const rpmalloc_config_t * config) {
     //Initialize this thread
     rpmalloc_thread_initialize();
     return 0;
-}
+        }
 
 //! Finalize the allocator
 void
@@ -2960,7 +2978,7 @@ extern void rpmalloc_thread_initialize(void) {
 #endif
         }
     }
-}
+    }
 
 //! Finalize thread, orphan heap
 void rpmalloc_thread_finalize(int release_caches) {
@@ -3015,7 +3033,7 @@ rpcalloc(size_t num, size_t size) {
     if (err || (total >= MAX_ALLOC_SIZE)) {
         errno = EINVAL;
         return 0;
-}
+    }
 #endif
 #else
     total = num * size;
@@ -3072,7 +3090,7 @@ rpaligned_calloc(size_t alignment, size_t num, size_t size) {
     if (err || (total >= MAX_ALLOC_SIZE)) {
         errno = EINVAL;
         return 0;
-}
+    }
 #endif
 #else
     total = num * size;
@@ -3161,7 +3179,7 @@ rpmalloc_thread_statistics(rpmalloc_thread_statistics_t * stats) {
         if (deferred->size_class != SIZE_CLASS_HUGE)
             stats->spancache += (size_t)deferred->span_count * _memory_span_size;
         deferred = (span_t *)deferred->free_list;
-    }
+}
 }
 
 void
@@ -3179,11 +3197,11 @@ rpmalloc_global_statistics(rpmalloc_global_statistics_t * stats) {
         while (current_span) {
             ++count;
             current_span = current_span->next;
-    }
+        }
 #endif
         atomic_store32_release(&cache->lock, 0);
         stats->cached += count * (iclass + 1) * _memory_span_size;
-}
+    }
 #endif
 }
 
