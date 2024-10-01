@@ -740,7 +740,9 @@ foreach(X ${TCC_X})
     set(CROSS_OBJFILES "")
 endforeach()
 
-add_subdirectory(tests)
+if(BUILD_TESTING)
+    add_subdirectory(tests)
+endif()
 
 file(GLOB WIN32_DEFS ${WIN_DIR}/lib/*.def)
 if(WIN32)
