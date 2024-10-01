@@ -3757,7 +3757,7 @@ ST_FUNC void vstore(void)
 
             /* if lvalue was saved on stack, must read it */
             if ((vtop[-1].r & VT_VALMASK) == VT_LLOCAL) {
-                SValue sv;
+                SValue sv = {0};
                 r = get_reg(RC_INT);
                 sv.type.t = VT_PTRDIFF_T;
                 sv.r = VT_LOCAL | VT_LVAL;
