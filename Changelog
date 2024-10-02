@@ -1,3 +1,33 @@
+version 0.9.29:
+
+- added [rpmalloc](https://github.com/zelang-dev/rpmalloc) to standard `libtcc1.a`, `libtcc.so/lib/dylib`, and cross chains,
+this replaces all **stdlib.h** `malloc` type calls,
+  - just `#include <rpmalloc.h>`
+- added [cthread](https://github.com/zelang-dev/cthread) to standard `libtcc1.a`, `libtcc.so/lib/dylib`, and cross chains,
+this allows all thread related with `C11` like interface calls to go through `pthread` on Windows also,
+  - just `#include <cthread.h>` for `C11` emulation, it includes `#include <pthread.h>` for Windows.
+- the `cthread` library adds `thrd_local` macro to emulate _tls_ **thread local storage** if needed, using normal usage behaviors as functions,
+the macro can be used the same even if `thread_local` is really available.
+- moved all source files into `src` subdirectory.
+- converted build system to use `cmake` only with a simple cross toolchain `tcc.cmake` file.
+- packaged `cmake` to create downloadable installer binaries for all supported platforms by default,
+this uses the platforms default package manager for setup.
+
+Installer includes:
+
+- `armv7-tcc, i386-win32-tcc, x86_64-tcc, x86_64-win32-tcc, arm64-tcc, riscv64-tcc, x86_64-osx-tcc, i386-tcc, arm64-osx-tcc, armv7-wince-tcc, arm64-osx-libtcc1.a, armv7-wince-libtcc1.a, x86_64-win32-libtcc1.a, arm64-libtcc1.a,  i386-libtcc1.a, x86_64-libtcc1.a, riscv64-libtcc1.a, x86_64-osx-libtcc1.a, armv7-libtcc1.a, i386-win32-libtcc1.a`, all cross chain binaries.
+- `tcc_prompt`, launch shell with path and custom environment for compiler.
+- `cmake_tcc`, launch normal cmake command with some pre configuration, can pass two additional arguments,
+an shortcut to:
+    On Windows
+        `cmake .. -G "NMake Makefiles" -DCMAKE_TOOLCHAIN_FILE="%CMAKE_TOOLCHAIN_FILE%" -DCMAKE_BUILD_TYPE=%1 -DSYSTEM_NAME=%2 -DHOST_ARCH=%3 %4 %5`
+    Otherwise
+        `cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE -DCMAKE_BUILD_TYPE=$1 -DSYSTEM_NAME=$2 -DHOST_ARCH=$3 $4 $5`
+    Therefore
+    `cmake_tcc Debug Native x86_64`, will setup and launch regular `tcc` executable, as cmake's compiler to use.
+
+**Fixes Changelog**: <https://github.com/zelang-dev/tinycc/compare/v0.9.28...0.9.29>
+
 version 0.9.28:
 
 User interface:
@@ -216,7 +246,7 @@ version 0.9.21:
 - section alignment fixes
 - bit fields fixes
 - do not generate code for unused inline functions
-- '-oformat' linker option. 
+- '-oformat' linker option.
 - added 'binary' output format.
 
 version 0.9.20:
@@ -430,7 +460,7 @@ version 0.9.3:
  - full ISOC99 64 bit 'long long' support.
  - full 32 bit 'float', 64 bit 'double' and 96 bit 'long double' support.
  - added '-U' option.
- - added assembly sections support. 
+ - added assembly sections support.
  - even faster startup time by mmaping sections instead of mallocing them.
  - added GNUC __attribute__ keyword support (currently supports
     'section' and 'aligned' attributes).

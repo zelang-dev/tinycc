@@ -1,8 +1,13 @@
 # Tiny C Compiler - C Scripting Everywhere - The Smallest ANSI C compiler
 
-[![armv7, aarch64, riscv64 ](https://github.com/zelang-dev/tinycc/actions/workflows/platforms.yml/badge.svg?branch=main)](https://github.com/zelang-dev/tinycc/actions/workflows/platforms.yml)
+[![armv7, aarch64, riscv64](https://github.com/zelang-dev/tinycc/actions/workflows/platforms.yml/badge.svg?branch=main)](https://github.com/zelang-dev/tinycc/actions/workflows/platforms.yml)
 
-[![Windows, Linux, macOS ](https://github.com/zelang-dev/tinycc/actions/workflows/cmake.yml/badge.svg?branch=main)](https://github.com/zelang-dev/tinycc/actions/workflows/cmake.yml)
+[![Windows, Linux, macOS](https://github.com/zelang-dev/tinycc/actions/workflows/cmake.yml/badge.svg?branch=main)](https://github.com/zelang-dev/tinycc/actions/workflows/cmake.yml)
+
+- This fork adds [rpmalloc](https://github.com/zelang-dev/rpmalloc) and [cthread](https://github.com/zelang-dev/cthread) to  standard `libtcc1.a`, `libtcc.so/lib/dylib`, and **cross chains**.
+- The `cthread` library adds `thrd_local` macro to emulate _tls_ **thread local storage** if needed, using normal usage behaviors as functions, the macro can be used the same even if `thread_local` is really available.
+  - All thread related features to go through `pthread` even on Windows.
+- See [Changelog](Changelog)
 
 ## Features
 
@@ -29,12 +34,51 @@
 
 ## Documentation
 
-1) Installation uses cmake on a i386/x86_64/arm/aarch64/riscv64 - Windows/Linux/macOS/FreeBSD/NetBSD/OpenBSD hosts.
+### Installation uses `cmake` on a i386/x86_64/arm/aarch64/riscv64 - Windows/Linux/macOS/FreeBSD/NetBSD/OpenBSD hosts
 
-    cmake ..
-    cmake --build .
+#### To build compiler
 
-2) Introduction
+_**Windows**_
+
+```bash
+mkdir build
+cd build
+cmake -D BUILD_TESTING=ON
+cmake --build . --config Debug
+ctest -C Debug --output-on-failure -F
+cpack -G `NSIS/WIX/Nuget`
+```
+
+_**Linux**_
+
+```bash
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON ..
+cmake --build .
+ctest -C Debug --output-on-failure -F
+cpack -G `DEB/RPM/DragNDrop`
+```
+
+### Use `tcc` on any `CMakeLists.txt` project
+
+- To launch separate shell with path and custom environment: `tcc_prompt`
+- To process **CMakeLists.txt**, and launch regular `tcc` executable, as cmake's compiler to use:
+    `cmake_tcc Debug Native x86_64`
+- You can pass two additional arguments to: `cmake_tcc`
+
+> The command is an shortcut to:
+
+    - On Windows
+        `cmake .. -G "NMake Makefiles" -DCMAKE_TOOLCHAIN_FILE="%CMAKE_TOOLCHAIN_FILE%" -DCMAKE_BUILD_TYPE=%1 -DSYSTEM_NAME=%2 -DHOST_ARCH=%3 %4 %5`
+
+    - Otherwise
+        `cmake .. -G "Unix Makefiles" -DCMAKE_TOOLCHAIN_FILE=$CMAKE_TOOLCHAIN_FILE -DCMAKE_BUILD_TYPE=$1 -DSYSTEM_NAME=$2 -DHOST_ARCH=$3 $4 $5`
+
+Then build as regular:
+    `cmake --build .`
+
+### Introduction
 
 We assume here that you know ANSI C. Look at the example ex1.c to know
 what the programs look like.
@@ -49,7 +93,7 @@ launch the C code as a shell or perl script :-) The command line
 arguments are put in 'argc' and 'argv' of the main functions, as in
 ANSI C.
 
-3) Examples
+### Examples
 
 ex1.c: simplest example (hello world). Can also be launched directly
 as a script: './ex1.c'.
@@ -71,10 +115,9 @@ generator.
 tcctest.c: auto test for TCC which tests many subtle possible bugs. Used
 when doing 'make test'.
 
-4) Full Documentation
+### Full Documentation
 
 Please read [tinycc-docs.html](tinycc-docs.html) to have all the features of TCC.
-
 
 ## License
 

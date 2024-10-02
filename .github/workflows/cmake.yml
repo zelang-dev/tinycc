@@ -28,8 +28,7 @@ jobs:
         shell: cmd
         run: |
             cd build
-            ctest -C Debug
-            cat Testing/Temporary/LastTest.log
+            ctest -C Debug --output-on-failure -F
       - name: ctest log
         run: |
             cd build
@@ -52,8 +51,7 @@ jobs:
       - name: Run ctest
         run: |
             cd build
-            ctest -C Debug
-            cat Testing/Temporary/LastTest.log
+            ctest -C Debug --output-on-failure -F
 
   build-linux:
     name: Linux ${{ matrix.target }}
@@ -82,5 +80,4 @@ jobs:
       - name: Run ctest
         run: |
             cd build
-            ctest -C Debug
-            cat Testing/Temporary/LastTest.log
+            ctest -C Debug --output-on-failure -Fg
