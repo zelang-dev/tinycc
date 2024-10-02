@@ -27,12 +27,11 @@ jobs:
             mkdir build
             cd build
             cmake .. -D BUILD_TESTING=OFF -A ${{ matrix.config.target }}
-      - name: Build
+      - name: Build & Create NSIS Installer from Release
         run: |
             cd build
             cmake --build . --config Release
-      - name: Create NSIS Installer from Release
-        run: cpack -G NSIS
+            cpack --config CPackConfig.cmake -G NSIS
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -96,14 +95,13 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update -q -y
           sudo apt-get install -y gcc-multilib g++-multilib valgrind libc6-dbg libc6-dbg:i386
-      - name: Configure & build
+      - name: Configure & build & Create DEB Installer from Release
         run: |
             mkdir build
             cd build
             cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTING=OFF -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
-      - name: Create DEB Installer from Release
-        run: cpack -G DEB
+            cpack --config CPackConfig.cmake -G DEB
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -129,16 +127,13 @@ jobs:
       - name: Prepare
         run: |
           dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint -y
-      - name: Configure & build
+      - name: Configure & build & Create RPM Installer from Release
         run: |
             mkdir build
             cd build
             cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTING=OFF
             cmake --build .
-      - name: Create RPM Installer from Release
-        run: |
-            cd build
-            cpack -G RPM
+            cpack --config CPackConfig.cmake -G RPM
       - name: Upload RPM binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:

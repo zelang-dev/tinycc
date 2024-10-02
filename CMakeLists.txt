@@ -10,9 +10,13 @@ project(
 
 set(C_STANDARD 90)
 
+include(CMakePackageConfigHelpers)
 include(CMakeDependentOption)
 include(CheckCCompilerFlag)
 include(GNUInstallDirs)
+include(FetchContent)
+include(CTest)
+
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}")
 
 set(_fmt TGZ)
@@ -30,8 +34,6 @@ SET(CPACK_NSIS_MODIFY_PATH ON)
 SET(CPACK_COMPONENTS_ALL_IN_ONE_PACKAGE 1)
 set(CPACK_VERBATIM_VARIABLES YES)
 set(CPACK_INSTALL_CMAKE_CONFIGURATIONS Release)
-
-set(CMAKE_CONFIGURATION_TYPES=Debug;Release)
 
 if(WIN32)
     if(CMAKE_SIZEOF_VOID_P MATCHES "8")
@@ -127,7 +129,6 @@ set( C67_FILES ${CORE_FILES} ${SRC_DIR}/c67-gen.c ${SRC_DIR}/c67-link.c ${SRC_DI
 set( RISCV64_FILES ${CORE_FILES} ${SRC_DIR}/riscv64-gen.c ${SRC_DIR}/riscv64-link.c ${SRC_DIR}/riscv64-asm.c )
 
 # Set C compiler flags.
-include( CheckCCompilerFlag )
 check_c_compiler_flag( -fno-strict-aliasing, HAVE_NOSTRICTALIASING )
 if( HAVE_NOSTRICTALIASING )
   add_definitions( -fno-strict-aliasing )
