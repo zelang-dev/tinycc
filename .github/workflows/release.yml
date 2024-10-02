@@ -32,7 +32,7 @@ jobs:
             cd build
             cmake --build . --config Release
       - name: Create NSIS Installer from Release
-        run: cpack -G NSIS Release
+        run: cpack -G NSIS
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -42,8 +42,6 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Tiny CC Windows Installer, includes full Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, x86_64-linux, i386-win32, x86_64-osx, armv7, arm64, riscv64, armv7-wince, arm64-osx."
 
   build-macos:
     name: macOS
@@ -76,8 +74,6 @@ jobs:
           asset_name: TinyCC_Installer-Darwin.dmg
           overwrite: true
           file_glob: true
-          body: "Tiny CC macOS Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, armv7, arm64, riscv64, armv7-wince, arm64-osx."
 
   build-ubuntu:
     name: Linux ${{ matrix.target }}
@@ -107,7 +103,7 @@ jobs:
             cmake -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTING=OFF -DCMAKE_C_FLAGS=${{ matrix.flags }} ..
             cmake --build .
       - name: Create DEB Installer from Release
-        run: cpack -G DEB Release
+        run: cpack -G DEB
       - name: Upload the windows binary artifacts
         uses: svenstaro/upload-release-action@v2
         with:
@@ -117,8 +113,6 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Tiny CC DEB Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, armv7, arm64, riscv64, armv7-wince, arm64-osx."
 
   build-centos:
     name: CentOS
@@ -154,8 +148,6 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Tiny CC RPM Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, armv7, arm64, riscv64, armv7-wince, arm64-osx."
 
   build-qemu:
     name: ${{ matrix.target }}
@@ -199,10 +191,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: built/Package/tcc_${{ github.event.release.tag_name }}_-${{ matrix.target }}.deb
+          file: built/Package/tcc_${{ github.event.release.tag_name }}_${{ matrix.target }}.deb
           asset_name: TinyCC_Installer_${{ matrix.target }}.deb
           tag: ${{ github.ref }}
           overwrite: true
           file_glob: true
-          body: "Tiny CC DEB Installer, includes full Windows Mingw32 headers, and cross compiling tool chains for:
-                i386-linux, i386-win32, x86_64-linux, x86_64-win64, x86_64-osx, armv7, arm64, riscv64, armv7-wince, arm64-osx."

@@ -665,12 +665,12 @@ foreach(X ${TCC_X})
     endif()
 
     if(UNIX AND
-        (${X} STREQUAL x86_64-osx OR ${X} STREQUAL arm OR ${X} STREQUAL armv7 OR ${X} STREQUAL arm64 OR ${X} STREQUAL riscv64 OR ${X} STREQUAL arm64-osx ))
+        (${X} STREQUAL x86_64-osx OR ${X} STREQUAL arm OR ${X} STREQUAL armv7 OR ${X} STREQUAL arm64 OR ${X} STREQUAL riscv64 OR ${X} STREQUAL arm64-osx OR ${X} STREQUAL i386 ))
             list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
     endif()
 
     if(APPLE AND
-        (${X} STREQUAL i386 OR ${X} STREQUAL x86_64 ))
+        (${X} STREQUAL x86_64 ))
             list(REMOVE_ITEM CROSS_SRCFILES ${CROSS_EXTRA_O})
     endif()
 
