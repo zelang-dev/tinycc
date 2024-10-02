@@ -139,7 +139,7 @@ jobs:
         run: |
             mkdir build
             cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Release -D LIBUV_BUILD_TESTS=OFF
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTING=OFF
             cmake --build .
       - name: Create RPM Installer from Release
         run: |
@@ -192,7 +192,7 @@ jobs:
           run: |
             mkdir build
             cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Release -D LIBUV_BUILD_TESTS=OFF
+            cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTING=OFF
             cmake --build .
             cpack -G DEB
       - name: Upload ${{ matrix.arch }} DEB binary artifacts
