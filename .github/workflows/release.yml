@@ -40,7 +40,16 @@ jobs:
           asset_name: TinyCC_Installer_${{ matrix.config.build }}.exe
           tag: ${{ github.ref }}
           overwrite: true
-          file_glob: true
+          file_glob: false
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
 
   build-macos:
     name: macOS
@@ -72,7 +81,16 @@ jobs:
           file: built/Package/tcc-${{ github.event.release.tag_name }}-Darwin.dmg
           asset_name: TinyCC_Installer_Darwin.dmg
           overwrite: true
-          file_glob: true
+          file_glob: false
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
 
   build-ubuntu:
     name: Linux ${{ matrix.target }}
@@ -110,7 +128,17 @@ jobs:
           asset_name: TinyCC_Installer_Linux.deb
           tag: ${{ github.ref }}
           overwrite: true
-          file_glob: true
+          file_glob: false
+      - uses: MCJack123/ghaction-generate-release-hashes@v3
+        with:
+            hash-type: md5
+            get-assets: true
+            file-name: md5.txt
+      - uses: actions/upload-artifact@v2
+        with:
+            name: Asset Hashes
+            path: md5.txt
+
 
   build-centos:
     name: CentOS
@@ -142,7 +170,7 @@ jobs:
           asset_name: TinyCC_Installer_Linux.rpm
           tag: ${{ github.ref }}
           overwrite: true
-          file_glob: true
+          file_glob: false
 
   build-qemu:
     name: ${{ matrix.target }}
@@ -190,4 +218,4 @@ jobs:
           asset_name: TinyCC_Installer_${{ matrix.target }}.deb
           tag: ${{ github.ref }}
           overwrite: true
-          file_glob: true
+          file_glob: false
