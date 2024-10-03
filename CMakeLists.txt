@@ -349,7 +349,7 @@ endif()
 
 if(${OS_SYSTEM} STREQUAL "CentOS Stream" OR ${OS_SYSTEM} STREQUAL "RedHat Linux" OR ${OS_SYSTEM} STREQUAL "Fedora" OR ${OS_SYSTEM} STREQUAL "CentOS Linux")
     target_compile_definitions(libtcc
-        PUBLIC CONFIG_LDDIR=\"lib64\")
+        PUBLIC CONFIG_LDDIR=\"/usr/lib64\")
 endif()
 
 target_include_directories(libtcc
