@@ -1,7 +1,13 @@
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 set(EXESUF)
-set(TCC_CFLAGS -w -I. -I${SRC_DIR} -I${TCC_DIR}/tests -I${INC_DIR} -B${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+
+if(${OS_SYSTEM} STREQUAL "CentOS Stream" OR ${OS_SYSTEM} STREQUAL "RedHat Linux" OR ${OS_SYSTEM} STREQUAL "Fedora" OR ${OS_SYSTEM} STREQUAL "CentOS Linux")
+    set(TCC_CFLAGS -w -I. -I${SRC_DIR} -I${TCC_DIR}/tests -I${INC_DIR} -B/usr/lib64 -isystem /usr/lib64 -L${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
+else()
+    set(TCC_CFLAGS -w -I. -I${SRC_DIR} -I${TCC_DIR}/tests -I${INC_DIR} -L${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} )
+endif()
+
 set(TCC_MATH_LDFLAGS)
 set(LIBTCC_LDFLAGS)
 if(WIN32)
