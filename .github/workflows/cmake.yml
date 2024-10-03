@@ -29,9 +29,6 @@ jobs:
         run: |
             cd build
             ctest -C Debug --output-on-failure -F
-      - name: ctest log
-        run: |
-            cd build
 
   build-macos:
     name: macOS
