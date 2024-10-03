@@ -44,9 +44,8 @@ if(WIN32)
         set(CMAKE_INSTALL_PREFIX "C:/Program Files (x86)/${PROJECT_NAME}")
     endif()
 else()
-    file(STRINGS /etc/os-release distro REGEX "^NAME=")
-    string(REGEX REPLACE "NAME=\"(.*)\"" "\\1" distro "${distro}")
-    message("OS Platform: ${distro}")
+    file(STRINGS /etc/os-release OS_SYSTEM REGEX "^NAME=")
+    string(REGEX REPLACE "NAME=\"(.*)\"" "\\1" OS_SYSTEM "${OS_SYSTEM}")
 endif()
 
 set(CPACK_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
@@ -267,10 +266,6 @@ else()
     endif()
 endif()
 
-if(${distro} STREQUAL "CentOS Stream" OR ${distro} STREQUAL "RedHat Linux" OR ${distro} STREQUAL "Fedora")
-    target_compile_definitions(libtcc PUBLIC CONFIG_LDDIR=\"lib64\")
-endif()
-
 target_compile_definitions(libtcc
     PUBLIC ONE_SOURCE=0
     PUBLIC "${NATIVE_TARGET}="
@@ -350,6 +345,12 @@ elseif (UNIX)
         endif()
     endif()
     target_link_libraries(libtcc PUBLIC m dl Threads::Threads)
+endif()
+
+if(${OS_SYSTEM} STREQUAL "CentOS Stream" OR ${OS_SYSTEM} STREQUAL "RedHat Linux" OR ${OS_SYSTEM} STREQUAL "Fedora")
+    target_compile_definitions(libtcc
+        CONFIG_LDDIR=\"lib64\"
+        CONFIG_TCC_LIBPATHS=\"{B}\")
 endif()
 
 target_include_directories(libtcc
