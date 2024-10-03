@@ -5,7 +5,7 @@ on:
     branches: [ master ]
 
 jobs:
-  test-x86_64-linux:
+  test-x86_64-ubuntu:
     runs-on: ubuntu-20.04
     timeout-minutes: 2
     steps:
@@ -33,6 +33,20 @@ jobs:
         set MSYSTEM=MINGW64
         set CHERE_INVOKING=yes
         C:\msys64\usr\bin\bash -l -c "./configure && make && make test -k"
+
+  test-x86_64-centos:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    container: quay.io/centos/centos:stream9
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Prepare
+        run: |
+          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint yum-utils python3 -y
+      - name: make & test tcc
+        run: ./configure && make && make test -k
 
   test-armv7-linux:
     runs-on: ubuntu-20.04
