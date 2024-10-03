@@ -274,6 +274,10 @@ target_compile_definitions(libtcc
     PUBLIC CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
 
+if(${distro} STREQUAL "CentOS Stream" OR ${distro} STREQUAL "RedHat Linux" OR ${distro} STREQUAL "Fedora")
+    target_compile_definitions(libtcc PUBLIC CONFIG_LDDIR=\"lib64\")
+endif()
+
 if(WIN32)
     if( ${TARGET_ARCH} STREQUAL arm64 )
         target_compile_definitions(libtcc PUBLIC
