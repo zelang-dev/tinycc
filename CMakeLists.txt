@@ -267,16 +267,16 @@ else()
     endif()
 endif()
 
+if(${distro} STREQUAL "CentOS Stream" OR ${distro} STREQUAL "RedHat Linux" OR ${distro} STREQUAL "Fedora")
+    target_compile_definitions(libtcc PUBLIC CONFIG_LDDIR=\"lib64\")
+endif()
+
 target_compile_definitions(libtcc
-    PUBLIC PRIVATE ONE_SOURCE=0
+    PUBLIC ONE_SOURCE=0
     PUBLIC "${NATIVE_TARGET}="
     PUBLIC TCC_LIBTCC1=\"libtcc1.a\"
     PUBLIC CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
-
-if(${distro} STREQUAL "CentOS Stream" OR ${distro} STREQUAL "RedHat Linux" OR ${distro} STREQUAL "Fedora")
-    target_compile_definitions(libtcc PUBLIC CONFIG_LDDIR=\"lib64\")
-endif()
 
 if(WIN32)
     if( ${TARGET_ARCH} STREQUAL arm64 )
@@ -301,7 +301,7 @@ if(WIN32)
 elseif (UNIX)
     if(APPLE)
         if( ${TARGET_ARCH} STREQUAL arm64 )
-            target_compile_definitions(libtcc PRIVATE
+            target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_ARM64="
                 "TCC_TARGET_MACHO=1")
         elseif( ${TARGET_ARCH} STREQUAL x86_64 )
