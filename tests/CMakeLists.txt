@@ -10,7 +10,7 @@ if(WIN32)
   set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
   add_subdirectory(dll)
 else()
-  set(LIBTCC_LDFLAGS -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
+  set(LIBTCC_LDFLAGS -pthread -Wl,-rpath=${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
 add_subdirectory(cc)
