@@ -46,7 +46,12 @@ jobs:
         run: |
           dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint yum-utils python3 -y
       - name: make & test tcc
-        run: ./configure && make && make test -k
+        run: |
+            ./configure
+            make
+            make test -k
+            cat config.h
+            cat config.mak
 
   test-armv7-linux:
     runs-on: ubuntu-20.04
