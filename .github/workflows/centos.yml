@@ -1,0 +1,25 @@
+name: CentOS Stream
+
+on:
+  push:
+    branches: [ master ]
+  workflow_dispatch:
+
+jobs:
+  build-centos:
+    name: RedHat
+    permissions:
+        contents: write
+        packages: write
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    container: quay.io/centos/centos:stream9
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Prepare
+        run: |
+          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint yum-utils python3 -y
+      - name: make & test tcc
+        run: ./configure && make && make test -k
