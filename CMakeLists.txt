@@ -43,6 +43,10 @@ if(WIN32)
         set(CMAKE_INSTALLER_DIR "C:/Program Files (x86)/")
         set(CMAKE_INSTALL_PREFIX "C:/Program Files (x86)/${PROJECT_NAME}")
     endif()
+else()
+    file(STRINGS /etc/os-release distro REGEX "^NAME=")
+    string(REGEX REPLACE "NAME=\"(.*)\"" "\\1" distro "${distro}")
+    message("OS Platform: ${distro}")
 endif()
 
 set(CPACK_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
@@ -249,25 +253,25 @@ find_package(Threads)
 
 if(BUILD_SHARED_LIBS)
     add_library(libtcc SHARED ${CODE_GENERATOR_SRCS})
-if(WIN32)
-    target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
+    if(WIN32)
+        target_compile_definitions(libtcc PUBLIC LIBTCC_AS_DLL)
     elseif(APPLE)
         target_compile_options(libtcc PUBLIC -shared -install_name libtcc.dylib -o libtcc.dylib)
     endif()
 else()
     add_library(libtcc STATIC ${CODE_GENERATOR_SRCS})
-if(WIN32)
-    target_compile_definitions(libtcc PUBLIC CONFIG_TCC_STATIC)
+    if(WIN32)
+        target_compile_definitions(libtcc PUBLIC CONFIG_TCC_STATIC)
     else()
         target_compile_options(libtcc PUBLIC -static)
-endif()
+    endif()
 endif()
 
 target_compile_definitions(libtcc
-    PRIVATE ONE_SOURCE=0
+    PUBLIC PRIVATE ONE_SOURCE=0
     PUBLIC "${NATIVE_TARGET}="
     PUBLIC TCC_LIBTCC1=\"libtcc1.a\"
-    PRIVATE CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
+    PUBLIC CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
 
 if(WIN32)
