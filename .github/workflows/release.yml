@@ -46,7 +46,7 @@ jobs:
             hash-type: md5
             get-assets: true
             file-name: md5.txt
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
             name: Asset Hashes
             path: md5.txt
@@ -87,7 +87,7 @@ jobs:
             hash-type: md5
             get-assets: true
             file-name: md5.txt
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
             name: Asset Hashes
             path: md5.txt
@@ -134,7 +134,7 @@ jobs:
             hash-type: md5
             get-assets: true
             file-name: md5.txt
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
             name: Asset Hashes
             path: md5.txt
