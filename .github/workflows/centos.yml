@@ -20,12 +20,14 @@ jobs:
         uses: actions/checkout@v4
       - name: Prepare
         run: |
-          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint yum-utils python3 -y
-      - name: Configure & build & ctest & Create RPM Installer
+          dnf install git make cmake gcc gcc-c++ binutils glibc-devel valgrind autoconf libtool bison automake libxml2-devel sudo which rpmdevtools rpmlint yum-utils -y
+      - name: Configure & build
         run: |
             mkdir build
             cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Release -D BUILD_TESTING=ON
+            cmake .. -DCMAKE_BUILD_TYPE=Debug -D BUILD_TESTING=ON
             cmake --build .
-            cpack --config CPackConfig.cmake -G RPM
-            ctest -C Release --output-on-failure -F
+      - name: Run ctest
+        run: |
+            cd build
+            ctest -C Debug --output-on-failure -F
