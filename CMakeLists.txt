@@ -46,6 +46,12 @@ if(WIN32)
 else()
     file(STRINGS /etc/os-release OS_SYSTEM REGEX "^NAME=")
     string(REGEX REPLACE "NAME=\"(.*)\"" "\\1" OS_SYSTEM "${OS_SYSTEM}")
+    if(${OS_SYSTEM} STREQUAL "CentOS Stream"
+        OR ${OS_SYSTEM} STREQUAL "RedHat Linux"
+        OR ${OS_SYSTEM} STREQUAL "Fedora"
+        OR ${OS_SYSTEM} STREQUAL "CentOS Linux")
+            set(IS_REDHAT TRUE)
+    endif()
 endif()
 
 set(CPACK_INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX})
@@ -273,6 +279,14 @@ target_compile_definitions(libtcc
     PUBLIC CONFIG_TCCDIR=\"${CMAKE_INSTALL_PREFIX}\"
     PUBLIC TCC_VERSION=\"${TCC_VERSION}\")
 
+set(NATIVE_DEFINES )
+if(${IS_REDHAT} STREQUAL TRUE)
+    set(NATIVE_DEFINES -DCONFIG_LDDIR="\"lib64\"")
+    target_compile_definitions(libtcc PUBLIC
+        "TCC_TARGET_X86_64="
+        CONFIG_LDDIR=\"lib64\")
+endif()
+
 if(WIN32)
     if( ${TARGET_ARCH} STREQUAL arm64 )
         target_compile_definitions(libtcc PUBLIC
@@ -317,7 +331,7 @@ elseif (UNIX)
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_I386="
                 CONFIG_TRIPLET=\"i386-linux-gnu\")
-        elseif( ${TARGET_ARCH} STREQUAL x86_64 )
+        elseif( ${TARGET_ARCH} STREQUAL x86_64 AND NOT ${IS_REDHAT} STREQUAL TRUE)
             target_compile_definitions(libtcc PUBLIC
                 "TCC_TARGET_X86_64="
                 CONFIG_TRIPLET=\"x86_64-linux-gnu\")
@@ -345,11 +359,6 @@ elseif (UNIX)
         endif()
     endif()
     target_link_libraries(libtcc PUBLIC m dl Threads::Threads)
-endif()
-
-if(${OS_SYSTEM} STREQUAL "CentOS Stream" OR ${OS_SYSTEM} STREQUAL "RedHat Linux" OR ${OS_SYSTEM} STREQUAL "Fedora" OR ${OS_SYSTEM} STREQUAL "CentOS Linux")
-    target_compile_definitions(libtcc
-        PUBLIC CONFIG_LDDIR=\"/usr/lib64\")
 endif()
 
 target_include_directories(libtcc

@@ -1,13 +1,7 @@
 include_directories(${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR})
 
 set(EXESUF)
-
-if(${OS_SYSTEM} STREQUAL "CentOS Stream" OR ${OS_SYSTEM} STREQUAL "RedHat Linux" OR ${OS_SYSTEM} STREQUAL "Fedora" OR ${OS_SYSTEM} STREQUAL "CentOS Linux")
-    set(TCC_CFLAGS -w -I. -I${SRC_DIR} -I${TCC_DIR}/tests -I${INC_DIR} -B/usr/lib64 -isystem /usr/lib64 -L${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-else()
-    set(TCC_CFLAGS -w -I. -I${SRC_DIR} -I${TCC_DIR}/tests -I${INC_DIR} -L${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} )
-endif()
-
+set(TCC_CFLAGS -w -I. -I${SRC_DIR} -I${TCC_DIR}/tests -I${INC_DIR} -L${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} )
 set(TCC_MATH_LDFLAGS)
 set(LIBTCC_LDFLAGS)
 if(WIN32)
@@ -207,21 +201,21 @@ set(PP
  pp-counter
 )
 
-set(TCC_CFLAGS ${TCC_CFLAGS} ${TCC_MATH_LDFLAGS} ${LIBTCC_LDFLAGS})
+set(TEST_CFLAGS ${TCC_CFLAGS} ${NATIVE_DEFINES} ${TCC_MATH_LDFLAGS} ${LIBTCC_LDFLAGS})
 foreach(testpp ${PP})
   add_test(NAME ${testpp} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/pp
-           COMMAND tcc ${TCC_CFLAGS} -run -E ${testpp}.c  arg1 arg2 | ${DIFF} - ${testpp}.expect)
+           COMMAND tcc ${TEST_CFLAGS} -run -E ${testpp}.c  arg1 arg2 | ${DIFF} - ${testpp}.expect)
 endforeach()
 
 foreach(testfile ${TESTS2})
   add_test(NAME ${testfile} WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/tests2
-           COMMAND tcc ${TCC_CFLAGS} -dt -bt -b -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
+           COMMAND tcc ${TEST_CFLAGS} -dt -bt -b -run ${testfile}.c - arg1 arg2 arg3 arg4 | ${DIFF} - ${testfile}.expect)
 endforeach()
 
 set( TEST_DIR ${TCC_DIR}/tests )
 add_custom_target(
     tcctest ALL
-    COMMAND tcc ${TEST_DIR}/tcctest.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
+    COMMAND tcc ${TEST_DIR}/tcctest.c ${TEST_CFLAGS} -o ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
     BYPRODUCTS ${CMAKE_BINARY_DIR}/tcctest${EXESUF}
     DEPENDS libarchive
     SOURCES ${TEST_DIR}/tcctest.c )
@@ -237,7 +231,7 @@ if(${TARGET_ARCH} STREQUAL armv7
 else()
     add_custom_target(
         libtcc_test ALL
-        COMMAND tcc ${TEST_DIR}/libtcc_test.c ${TCC_CFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF}
+        COMMAND tcc ${TEST_DIR}/libtcc_test.c ${TEST_CFLAGS} -o ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY}/libtcc${LIBSUF}
         BYPRODUCTS ${CMAKE_BINARY_DIR}/libtcc_test${EXESUF}
         SOURCES ${TEST_DIR}/libtcc_test.c
         DEPENDS libarchive)
