@@ -7,6 +7,8 @@
 - This fork adds [rpmalloc](https://github.com/zelang-dev/rpmalloc) and [cthread](https://github.com/zelang-dev/cthread) to  standard `libtcc1.a`, `libtcc.so/lib/dylib`, and **cross chains**.
 - The `cthread` library adds `thrd_local` macro to emulate _tls_ **thread local storage** if needed, using normal usage behaviors as functions, the macro can be used the same even if `thread_local` is really available.
   - All thread related features to go through `pthread` even on Windows.
+- added `dlopen` api for _Windows_, the **Dynamically Load** behavior works the same as _Linux_.
+- added `cmake` build script, with `cross toolchain`, and a process to handle any `CMakeLists.txt` file.
 - See [Changelog](Changelog)
 
 ## Features
