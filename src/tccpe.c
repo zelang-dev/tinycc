@@ -525,7 +525,7 @@ static int pe_put_long_secname(char *secname, const char *name)
     const char *d = dwarf_secs;
     do {
         if (0 == strcmp(d, name)) {
-            sprintf(secname, "/%d", (int)(d - dwarf_secs + 4));
+            snprintf(secname, 8, "/%d", (int)(d - dwarf_secs + 4));
             return 1;
         }
         d = strchr(d, 0) + 1;
@@ -1368,7 +1368,7 @@ static int pe_check_symbols(struct pe_info *pe)
 #ifdef TCC_TARGET_X86_64
                     write32le(p + 2, (DWORD)-4);
 #endif
-                    put_elf_reloc(symtab_section, text_section,
+                    put_elf_reloc(symtab_section, text_section, 
                         offset + 2, R_XXX_THUNKFIX, is->iat_index);
 #endif
                 }
@@ -1871,10 +1871,11 @@ static unsigned pe_add_uwwind_info(TCCState *s1)
             0x04, // UBYTE Size of prolog
             0x02, // UBYTE Count of unwind codes
             0x05, // UBYTE: 4 Frame Register (rbp), UBYTE: 4 Frame Register offset (scaled)
-            // USHORT * n Unwind codes array
+            // USHORT * n Unwind codes array (descending order)
             // 0x0b, 0x01, 0xff, 0xff, // stack size
-            0x04, 0x03, // set frame ptr (mov rsp -> rbp)
-            0x01, 0x50  // push reg (rbp)
+            // UBYTE offset of end of instr in prolog + 1, UBYTE:4 operation, UBYTE:4 info
+            0x04, 0x03, // 3:0 UWOP_SET_FPREG (mov rsp -> rbp)
+            0x01, 0x50, // 0:5 UWOP_PUSH_NONVOL (push rbp)
         };
 
         Section *s = text_section;
@@ -1987,7 +1988,7 @@ static void pe_add_runtime(TCCState *s1, struct pe_info *pe)
 
     if (0 == s1->nostdlib) {
         static const char * const libs[] = {
-            "msvcrt", "kernel32", "advapi32", "", "user32", "gdi32", NULL
+            "msvcrt", "kernel32", "", "user32", "gdi32", NULL
         };
         const char * const *pp, *p;
         if (TCC_LIBTCC1[0])

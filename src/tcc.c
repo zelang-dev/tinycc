@@ -69,6 +69,7 @@ static const char help[] =
     "  -bt[N]       link with backtrace (stack dump) support [show max N callers]\n"
 #endif
     "Misc. options:\n"
+    "  -std=version define __STDC_VERSION__ according to version (c11/gnu11)\n"
     "  -x[c|a|b|n]  specify type of the next infile (C,ASM,BIN,NONE)\n"
     "  -nostdinc    do not use standard system include paths\n"
     "  -nostdlib    do not link with standard crt and libraries\n"
