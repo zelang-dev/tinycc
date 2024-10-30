@@ -70,3 +70,4 @@ tcc_env
 tcc_env.*
 cmake_env.bat
 cmake_env.sh
+.cache/

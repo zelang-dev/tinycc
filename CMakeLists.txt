@@ -174,6 +174,8 @@ else()
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
     if(CMAKE_C_SIMULATE_ID MATCHES "MSVC")
         add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
+    else()
+        add_definitions(-Wno-string-plus-int -Wno-pointer-sign -Wno-shift-negative-value)
     endif()
 endif()
 
