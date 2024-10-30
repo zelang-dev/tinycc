@@ -172,7 +172,9 @@ if(UNIX)
     set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -g")
 else()
     add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
-    add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
+    if(CMAKE_C_SIMULATE_ID MATCHES "MSVC")
+        add_definitions("/wd4244 /wd4267 /wd4033 /wd4715 /wd4996")
+    endif()
 endif()
 
 set(TCC_VERSION ${PROJECT_VERSION})
@@ -374,7 +376,10 @@ set_target_properties(libtcc PROPERTIES
 # TCC compiler as executable
 
 if(WIN32)
-    add_definitions(-W2 -MT -GS- -nologo -D_CRT_SECURE_NO_DEPRECATE)
+    add_definitions(-D_CRT_SECURE_NO_DEPRECATE)
+    if(CMAKE_C_SIMULATE_ID MATCHES "MSVC")
+        add_definitions(-W2 -MT -GS- -nologo)
+    endif()
 endif()
 
 add_executable(tcc ${SRC_DIR}/tcc.c)
