@@ -64,7 +64,7 @@ set(CMAKE_INSTALL_CONFIG_NAME ${CMAKE_BUILD_TYPE})
 
 cmake_dependent_option(BUILD_TESTING
   "Build the unit tests when BUILD_TESTING is enabled and we are the root project" ON
-  "BUILD_TESTING;CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
+  "BUILD_TESTING;CMAKE_CURRENT_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR" OFF)
 option(BUILD_SHARED_LIBS    "Build the library as a shared (dynamically-linked) " OFF)
 
 include(TargetArch)
@@ -91,7 +91,7 @@ elseif(APPLE)
     set(NATIVE_ARCH ${TARGET_ARCH}-osx)
 endif()
 
-set(TCC_DIR ${CMAKE_SOURCE_DIR})
+set(TCC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(INC_DIR ${TCC_DIR}/include)
 set(SRC_DIR ${TCC_DIR}/src)
 set(WIN_DIR ${SRC_DIR}/win32)
