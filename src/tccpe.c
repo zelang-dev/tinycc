@@ -1368,7 +1368,7 @@ static int pe_check_symbols(struct pe_info *pe)
 #ifdef TCC_TARGET_X86_64
                     write32le(p + 2, (DWORD)-4);
 #endif
-                    put_elf_reloc(symtab_section, text_section, 
+                    put_elf_reloc(symtab_section, text_section,
                         offset + 2, R_XXX_THUNKFIX, is->iat_index);
 #endif
                 }
@@ -1988,7 +1988,7 @@ static void pe_add_runtime(TCCState *s1, struct pe_info *pe)
 
     if (0 == s1->nostdlib) {
         static const char * const libs[] = {
-            "msvcrt", "kernel32", "", "user32", "gdi32", NULL
+            "msvcrt", "kernel32", "advapi32", "", "user32", "gdi32", NULL
         };
         const char * const *pp, *p;
         if (TCC_LIBTCC1[0])
