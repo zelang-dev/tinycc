@@ -490,4 +490,30 @@ int *invalid_operation(int *p, double d)
     return p + d;
 }
 
+#elif defined test_duplicate_case
+
+int main()
+{
+    unsigned int x;
+    switch (x) {
+        case -1 ... 0: /* empty case range with unsigned */
+        case 3:
+        case 1:
+        case 2:
+        case 3: /* show this line number in error */
+        case 4:
+        case 5:
+    }
+}
+#elif defined test_normal_funcargs || defined test_reverse_funcargs
+
+#ifdef test_reverse_funcargs
+# pragma comment(option, "-freverse-funcargs")
+#endif
+int printf(const char*, ...);
+int main()
+{
+    printf(" %d %d %d\n", printf("1"), printf("22"), printf("333"));
+}
+
 #endif

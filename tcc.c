@@ -115,6 +115,9 @@ static const char help2[] =
     "  leading-underscore            decorate extern symbols\n"
     "  ms-extensions                 allow anonymous struct in struct\n"
     "  dollars-in-identifiers        allow '$' in C symbols\n"
+    "  reverse-funcargs              evaluate function arguments right to left\n"
+    "  gnu89-inline                  'extern inline' is like 'static inline'\n"
+    "  asynchronous-unwind-tables    create eh_frame section [on]\n"
     "  test-coverage                 create code coverage code\n"
     "-m... target specific options:\n"
     "  ms-bitfields                  use MSVC bitfield layout\n"
@@ -363,7 +366,7 @@ redo:
         struct filespec *f = s->files[n];
         s->filetype = f->type;
         if (f->type & AFF_TYPE_LIB) {
-            ret = tcc_add_library_err(s, f->name);
+            ret = tcc_add_library(s, f->name);
         } else {
             if (1 == s->verbose)
                 printf("-> %s\n", f->name);
@@ -389,9 +392,9 @@ redo:
         } else {
             if (!s->outfile)
                 s->outfile = default_outputfile(s, first_file);
-            if (!s->just_deps && tcc_output_file(s, s->outfile))
-                ;
-            else if (s->gen_deps)
+            if (!s->just_deps)
+                ret = tcc_output_file(s, s->outfile);
+            if (!ret && s->gen_deps)
                 gen_makedeps(s, s->outfile, s->deps_outfile);
         }
     }
@@ -399,7 +402,7 @@ redo:
     done = 1;
     if (t)
         done = 0; /* run more tests with -dt -run */
-    else if (s->nb_errors)
+    else if (ret)
         ret = 1;
     else if (n < s->nb_files)
         done = 0; /* compile more files with -c */

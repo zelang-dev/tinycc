@@ -564,14 +564,16 @@ typedef struct Sym {
             union {
                 int sym_scope; /* scope level for locals */
                 int jnext; /* next jump label */
+                int jind; /* label position */
                 struct FuncAttr f; /* function attributes */
                 int auxtype; /* bitfield access type */
             };
         };
         long long enum_val; /* enum constant if IS_ENUM_VAL */
         int *d; /* define token stream */
-        struct Sym *ncl; /* next cleanup */
+        struct Sym *cleanup_func;
     };
+
     CType type; /* associated type */
     union {
         struct Sym *next; /* next related symbol (for fields and anoms) */
@@ -774,6 +776,9 @@ struct TCCState {
     unsigned char ms_extensions; /* allow nested named struct w/o identifier behave like unnamed */
     unsigned char dollars_in_identifiers;  /* allows '$' char in identifiers */
     unsigned char ms_bitfields; /* if true, emulate MS algorithm for aligning bitfields */
+    unsigned char reverse_funcargs; /* if true, evaluate last function arg first */
+    unsigned char gnu89_inline; /* treat 'extern inline' like 'static inline' */
+    unsigned char unwind_tables; /* create eh_frame section */
 
     /* warning switches */
     unsigned char warn_none;
@@ -969,8 +974,6 @@ struct TCCState {
     int uw_sym;
     unsigned uw_offs;
 # endif
-#else
-    unsigned shf_RELRO; /* section flags for RELRO sections */
 #endif
 
 #if defined TCC_TARGET_MACHO
@@ -1488,9 +1491,9 @@ ST_FUNC void vpushi(int v);
 ST_FUNC void vpushv(SValue *v);
 ST_FUNC void vpushsym(CType *type, Sym *sym);
 ST_FUNC void vswap(void);
-ST_FUNC void vrote(SValue *e, int n);
 ST_FUNC void vrott(int n);
 ST_FUNC void vrotb(int n);
+ST_FUNC void vrev(int n);
 ST_FUNC void vpop(void);
 #if PTR_SIZE == 4
 ST_FUNC void lexpand(void);
@@ -1869,10 +1872,6 @@ ST_FUNC int gen_makedeps(TCCState *s, const char *target, const char *filename);
 
 /* ------------ tccdbg.c ------------ */
 
-ST_FUNC void tcc_eh_frame_start(TCCState *s1);
-ST_FUNC void tcc_eh_frame_end(TCCState *s1);
-ST_FUNC void tcc_eh_frame_hdr(TCCState *s1, int final);
-
 ST_FUNC void tcc_debug_new(TCCState *s);
 
 ST_FUNC void tcc_debug_start(TCCState *s1);
@@ -1890,6 +1889,13 @@ ST_FUNC void tcc_debug_extern_sym(TCCState *s1, Sym *sym, int sh_num, int sym_bi
 ST_FUNC void tcc_debug_typedef(TCCState *s1, Sym *sym);
 ST_FUNC void tcc_debug_stabn(TCCState *s1, int type, int value);
 ST_FUNC void tcc_debug_fix_anon(TCCState *s1, CType *t);
+
+#if !(defined ELF_OBJ_ONLY || defined TCC_TARGET_ARM || defined TARGETOS_BSD)
+ST_FUNC void tcc_eh_frame_start(TCCState *s1);
+ST_FUNC void tcc_eh_frame_end(TCCState *s1);
+ST_FUNC void tcc_eh_frame_hdr(TCCState *s1, int final);
+#define TCC_EH_FRAME 1
+#endif
 
 ST_FUNC void tcc_tcov_start(TCCState *s1);
 ST_FUNC void tcc_tcov_end(TCCState *s1);
