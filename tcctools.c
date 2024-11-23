@@ -48,18 +48,6 @@ static unsigned long le2belong(unsigned long ul) {
         ((ul & 0xFF)<<24)+((ul & 0xFF00)<<8);
 }
 
-/* Returns 1 if s contains any of the chars of list, else 0 */
-static int contains_any(const char *s, const char *list) {
-  const char *l;
-  for (; *s; s++) {
-      for (l = list; *l; l++) {
-          if (*s == *l)
-              return 1;
-      }
-  }
-  return 0;
-}
-
 static int ar_usage(int ret) {
     fprintf(stderr, "usage: tcc -ar [crstvx] lib [files]\n");
     fprintf(stderr, "create library ([abdiopN] not supported).\n");
@@ -103,16 +91,16 @@ ST_FUNC int tcc_tool_ar(TCCState *s1, int argc, char **argv)
     i_lib = 0; i_obj = 0;  // will hold the index of the lib and first obj
     for (i = 1; i < argc; i++) {
         const char *a = argv[i];
-        if (*a == '-' && strstr(a, "."))
+        if (*a == '-' && strchr(a, '.'))
             ret = 1; // -x.y is always invalid (same as gnu ar)
-        if ((*a == '-') || (i == 1 && !strstr(a, "."))) {  // options argument
-            if (contains_any(a, ops_conflict))
+        if ((*a == '-') || (i == 1 && !strchr(a, '.'))) {  // options argument
+            if (strpbrk(a, ops_conflict))
                 ret = 1;
-            if (strstr(a, "x"))
+            if (strchr(a, 'x'))
                 extract = 1;
-            if (strstr(a, "t"))
+            if (strchr(a, 't'))
                 table = 1;
-            if (strstr(a, "v"))
+            if (strchr(a, 'v'))
                 verbose = 1;
         } else {  // lib or obj files: don't abort - keep validating all args.
             if (!i_lib)  // first file is the lib
@@ -509,21 +497,38 @@ ST_FUNC int tcc_tool_cross(TCCState *s1, char **argv, int option)
 #ifdef _WIN32
 #include <process.h>
 
-/* quote quotes in string and quote string if it contains spaces */
-static char *quote_win32(const char *s0)
+/* - Empty argument or with space/tab (not newline) requires quoting.
+ * - Double-quotes at the value require '\'-escape, regardless of quoting.
+ * - Consecutive (or 1) backslashes at the value all need '\'-escape only if
+ *   followed by [escaped] double quote, else taken literally, e.g. <x\\y\>
+ *   remains literal without quoting or esc, but <x\\"y\> becomes <x\\\\\"y\>.
+ * - This "before double quote" rule applies also before delimiting quoting,
+ *   e.g. <x\y \"z\> becomes <"x\y \\\"z\\"> (quoting required because space).
+ *
+ * https://learn.microsoft.com/en-us/cpp/c-language/parsing-c-command-line-arguments
+ */
+static char *quote_win32(const char *s)
 {
-    const char *s;
-    char *p, *q;
-    int a = 0, b = 0, c;
-    for (s = s0; !!(c = *s); ++s)
-        a += c == '"', b |= c == ' ';
-    q = p = tcc_malloc(s - s0 + a + b + b + 1);
-    *q = '"', q += b;
-    for (s = s0; !!(c = *s); *q++ = c, ++s)
-        if (c == '"')
-            *q++ = '\\';
-    *q = '"', q += b, *q = '\0';
-    return p;
+    char *o, *r = tcc_malloc(2 * strlen(s) + 3);   /* max-esc, quotes, \0 */
+    int cbs = 0, quoted = !*s;  /* consecutive backslashes before current */
+
+    for (o = r; *s; *o++ = *s++) {
+        quoted |= *s == ' ' || *s == '\t';
+        if (*s == '\\' || *s == '"')
+            *o++ = '\\';
+        else
+            o -= cbs;  /* undo cbs escapes, if any (not followed by DQ) */
+        cbs = *s == '\\' ? cbs + 1 : 0;
+    }
+    if (quoted) {
+        memmove(r + 1, r, o++ - r);
+        *r = *o++ = '"';
+    } else {
+        o -= cbs;
+    }
+
+    *o = 0;
+    return r; /* don't bother with realloc(r, o-r+1) */
 }
 
 static int execvp_win32(const char *prog, char **argv)
