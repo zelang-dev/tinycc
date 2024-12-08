@@ -1,6 +1,6 @@
 /*
  *  X86 code generator for TCC
- *
+ * 
  *  Copyright (c) 2001-2004 Fabrice Bellard
  *
  * This library is free software; you can redistribute it and/or
@@ -218,11 +218,6 @@ ST_FUNC void load(int r, SValue *sv)
     int v, t, ft, fc, fr;
     SValue v1;
 
-#ifdef TCC_TARGET_PE
-    SValue v2;
-    sv = pe_getimport(sv, &v2);
-#endif
-
     fr = sv->r;
     ft = sv->type.t & ~VT_DEFSIGN;
     fc = sv->c.i;
@@ -296,11 +291,6 @@ ST_FUNC void load(int r, SValue *sv)
 ST_FUNC void store(int r, SValue *v)
 {
     int fr, bt, ft, fc;
-
-#ifdef TCC_TARGET_PE
-    SValue v2;
-    v = pe_getimport(v, &v2);
-#endif
 
     ft = v->type.t;
     fc = v->c.i;
@@ -736,7 +726,7 @@ ST_FUNC void gen_opi(int op)
             r = vtop[-1].r;
             fr = vtop[0].r;
             o((opc << 3) | 0x01);
-            o(0xc0 + r + fr * 8);
+            o(0xc0 + r + fr * 8); 
         }
         vtop--;
         if (op >= TOK_ULT && op <= TOK_GT)
@@ -911,7 +901,7 @@ ST_FUNC void gen_opf(int op)
             load(TREG_ST0, vtop);
             swapped = !swapped;
         }
-
+        
         switch(op) {
         default:
         case '+':
@@ -974,7 +964,8 @@ ST_FUNC void gen_cvt_itof(int t)
         o(0x242cdf); /* fildll (%esp) */
         o(0x08c483); /* add $8, %esp */
         vtop->r2 = VT_CONST;
-    } else if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) == (VT_INT | VT_UNSIGNED)) {
+    } else if ((vtop->type.t & (VT_BTYPE | VT_UNSIGNED)) == 
+               (VT_INT | VT_UNSIGNED)) {
         /* unsigned int to float/double/long double */
         o(0x6a); /* push $0 */
         g(0x00);

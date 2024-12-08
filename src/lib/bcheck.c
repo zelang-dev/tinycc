@@ -1,6 +1,6 @@
 /*
  *  Tiny C Memory and bounds checker
- *
+ * 
  *  Copyright (c) 2002 Fabrice Bellard
  *
  * This library is free software; you can redistribute it and/or
@@ -37,6 +37,8 @@
 #include <sys/syscall.h>
 #endif
 
+#include "config.h"
+
 #define BOUND_DEBUG             (1)
 #define BOUND_STATISTIC         (1)
 
@@ -48,7 +50,7 @@
 
 #ifdef __attribute__
   /* an __attribute__ macro is defined in the system headers */
-  #undef __attribute__
+  #undef __attribute__ 
 #endif
 #define FASTCALL __attribute__((regparm(3)))
 
@@ -161,7 +163,7 @@ static pthread_spinlock_t bounds_spin;
 #define HAVE_TLS_FUNC          (1)
 #define HAVE_TLS_VAR           (0)
 #endif
-#if defined TCC_MUSL || defined __ANDROID__
+#if defined CONFIG_TCC_MUSL || defined __ANDROID__
 # undef HAVE_CTYPE
 #endif
 #endif
@@ -388,11 +390,11 @@ static pthread_key_t no_checking_key;
 #elif HAVE_TLS_VAR
 static __thread int no_checking = 0;
 #define NO_CHECKING_GET()  no_checking
-#define NO_CHECKING_SET(v) no_checking = v
+#define NO_CHECKING_SET(v) no_checking = v 
 #else
 static int no_checking = 0;
 #define NO_CHECKING_GET()  no_checking
-#define NO_CHECKING_SET(v) no_checking = v
+#define NO_CHECKING_SET(v) no_checking = v 
 #endif
 static char exec[100];
 
@@ -650,7 +652,7 @@ BOUND_PTR_INDIR(16)
 }
 
 /* called when entering a function to add all the local regions */
-void FASTCALL __bound_local_new(void *p1)
+void FASTCALL __bound_local_new(void *p1) 
 {
     size_t addr, fp, *p = p1;
 
@@ -680,7 +682,7 @@ void FASTCALL __bound_local_new(void *p1)
 }
 
 /* called when leaving a function to delete all the local regions */
-void FASTCALL __bound_local_delete(void *p1)
+void FASTCALL __bound_local_delete(void *p1) 
 {
     size_t addr, fp, *p = p1;
 
@@ -1053,7 +1055,7 @@ void __bound_init(size_t *p, int mode)
             strcat (exec, ":");
             fclose (fp);
         }
-        /* check if dlopen is used (is threre a better way?) */
+        /* check if dlopen is used (is threre a better way?) */ 
         found = 0;
         fp = fopen ("/proc/self/maps", "r");
         if (fp) {
@@ -1187,7 +1189,7 @@ void __attribute__((destructor)) __bound_exit(void)
     dprintf(stderr, "%s, %s():\n", __FILE__, __FUNCTION__);
 
     if (inited) {
-#if !defined(_WIN32) && !defined(__APPLE__) && !defined TCC_MUSL && \
+#if !defined(_WIN32) && !defined(__APPLE__) && !defined CONFIG_TCC_MUSL && \
     !defined(__OpenBSD__) && !defined(__FreeBSD__) && !defined(__NetBSD__) && \
     !defined(__ANDROID__)
         if (print_heap) {
@@ -1323,7 +1325,7 @@ static void *bound_thread_create(void *bdata)
     void *retval;
 #if HAVE_TLS_FUNC
     int *p = (int *) BOUND_MALLOC(sizeof(int));
-
+  
     if (!p) bound_alloc_error("bound_thread_create malloc");
     *p = 0;
     pthread_setspecific(no_checking_key, p);
@@ -1345,7 +1347,7 @@ int pthread_create(pthread_t *thread, const pthread_attr_t *attr,
     bound_thread_create_type *data;
     sigset_t mask;
     sigset_t old_mask;
-
+  
     use_sem = 1;
     dprintf (stderr, "%s, %s()\n", __FILE__, __FUNCTION__);
     sigfillset(&mask);
@@ -1483,7 +1485,7 @@ void *__bound_malloc(size_t size, const void *caller)
 #endif
 {
     void *ptr;
-
+    
 #if MALLOC_REDIR
     /* This will catch the first dlsym call from __bound_init */
     if (malloc_redir == NULL) {
@@ -1505,7 +1507,7 @@ void *__bound_malloc(size_t size, const void *caller)
     ptr = BOUND_MALLOC (size + 1);
     dprintf(stderr, "%s, %s(): %p, 0x%lx\n",
             __FILE__, __FUNCTION__, ptr, (unsigned long)size);
-
+    
     if (inited && NO_CHECKING_GET() == 0) {
         WAIT_SEM ();
         INCR_COUNT(bound_malloc_count);
@@ -2092,12 +2094,12 @@ static Tree * splay (size_t addr, Tree *t)
 {
     Tree N, *l, *r, *y;
     int comp;
-
+    
     INCR_COUNT_SPLAY(bound_splay);
     if (t == NULL) return t;
     N.left = N.right = NULL;
     l = r = &N;
-
+ 
     for (;;) {
         comp = compare(addr, t->start, t->size);
         if (comp < 0) {
@@ -2145,12 +2147,12 @@ static Tree * splay_end (size_t addr, Tree *t)
 {
     Tree N, *l, *r, *y;
     int comp;
-
+    
     INCR_COUNT_SPLAY(bound_splay_end);
     if (t == NULL) return t;
     N.left = N.right = NULL;
     l = r = &N;
-
+ 
     for (;;) {
         comp = compare_end(addr, t->start + t->size);
         if (comp < 0) {
