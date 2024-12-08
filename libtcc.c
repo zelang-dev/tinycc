@@ -18,7 +18,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#if !defined ONE_SOURCE || ONE_SOURCE
+#ifndef ONE_SOURCE
+# define ONE_SOURCE 1
+#endif
+
+#if ONE_SOURCE
 #include "tccpp.c"
 #include "tccgen.c"
 #include "tccdbg.c"
@@ -60,7 +64,6 @@
 #endif
 #endif /* ONE_SOURCE */
 
-#define TCC_SEM_IMPL 1
 #include "tcc.h"
 
 /********************************************************/
@@ -1189,12 +1192,12 @@ ST_FUNC int tcc_add_dll(TCCState *s, const char *filename, int flags)
 }
 
 /* find [cross-]libtcc1.a and tcc helper objects in library path */
-ST_FUNC void tcc_add_support(TCCState *s1, const char *filename)
+ST_FUNC int tcc_add_support(TCCState *s1, const char *filename)
 {
     char buf[100];
     if (CONFIG_TCC_CROSSPREFIX[0])
         filename = strcat(strcpy(buf, CONFIG_TCC_CROSSPREFIX), filename);
-    tcc_add_dll(s1, filename, AFF_PRINT_ERROR);
+    return tcc_add_dll(s1, filename, AFF_PRINT_ERROR);
 }
 
 #if !defined TCC_TARGET_PE && !defined TCC_TARGET_MACHO
@@ -1333,6 +1336,12 @@ static int link_option(const char *str, const char *val, const char **ptr)
     return ret;
 }
 
+static int link_arg(const char *opt, const char *str)
+{
+    int l = strlen(opt);
+    return 0 == strncmp(opt, str, l) && (str[l] == '\0' || str[l] == ',');
+}
+
 static const char *skip_linker_arg(const char **str)
 {
     const char *s1 = *str;
@@ -1400,10 +1409,10 @@ static int tcc_set_linker(TCCState *s, const char *option)
             if (strstart("elf32-", &p)) {
 #endif
                 s->output_format = TCC_OUTPUT_FORMAT_ELF;
-            } else if (!strcmp(p, "binary")) {
+            } else if (link_arg("binary", p)) {
                 s->output_format = TCC_OUTPUT_FORMAT_BINARY;
 #ifdef TCC_TARGET_COFF
-            } else if (!strcmp(p, "coff")) {
+            } else if (link_arg("coff", p)) {
                 s->output_format = TCC_OUTPUT_FORMAT_COFF;
 #endif
             } else
@@ -1436,24 +1445,24 @@ static int tcc_set_linker(TCCState *s, const char *option)
             s->pe_stack_size = strtoul(p, &end, 10);
         } else if (link_option(option, "subsystem=", &p)) {
 #if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
-            if (strstart("native", &p)) {
+            if (link_arg("native", p)) {
                 s->pe_subsystem = 1;
-            } else if (strstart("console", &p)) {
+            } else if (link_arg("console", p)) {
                 s->pe_subsystem = 3;
-            } else if (strstart("gui", &p) || strstart("windows", &p)) {
+            } else if (link_arg("gui", p) || link_arg("windows", p)) {
                 s->pe_subsystem = 2;
-            } else if (strstart("posix", &p)) {
+            } else if (link_arg("posix", p)) {
                 s->pe_subsystem = 7;
-            } else if (strstart("efiapp", &p)) {
+            } else if (link_arg("efiapp", p)) {
                 s->pe_subsystem = 10;
-            } else if (strstart("efiboot", &p)) {
+            } else if (link_arg("efiboot", p)) {
                 s->pe_subsystem = 11;
-            } else if (strstart("efiruntime", &p)) {
+            } else if (link_arg("efiruntime", p)) {
                 s->pe_subsystem = 12;
-            } else if (strstart("efirom", &p)) {
+            } else if (link_arg("efirom", p)) {
                 s->pe_subsystem = 13;
 #elif defined(TCC_TARGET_ARM)
-            if (strstart("wince", &p)) {
+            if (link_arg("wince", p)) {
                 s->pe_subsystem = 9;
 #endif
             } else
@@ -1750,7 +1759,7 @@ static const char dumpmachine_str[] =
     "openbsd"
 #elif TARGETOS_NetBSD
     "netbsd"
-#elif TCC_MUSL
+#elif CONFIG_TCC_MUSL
     "linux-musl"
 #else
     "linux-gnu"
@@ -1941,7 +1950,7 @@ dorun:
         enable_backtrace:
             s->do_backtrace = 1;
             s->do_debug = s->do_debug ? s->do_debug : 1;
-	    s->dwarf = DWARF_VERSION;
+	    s->dwarf = CONFIG_DWARF_VERSION;
             break;
 #ifdef CONFIG_TCC_BCHECK
         case TCC_OPTION_b:
@@ -1951,7 +1960,7 @@ dorun:
 #endif
         case TCC_OPTION_g:
             s->do_debug = 2;
-            s->dwarf = DWARF_VERSION;
+            s->dwarf = CONFIG_DWARF_VERSION;
             if (strstart("dwarf", &optarg)) {
                 s->dwarf = (*optarg) ? (0 - atoi(optarg)) : DEFAULT_DWARF_VERSION;
             } else if (isnum(*optarg)) {
