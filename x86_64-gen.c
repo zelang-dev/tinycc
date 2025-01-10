@@ -828,6 +828,9 @@ void gfunc_call(int nb_args)
             continue; /* arguments smaller than 8 bytes passed in registers or on stack */
 
         if (bt == VT_STRUCT) {
+            /* fetch cpu flag before generating any code */
+            if ((vtop->r & VT_VALMASK) == VT_CMP)
+                gv(RC_INT);
             /* align to stack align size */
             size = (size + 15) & ~15;
             /* generate structure store */
