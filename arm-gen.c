@@ -1332,7 +1332,7 @@ again:
    parameters and the function address. */
 void gfunc_call(int nb_args)
 {
-  int r, args_size;
+  int args_size;
   int def_float_abi = float_abi;
   int todo;
   struct plan plan;
@@ -1352,12 +1352,6 @@ void gfunc_call(int nb_args)
       float_abi = ARM_SOFTFP_FLOAT;
   }
 #endif
-  /* cannot let cpu flags if other instruction are generated. Also avoid leaving
-     VT_JMP anywhere except on the top of the stack because it would complicate
-     the code generator. */
-  r = vtop->r & VT_VALMASK;
-  if (r == VT_CMP || (r & ~1) == VT_JMP)
-    gv(RC_INT);
 
   memset(&plan, 0, sizeof plan);
   if (nb_args)
@@ -1716,9 +1710,6 @@ void gen_opi(int op)
 	  opc|=2; // sub -> rsb
 	}
       }
-      if ((vtop->r & VT_VALMASK) == VT_CMP ||
-          (vtop->r & (VT_VALMASK & ~1)) == VT_JMP)
-        gv(RC_INT);
       vswap();
       c=intr(gv(RC_INT));
       vswap();
@@ -1757,9 +1748,6 @@ done:
       break;
     case 2:
       opc=0xE1A00000|(opc<<5);
-      if ((vtop->r & VT_VALMASK) == VT_CMP ||
-          (vtop->r & (VT_VALMASK & ~1)) == VT_JMP)
-        gv(RC_INT);
       vswap();
       r=intr(gv(RC_INT));
       vswap();

@@ -3247,11 +3247,12 @@ invalid:
         } else {
             s->data_offset += size;
         }
-        /* align end of section */
+#if defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
+        /* align code sections to instruction lenght */
         /* This is needed if we compile a c file after this */
-        if (s == text_section || s == data_section || s == rodata_section ||
-            s == bss_section || s == common_section)
-            s->data_offset += -s->data_offset & (s->sh_addralign - 1);
+        if (s->sh_flags & SHF_EXECINSTR)
+            section_add(s, 0, 4);
+#endif
     next: ;
     }
 

@@ -628,11 +628,6 @@ ST_FUNC void gfunc_call(int nb_args)
     tempspace = (tempspace + 15) & -16;
     stack_add = stack_adj + tempspace;
 
-    /* fetch cpu flag before generating any code */
-    if ((vtop->r & VT_VALMASK) == VT_CMP)
-      gv(RC_INT);
-
-
     if (stack_add) {
         if (stack_add >= 0x800) {
             unsigned int bit11 = (((unsigned int)-stack_add) >> 11) & 1;

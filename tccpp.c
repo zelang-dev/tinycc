@@ -1338,8 +1338,10 @@ ST_FUNC void skip_to_eol(int warn)
         return;
     if (warn)
         tcc_warning("extra tokens after directive");
+    while (macro_stack)
+        end_macro();
     file->buf_ptr = parse_line_comment(file->buf_ptr - 1);
-    tok = TOK_LINEFEED;
+    next_nomacro();
 }
 
 static CachedInclude *
@@ -1931,38 +1933,37 @@ ST_FUNC void preprocess(int is_bof)
     case TOK_LINE:
         parse_flags &= ~PARSE_FLAG_TOK_NUM;
         next();
-        parse_flags |= PARSE_FLAG_TOK_NUM;
         if (tok != TOK_PPNUM) {
     _line_err:
             tcc_error("wrong #line format");
         }
+        c = 1;
         goto _line_num;
     case TOK_PPNUM:
         if (parse_flags & PARSE_FLAG_ASM_FILE)
             goto ignore;
+        c = 0; /* no error with extra tokens */
     _line_num:
         for (n = 0, q = tokc.str.data; *q; ++q) {
             if (!isnum(*q))
                 goto _line_err;
             n = n * 10 + *q - '0';
         }
-        parse_flags &= ~PARSE_FLAG_TOK_STR;
+        parse_flags &= ~PARSE_FLAG_TOK_STR; /* don't parse escape sequences */
         next();
-        parse_flags |= PARSE_FLAG_TOK_STR;
-        if (tok == TOK_PPSTR && tokc.str.data[0] == '"') {
+        if (tok != TOK_LINEFEED) {
+            if (tok != TOK_PPSTR || tokc.str.data[0] != '"')
+                goto _line_err;
             tokc.str.data[tokc.str.size - 2] = 0;
             tccpp_putfile(tokc.str.data + 1);
-            n--;
-            if (macro_ptr && *macro_ptr == 0)
-                macro_stack->save_line_num = n;
+            next();
+            /* skip optional level number & advance to next line */
+            skip_to_eol(c);
         }
-        else if (tok != TOK_LINEFEED)
-            goto _line_err;
         if (file->fd > 0)
             total_lines += file->line_num - n;
-        file->line_ref += file->line_num - n;
         file->line_num = n;
-        goto ignore; /* skip optional level number */
+        break;
 
     case TOK_ERROR:
     case TOK_WARNING:
