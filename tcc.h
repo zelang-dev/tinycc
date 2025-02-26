@@ -729,6 +729,7 @@ struct TCCState {
     unsigned char verbose; /* if true, display some information during compilation */
     unsigned char nostdinc; /* if true, no standard headers are added */
     unsigned char nostdlib; /* if true, no standard libraries are added */
+    unsigned char nostdlib_paths; /* if true, the default paths are not searched for libraries */
     unsigned char nocommon; /* if true, do not use common symbols for .bss data */
     unsigned char static_link; /* if true, static linking is performed */
     unsigned char rdynamic; /* if true, all symbols are exported */
@@ -802,6 +803,7 @@ struct TCCState {
     char *tcc_lib_path; /* CONFIG_TCCDIR or -B option */
     char *soname; /* as specified on the command line (-soname) */
     char *rpath; /* as specified on the command line (-Wl,-rpath=) */
+    char *elfint; /* -Wl,-I on command line, LD_SO in environment, or DEFAULT_ELFINTERP(this) */
     char *elf_entryname; /* "_start" unless set */
     char *init_symbol; /* symbols to call at load-time (not used currently) */
     char *fini_symbol; /* symbols to call at unload-time (not used currently) */
