@@ -541,6 +541,15 @@ static int negcc(int cc)
    Use relative/got addressing to avoid setting DT_TEXTREL */
 static void load_value(SValue *sv, int r)
 {
+#if CONFIG_TCC_CPUVER >= 7
+    if (!(sv->r & VT_SYM)) {
+        unsigned x=sv->c.i;
+        o(0xE3000000|intr(r)<<12|(x&0xFFF)|(x<<4&0xF0000)); /* movw rx,#x(lo) */
+        if (x&0xFFFF0000)
+          o(0xE3400000|intr(r)<<12|(x>>16&0xFFF)|(x>>12&0xF0000)); /* movt rx,#x(hi) */
+        return;
+    }
+#endif
     o(0xE59F0000|(intr(r)<<12)); /* ldr r, [pc] */
     o(0xEA000000); /* b $+4 */
 #ifndef CONFIG_TCC_PIC

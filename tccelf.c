@@ -2115,15 +2115,6 @@ static int set_sec_sizes(TCCState *s1)
                    || s1->do_debug) {
             s->sh_size = s->data_offset;
         }
-
-#ifdef TCC_TARGET_ARM
-        /* XXX: Suppress stack unwinding section. */
-        if (s->sh_type == SHT_ARM_EXIDX) {
-            s->sh_flags = 0;
-            s->sh_size = 0;
-        }
-#endif
-
     }
     return textrel;
 }
@@ -2762,7 +2753,11 @@ static void create_arm_attribute_section(TCCState *s1)
         'a', 'e', 'a', 'b', 'i', 0x00,   // "aeabi"
         0x01, 0x22, 0x00, 0x00, 0x00,    // 'File Attributes', size 0x22
         0x05, 0x36, 0x00,                // 'CPU_name', "6"
+#if CONFIG_TCC_CPUVER >= 7
+        0x06, 0x0a,                      // 'CPU_arch', 'v7'
+#else
         0x06, 0x06,                      // 'CPU_arch', 'v6'
+#endif
         0x08, 0x01,                      // 'ARM_ISA_use', 'Yes'
         0x09, 0x01,                      // 'THUMB_ISA_use', 'Thumb-1'
         0x0a, 0x02,                      // 'FP_arch', 'VFPv2'
@@ -3184,8 +3179,13 @@ invalid:
             sh->sh_type != SHT_INIT_ARRAY &&
             sh->sh_type != SHT_FINI_ARRAY
 #ifdef TCC_ARM_EABI
-            && sh->sh_type != SHT_ARM_EXIDX
+            /* Added in commit f99d3de221db23e322c6c18c8249282e27726c25
+               but suppressed in 3cfaaaf1eb97d858e583412616f68f75fdad5da5
+               So don't load it in order to avoid dangling references from
+               (STT_SECTION) symbols. */
+            // && sh->sh_type != SHT_ARM_EXIDX
 #endif
+
 #if TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD
             && sh->sh_type != SHT_X86_64_UNWIND
 #endif

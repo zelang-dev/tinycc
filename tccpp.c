@@ -2933,6 +2933,13 @@ maybe_newline:
         break;
         
         /* simple tokens */
+    case '@': /* only used in assembler */
+#ifdef TCC_TARGET_ARM /* comment on arm asm */
+        if (parse_flags & PARSE_FLAG_ASM_FILE) {
+            p = parse_line_comment(p);
+            goto redo_no_start;
+        }
+#endif
     case '(':
     case ')':
     case '[':
@@ -2944,7 +2951,6 @@ maybe_newline:
     case ':':
     case '?':
     case '~':
-    case '@': /* only used in assembler */
     parse_simple:
         tok = c;
         p++;

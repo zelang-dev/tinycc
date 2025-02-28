@@ -238,6 +238,9 @@
  DEF_ASM_CONDED(smlals)
  DEF_ASM_CONDED(umlal)
  DEF_ASM_CONDED(umlals)
+ DEF_ASM_CONDED(mls)
+ DEF_ASM_CONDED(udiv)
+ DEF_ASM_CONDED(sdiv)
 
  /* load/store */
 
@@ -247,8 +250,10 @@
  DEF_ASM_CONDED(strb)
  DEF_ASM_CONDED(ldrex)
  DEF_ASM_CONDED(ldrexb)
+ DEF_ASM_CONDED(ldrexh)
  DEF_ASM_CONDED(strex)
  DEF_ASM_CONDED(strexb)
+ DEF_ASM_CONDED(strexh)
  DEF_ASM_CONDED(ldrh)
  DEF_ASM_CONDED(ldrsh)
  DEF_ASM_CONDED(ldrsb)
