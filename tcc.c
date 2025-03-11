@@ -154,7 +154,7 @@ static const char help2[] =
 #if defined(TCC_TARGET_MACHO)
     "  -install_name=                set DT_SONAME elf tag (soname macOS alias)\n"
 #else
-    "  -Ipath, -dynamic-linker=path  set ELF interpreter to path"
+    "  -Ipath, -dynamic-linker=path  set ELF interpreter to path\n"
 #endif
     "  -Bsymbolic                    set DT_SYMBOLIC elf tag\n"
     "  -oformat=[elf32/64-* binary]  set executable output format\n"
