@@ -75,6 +75,8 @@ TCC_SEM(static tcc_compile_sem);
 /* an array of pointers to memory to be free'd after errors */
 ST_DATA void** stk_data;
 ST_DATA int nb_stk_data;
+/* option -d<num> (for general development purposes) */
+ST_DATA int g_debug;
 
 /********************************************************/
 #ifdef _WIN32
@@ -547,9 +549,8 @@ static void tcc_split_path(TCCState *s, void *p_ary, int *p_nb_ary, const char *
         }
         if (str.size) {
             cstr_ccat(&str, '\0');
-            dynarray_add(p_ary, p_nb_ary, tcc_strdup(str.data));
+            dynarray_add(p_ary, p_nb_ary, str.data);
         }
-        cstr_free(&str);
         in = p+1;
     } while (*p);
 }
@@ -848,6 +849,9 @@ LIBTCCAPI TCCState *tcc_new(void)
     s->include_stack_ptr = s->include_stack;
 
     tcc_set_lib_path(s, CONFIG_TCCDIR);
+#ifdef CONFIG_TCC_SWITCHES /* predefined options */
+    tcc_set_options(s, CONFIG_TCC_SWITCHES);
+#endif
     return s;
 }
 
@@ -867,6 +871,7 @@ LIBTCCAPI void tcc_delete(TCCState *s1)
     tcc_free(s1->tcc_lib_path);
     tcc_free(s1->soname);
     tcc_free(s1->rpath);
+    tcc_free(s1->elfint);
     tcc_free(s1->elf_entryname);
     tcc_free(s1->init_symbol);
     tcc_free(s1->fini_symbol);
@@ -1225,17 +1230,15 @@ LIBTCCAPI int tcc_add_library(TCCState *s, const char *libraryname)
         "%s/lib%s.a",
         NULL
     };
-
-    const char * const *pp = s->static_link
-                             ? libs + sizeof(libs) / sizeof(*libs) - 2
-                             : libs;
-
     /* if libraryname begins with a colon, it means search lib paths for
        exactly the following file, without lib prefix or anything */
-    if (*libraryname == ':')
+    if (*libraryname == ':') {
         libraryname++;
-    else {
+    } else {
         int flags = s->filetype & AFF_WHOLE_ARCHIVE;
+        const char * const *pp = libs;
+        if (s->static_link)
+            pp += sizeof(libs) / sizeof(*libs) - 2; /* only "%s/lib%s.a" */
         while (*pp) {
             int ret = tcc_add_library_internal(s, *pp,
                 libraryname, flags, s->library_paths, s->nb_library_paths);
@@ -1341,7 +1344,7 @@ static int link_option(const char *str, const char *val, const char **ptr)
         if (*p != ',' && *p != '=')
             return 0;
         p++;
-    } else if (*p) {
+    } else if (*p && *p != ',') {
         return 0;
     }
     *ptr = p;
@@ -1890,7 +1893,6 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv, int optind)
                 ++s->verbose;
             continue;
         }
-reparse:
         if (r[0] != '-' || r[1] == '\0') {
             args_parser_add_file(s, r, s->filetype);
             if (run) {
@@ -1968,7 +1970,8 @@ dorun:
             goto enable_backtrace;
         enable_backtrace:
             s->do_backtrace = 1;
-            s->do_debug = s->do_debug ? s->do_debug : 1;
+            if (0 == s->do_debug)
+                s->do_debug = 1;
 	    s->dwarf = CONFIG_DWARF_VERSION;
             break;
 #ifdef CONFIG_TCC_BCHECK
@@ -1982,6 +1985,8 @@ dorun:
             s->dwarf = CONFIG_DWARF_VERSION;
             if (strstart("dwarf", &optarg)) {
                 s->dwarf = (*optarg) ? (0 - atoi(optarg)) : DEFAULT_DWARF_VERSION;
+            } else if (0 == strcmp("stabs", optarg)) {
+                s->dwarf = 0;
             } else if (isnum(*optarg)) {
                 x = *optarg - '0';
                 /* -g0 = no info, -g1 = lines/functions only, -g2 = full info */
@@ -2007,7 +2012,7 @@ dorun:
             else if (*optarg == 't')
                 s->dflag = 16;
             else if (isnum(*optarg))
-                s->g_debug |= atoi(optarg);
+                g_debug |= atoi(optarg);
             else
                 goto unsupported_option;
             break;
@@ -2106,8 +2111,15 @@ dorun:
                 return -1;
             break;
         case TCC_OPTION_Wp:
-            r = optarg;
-            goto reparse;
+        {
+            char *p = tcc_strdup(optarg), *q = p;
+            while (!!(q = strchr(q, ','))) *q++ = ' ';
+            x = tcc_set_options(s, p);
+            tcc_free(p);
+            if (x < 0)
+                return -1;
+            break;
+        }
         case TCC_OPTION_E:
             x = TCC_OUTPUT_PREPROCESS;
             goto set_output_type;
@@ -2156,7 +2168,7 @@ dorun:
             s->filetype = x | (s->filetype & ~AFF_TYPE_MASK);
             break;
         case TCC_OPTION_O:
-            s->optimize = atoi(optarg);
+            s->optimize = isnum(optarg[0]) ? optarg[0]-'0' : 1 /* -O -Os */;
             break;
         case TCC_OPTION_print_search_dirs:
             x = OPT_PRINT_DIRS;

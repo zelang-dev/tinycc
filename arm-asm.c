@@ -971,12 +971,21 @@ static void asm_multiplication_opcode(TCCState *s1, int token)
         opcode |= 1 << 20; // Status
         /* fallthrough */
     case TOK_ASM_mlaeq:
+    case_TOK_ASM_mlaeq:
         if (nb_ops != 4)
             expect("four operands");
         else {
             opcode |= 1 << 21; // Accumulate
             asm_emit_opcode(token, opcode);
         }
+        break;
+    case TOK_ASM_mlseq:
+        opcode |= 0x00400000;
+        goto case_TOK_ASM_mlaeq;
+    case TOK_ASM_udiveq:
+        opcode |= 0x00200000;
+    case TOK_ASM_sdiveq:
+        asm_emit_opcode(token, (opcode & ~0x80) | 0x0710f010);
         break;
     default:
         expect("known multiplication instruction");
@@ -1084,6 +1093,7 @@ static void asm_single_data_transfer_opcode(TCCState *s1, int token)
     next(); // skip ','
 
     switch (ARM_INSTRUCTION_GROUP(token)) {
+    case TOK_ASM_strexheq:
     case TOK_ASM_strexbeq:
     case TOK_ASM_strexeq:
         parse_operand(s1, &strex_operand);
@@ -1200,6 +1210,8 @@ static void asm_single_data_transfer_opcode(TCCState *s1, int token)
             opcode |= asm_encode_shift(&shift);
         asm_emit_opcode(token, opcode);
         break;
+    case TOK_ASM_strexheq:
+        opcode |= 1 << 21;
     case TOK_ASM_strexbeq:
         opcode |= 1 << 22; // B
         /* fallthrough */
@@ -1217,6 +1229,8 @@ static void asm_single_data_transfer_opcode(TCCState *s1, int token)
         opcode |= strex_operand.reg;
         asm_emit_opcode(token, opcode);
         break;
+    case TOK_ASM_ldrexheq:
+        opcode |= 1 << 21;
     case TOK_ASM_ldrexbeq:
         opcode |= 1 << 22; // B
         /* fallthrough */
@@ -2305,11 +2319,16 @@ static void asm_branch_opcode(TCCState *s1, int token)
     case TOK_ASM_beq:
     case TOK_ASM_bleq:
         asm_expr(s1, &e);
-        esym = elfsym(e.sym);
-        if (!esym || esym->st_shndx != cur_text_section->sh_num) {
-            tcc_error("invalid branch target");
+        if (e.sym) {
+            esym = elfsym(e.sym);
+            if (esym && esym->st_shndx == cur_text_section->sh_num) {
+                jmp_disp = esym->st_value;
+            } else {
+                greloca(cur_text_section, e.sym, ind, R_ARM_PC24, 0);
+                jmp_disp = ind;
+            }
         }
-        jmp_disp = encbranchoffset(ind, e.v + esym->st_value, 1);
+        jmp_disp = encbranchoffset(ind, e.v + jmp_disp, 1);
         break;
     default:
         parse_operand(s1, &op);
@@ -2409,8 +2428,10 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_strbeq:
     case TOK_ASM_ldrexeq:
     case TOK_ASM_ldrexbeq:
+    case TOK_ASM_ldrexheq:
     case TOK_ASM_strexeq:
     case TOK_ASM_strexbeq:
+    case TOK_ASM_strexheq:
         asm_single_data_transfer_opcode(s1, token);
         return;
 
@@ -2473,6 +2494,9 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_mulseq:
     case TOK_ASM_mlaeq:
     case TOK_ASM_mlaseq:
+    case TOK_ASM_mlseq:
+    case TOK_ASM_udiveq:
+    case TOK_ASM_sdiveq:
         asm_multiplication_opcode(s1, token);
         return;
 

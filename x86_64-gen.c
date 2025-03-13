@@ -828,9 +828,6 @@ void gfunc_call(int nb_args)
             continue; /* arguments smaller than 8 bytes passed in registers or on stack */
 
         if (bt == VT_STRUCT) {
-            /* fetch cpu flag before generating any code */
-            if ((vtop->r & VT_VALMASK) == VT_CMP)
-                gv(RC_INT);
             /* align to stack align size */
             size = (size + 15) & ~15;
             /* generate structure store */
@@ -1280,10 +1277,6 @@ void gfunc_call(int nb_args)
 
     if (nb_sse_args && tcc_state->nosse)
       tcc_error("SSE disabled but floating point arguments passed");
-
-    /* fetch cpu flag before generating any code */
-    if ((vtop->r & VT_VALMASK) == VT_CMP)
-      gv(RC_INT);
 
     /* for struct arguments, we need to call memcpy and the function
        call breaks register passing arguments we are preparing.
@@ -1831,13 +1824,6 @@ void gen_opl(int op)
     gen_opi(op);
 }
 
-void vpush_const(int t, int v)
-{
-    CType ctype = { t | VT_CONSTANT, 0 };
-    vpushsym(&ctype, external_global_sym(v, &ctype));
-    vtop->r |= VT_LVAL;
-}
-
 /* generate a floating point operation 'v = t1 op t2' instruction. The
    two operands are guaranteed to have the same floating point type */
 /* XXX: need to use ST1 too */
@@ -1852,14 +1838,10 @@ void gen_opf(int op)
         if (float_type == RC_ST0) {
             o(0xe0d9); /* fchs */
         } else {
-            /* -0.0, in libtcc1.c */
-            vpush_const(bt, bt == VT_FLOAT ? TOK___mzerosf : TOK___mzerodf);
-            gv(RC_FLOAT);
-            if (bt == VT_DOUBLE)
-                o(0x66);
-            /* xorp[sd] %xmm1, %xmm0 */
-            o(0xc0570f | (REG_VALUE(vtop[0].r) + REG_VALUE(vtop[-1].r)*8) << 16);
-            vtop--;
+            save_reg(vtop->r);
+            o(0x80); /* xor $0x80, $n(rbp) */
+            gen_modrm(6, vtop->r, NULL, vtop->c.i + (bt == VT_DOUBLE ? 7 : 3));
+            o(0x80);
         }
         return;
     }

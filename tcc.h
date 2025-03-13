@@ -803,7 +803,7 @@ struct TCCState {
     char *tcc_lib_path; /* CONFIG_TCCDIR or -B option */
     char *soname; /* as specified on the command line (-soname) */
     char *rpath; /* as specified on the command line (-Wl,-rpath=) */
-    char *elfint; /* -Wl,-I on command line, LD_SO in environment, or DEFAULT_ELFINTERP(this) */
+    char *elfint; /* -Wl,-I... on command line */
     char *elf_entryname; /* "_start" unless set */
     char *init_symbol; /* symbols to call at load-time (not used currently) */
     char *fini_symbol; /* symbols to call at unload-time (not used currently) */
@@ -986,9 +986,6 @@ struct TCCState {
     int total_lines;
     unsigned int total_bytes;
     unsigned int total_output[4];
-
-    /* option -dnum (for general development purposes) */
-    int g_debug;
 
     /* used by tcc_load_ldscript */
     int fd, cc;
@@ -1193,6 +1190,7 @@ enum tcc_token {
 ST_DATA struct TCCState *tcc_state;
 ST_DATA void** stk_data;
 ST_DATA int nb_stk_data;
+ST_DATA int g_debug;
 
 /* public functions currently used by the tcc main function */
 ST_FUNC char *pstrcpy(char *buf, size_t buf_size, const char *s);

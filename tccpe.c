@@ -1262,6 +1262,8 @@ static int pe_check_symbols(struct pe_info *pe)
             const char *s, *p;
 
             n = _imp_ = 0;
+            if (sym->st_other & ST_PE_IMPORT)
+                _imp_ = 1;
             do {
                 s = pe_export_name(s1, sym);
                 if (n) {
@@ -1293,7 +1295,7 @@ static int pe_check_symbols(struct pe_info *pe)
 
             if (type == STT_FUNC
                 /* symbols from assembler often have no type */
-                || type == STT_NOTYPE) {
+                || (type == STT_NOTYPE && 0 == _imp_)) {
                 unsigned offset = is->thk_offset;
                 if (offset) {
                     /* got aliased symbol, like stricmp and _stricmp */
@@ -1336,7 +1338,7 @@ static int pe_check_symbols(struct pe_info *pe)
                 sym->st_other &= ~ST_PE_EXPORT; /* do not export */
 
             } else { /* STT_OBJECT */
-                if (0 == _imp_ && 0 == (sym->st_other & ST_PE_IMPORT))
+                if (0 == _imp_)
                     ret = tcc_error_noabort("symbol '%s' is missing __declspec(dllimport)", name);
                 /* original symbol will be patched later in pe_build_imports */
                 sym->st_value = is->iat_index; /* chain potential alias */
@@ -2015,7 +2017,7 @@ ST_FUNC int pe_output_file(TCCState *s1, const char *filename)
     }
     pe_free_imports(&pe);
 #if PE_PRINT_SECTIONS
-    if (s1->g_debug & 8)
+    if (g_debug & 8)
         pe_print_sections(s1, "tcc.log");
 #endif
     return s1->nb_errors ? -1 : 0;
