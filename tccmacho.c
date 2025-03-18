@@ -1770,7 +1770,7 @@ static void collect_sections(TCCState *s1, struct macho *mo, const char *filenam
     for(i = 0; i < s1->nb_loaded_dlls; i++) {
         DLLReference *dllref = s1->loaded_dlls[i];
         if (dllref->level == 0)
-          add_dylib(mo, dllref->name);
+          add_dylib(mo, tcc_basename(dllref->path));
     }
 
     if (s1->rpath) {

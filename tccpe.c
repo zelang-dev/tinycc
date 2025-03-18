@@ -848,7 +848,9 @@ static void pe_build_imports(struct pe_info *pe)
 
         dllindex = p->dll_index;
         if (dllindex)
-            name = (dllref = pe->s1->loaded_dlls[dllindex-1])->name;
+            name = tcc_basename(
+                (dllref = pe->s1->loaded_dlls[dllindex-1])
+                ->path);
         else
             name = "", dllref = NULL;
 
@@ -884,7 +886,7 @@ static void pe_build_imports(struct pe_info *pe)
                 if (pe->type == PE_RUN) {
                     if (dllref) {
                         if ( !dllref->handle )
-                            dllref->handle = LoadLibraryA(dllref->name);
+                            dllref->handle = LoadLibraryA(dllref->path);
                         v = (ADDR3264)GetProcAddress(dllref->handle, ordinal?(char*)0+ordinal:name);
                     }
                     if (!v)
@@ -1736,7 +1738,7 @@ quit:
 static int pe_load_dll(TCCState *s1, int fd, const char *filename)
 {
     char *p, *q;
-    DLLReference *ref = tcc_add_dllref(s1, tcc_basename(filename), 0);
+    DLLReference *ref = tcc_add_dllref(s1, filename, 0);
     if (ref->found)
         return 0;
     if (get_dllexports(fd, &p))

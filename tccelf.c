@@ -1056,9 +1056,17 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
             name = (char *) s1->symtab->link->data + sym->st_name;
             /* Use ld.so to resolve symbol for us (for tcc -run) */
             if (do_resolve) {
-#if defined TCC_IS_NATIVE && !defined TCC_TARGET_PE
+                void *addr = NULL;
+#if defined(TCC_IS_NATIVE)
+#if defined(TCC_TARGET_PE)
+                int i;
+                for (i = 0; i < s1->nb_loaded_dlls; i++) {
+                    if ((addr = GetProcAddress(s1->loaded_dlls[i]->handle, name)))
+                        break;
+                }
+#else
                 /* dlsym() needs the undecorated name.  */
-                void *addr = dlsym(RTLD_DEFAULT, &name[s1->leading_underscore]);
+                addr = dlsym(RTLD_DEFAULT, &name[s1->leading_underscore]);
 #if TARGETOS_OpenBSD || TARGETOS_FreeBSD || TARGETOS_NetBSD || TARGETOS_ANDROID
 		if (addr == NULL) {
 		    int i;
@@ -1066,6 +1074,7 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
                         if ((addr = dlsym(s1->loaded_dlls[i]->handle, name)))
 			    break;
 		}
+#endif
 #endif
                 if (addr) {
                     sym->st_value = (addr_t) addr;
@@ -2901,7 +2910,7 @@ static int elf_output_file(TCCState *s1, const char *filename)
         for(i = 0; i < s1->nb_loaded_dlls; i++) {
             DLLReference *dllref = s1->loaded_dlls[i];
             if (dllref->level == 0)
-                put_dt(dynamic, DT_NEEDED, put_elf_str(dynstr, dllref->name));
+                put_dt(dynamic, DT_NEEDED, put_elf_str(dynstr, tcc_basename(dllref->path)));
         }
 
         if (s1->rpath)
@@ -3723,7 +3732,7 @@ ST_FUNC int tcc_load_dll(TCCState *s1, int fd, const char *filename, int level)
             soname = dynstr + dt->d_un.d_val;
 
     /* if the dll is already loaded, do not load it */
-    if (tcc_add_dllref(s1, soname, level)->found)
+    if (tcc_add_dllref(s1, filename, level)->found)
         goto ret_success;
 
     if (v.nb_versyms != nb_syms)
