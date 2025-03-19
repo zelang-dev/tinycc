@@ -4696,29 +4696,14 @@ static int parse_btype(CType *type, AttributeDef *ad, int ignore_label)
             }
             next();
             break;
-#ifdef TCC_TARGET_ARM64
-        case TOK_UINT128:
-            /* GCC's __uint128_t appears in some Linux header files. Make it a
-               synonym for long double to get the size and alignment right. */
-            u = VT_LDOUBLE;
-            goto basic_type;
-#endif
         case TOK_BOOL:
             u = VT_BOOL;
             goto basic_type;
         case TOK_COMPLEX:
             tcc_error("_Complex is not yet supported");
         case TOK_FLOAT:
-            /* macOS SDK uses it in math.h
-               fake the size and alignment
-            */
             u = VT_FLOAT;
-            /* tcc_warning("_Float16 is not yet supported. Skipped.");
-               I hope no one really uses it in the wild. */
             goto basic_type;
-        case TOK_FLOAT16:
-            u = VT_SHORT;
-
         case TOK_DOUBLE:
             if ((t & (VT_BTYPE|VT_LONG)) == VT_LONG) {
                 t = (t & ~(VT_BTYPE|VT_LONG)) | VT_LDOUBLE;

@@ -78,7 +78,6 @@ ST_DATA int nb_stk_data;
 /* option -d<num> (for general development purposes) */
 ST_DATA int g_debug;
 
-
 /********************************************************/
 #ifdef _WIN32
 ST_FUNC char *normalize_slashes(char *path)
@@ -964,19 +963,15 @@ LIBTCCAPI int tcc_add_sysinclude_path(TCCState *s, const char *pathname)
 }
 
 /* add/update a 'DLLReference', Just find if level == -1  */
-ST_FUNC DLLReference *tcc_add_dllref(TCCState *s1, const char *dllpath, int level)
+ST_FUNC DLLReference *tcc_add_dllref(TCCState *s1, const char *dllname, int level)
 {
     DLLReference *ref = NULL;
     int i;
-    const char *dllname = tcc_basename(dllpath);
-    const char *name;
-    for (i = 0; i < s1->nb_loaded_dlls; i++) {
-        name = tcc_basename(s1->loaded_dlls[i]->path);
-        if (0 == strcmp(name, dllname)) {
+    for (i = 0; i < s1->nb_loaded_dlls; i++)
+        if (0 == strcmp(s1->loaded_dlls[i]->name, dllname)) {
             ref = s1->loaded_dlls[i];
             break;
         }
-    }
     if (level == -1)
         return ref;
     if (ref) {
@@ -985,8 +980,8 @@ ST_FUNC DLLReference *tcc_add_dllref(TCCState *s1, const char *dllpath, int leve
         ref->found = 1;
         return ref;
     }
-    ref = tcc_mallocz(sizeof(DLLReference) + strlen(dllpath));
-    strcpy(ref->path, dllpath);
+    ref = tcc_mallocz(sizeof(DLLReference) + strlen(dllname));
+    strcpy(ref->name, dllname);
     dynarray_add(&s1->loaded_dlls, &s1->nb_loaded_dlls, ref);
     ref->level = level;
     ref->index = s1->nb_loaded_dlls;
