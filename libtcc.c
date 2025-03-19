@@ -78,9 +78,6 @@ ST_DATA int nb_stk_data;
 /* option -d<num> (for general development purposes) */
 ST_DATA int g_debug;
 
-#define DEBUG_LIBTCC 0
-#undef dprintf
-#define dprintf if (DEBUG_LIBTCC) printf
 
 /********************************************************/
 #ifdef _WIN32
