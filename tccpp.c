@@ -542,11 +542,7 @@ ST_FUNC const char *get_tok_str(int v, CValue *cv)
     case TOK_CLLONG:
     case TOK_CULLONG:
         /* XXX: not quite exact, but only useful for testing  */
-#ifdef _WIN32
-        sprintf(p, "%u", (unsigned)cv->i);
-#else
         sprintf(p, "%llu", (unsigned long long)cv->i);
-#endif
         break;
     case TOK_LCHAR:
         cstr_ccat(&cstr_buf, 'L');
@@ -1493,8 +1489,7 @@ static int expr_preprocess(TCCState *s1)
                 if (tok != ')')
                     expect("')'");
             }
-            tok = TOK_CINT;
-            tokc.i = c;
+            goto c_number;
         } else if (tok == TOK___HAS_INCLUDE ||
                    tok == TOK___HAS_INCLUDE_NEXT) {
             t = tok;
@@ -1504,12 +1499,13 @@ static int expr_preprocess(TCCState *s1)
             c = parse_include(s1, t - TOK___HAS_INCLUDE, 1);
             if (tok != ')')
                 expect("')'");
-            tok = TOK_CINT;
-            tokc.i = c;
+            goto c_number;
         } else {
             /* if undefined macro, replace with zero */
-            tok = TOK_CINT;
-            tokc.i = 0;
+            c = 0;
+        c_number:
+            tok = TOK_CLLONG; /* type intmax_t */
+            tokc.i = c;
         }
         tok_str_add_tok(str);
     }
@@ -2509,6 +2505,10 @@ static void parse_number(const char *p)
                 break;
             }
         }
+
+        /* in #if/#elif expressions, all numbers have type (u)intmax_t anyway */
+        if (pp_expr)
+            lcount = 2;
 
         /* Determine if it needs 64 bits and/or unsigned in order to fit */
         if (ucount == 0 && b == 10) {
