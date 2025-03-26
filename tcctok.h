@@ -67,6 +67,7 @@
      DEF(TOK_TYPEOF2, "__typeof")
      DEF(TOK_TYPEOF3, "__typeof__")
      DEF(TOK_LABEL, "__label__")
+     DEF(TOK_FLOAT16, "_Float16")
 
 #ifdef TCC_TARGET_ARM64
      DEF(TOK_UINT128, "__uint128_t")

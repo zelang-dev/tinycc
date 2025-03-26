@@ -4709,8 +4709,16 @@ static int parse_btype(CType *type, AttributeDef *ad, int ignore_label)
         case TOK_COMPLEX:
             tcc_error("_Complex is not yet supported");
         case TOK_FLOAT:
+            /* macOS SDK uses it in math.h
+               fake the size and alignment
+            */
             u = VT_FLOAT;
+            /* tcc_warning("_Float16 is not yet supported. Skipped.");
+               I hope no one really uses it in the wild. */
             goto basic_type;
+        case TOK_FLOAT16:
+            u = VT_SHORT;
+
         case TOK_DOUBLE:
             if ((t & (VT_BTYPE|VT_LONG)) == VT_LONG) {
                 t = (t & ~(VT_BTYPE|VT_LONG)) | VT_LDOUBLE;
