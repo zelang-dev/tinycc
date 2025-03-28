@@ -1354,7 +1354,7 @@ static int parse_include(TCCState *s1, int do_next, int test)
         cstr_reset(&tokcstr);
         file->buf_ptr = parse_pp_string(file->buf_ptr, c == '<' ? '>' : c, &tokcstr);
         i = tokcstr.size;
-        pstrncpy(name, tokcstr.data, i >= sizeof name ? sizeof name - 1 : i);
+        pstrncpy(name, sizeof name, tokcstr.data, i);
         next_nomacro();
     } else {
         /* computed #include : concatenate tokens until result is one of
@@ -1395,7 +1395,7 @@ static int parse_include(TCCState *s1, int do_next, int test)
             if (c != '\"')
                 continue;
             p = file->true_filename;
-            pstrncpy(buf, p, tcc_basename(p) - p);
+            pstrncpy(buf, sizeof buf, p, tcc_basename(p) - p);
         } else {
             int j = i - 2, k = j - s1->nb_include_paths;
             if (k < 0)
