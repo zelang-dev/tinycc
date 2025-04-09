@@ -217,6 +217,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 #if defined TCC_TARGET_PE || defined TCC_TARGET_MACHO
 # define ELF_OBJ_ONLY /* create elf .o but native executables */
+#else
+# define TCC_TARGET_UNIX 1
 #endif
 
 /* No ten-byte long doubles on window and macos except in
@@ -583,7 +585,7 @@ typedef struct DLLReference {
     int level;
     void *handle;
     unsigned char found, index;
-    char path[1];
+    char name[1];
 } DLLReference;
 
 /* -------------------------------------------------- */
@@ -919,8 +921,6 @@ struct TCCState {
     /* debug state */
     struct _tccdbg *dState;
 
-    /* Is there a new undefined sym since last new_undef_sym() */
-    int new_undef_sym;
     /* extra attributes (eg. GOT/PLT value) for symtab symbols */
     struct sym_attr *sym_attrs;
     int nb_sym_attrs;
@@ -988,7 +988,7 @@ struct TCCState {
     unsigned int total_output[4];
 
     /* used by tcc_load_ldscript */
-    int fd, cc;
+    unsigned char *ld_p; /* text pointer */
 
     /* for warnings/errors for object files */
     const char *current_filename;
@@ -1001,7 +1001,9 @@ struct TCCState {
     char *deps_outfile; /* option -MF */
     int argc;
     char **argv;
-    CString linker_arg; /* collect -Wl options */
+    /* -Wl options */
+    char **link_argv;
+    int link_argc, link_optind;
 };
 
 struct filespec {
@@ -1195,7 +1197,7 @@ ST_DATA int g_debug;
 /* public functions currently used by the tcc main function */
 ST_FUNC char *pstrcpy(char *buf, size_t buf_size, const char *s);
 ST_FUNC char *pstrcat(char *buf, size_t buf_size, const char *s);
-ST_FUNC char *pstrncpy(char *out, const char *in, size_t num);
+ST_FUNC char *pstrncpy(char *out, size_t buf_size, const char *s, size_t num);
 PUB_FUNC char *tcc_basename(const char *name);
 PUB_FUNC char *tcc_fileextension (const char *name);
 
@@ -1265,7 +1267,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 #define AFF_TYPE_ASM    2
 #define AFF_TYPE_ASMPP  4
 #define AFF_TYPE_LIB    8
-#define AFF_TYPE_MASK   (15 | AFF_TYPE_BIN)
+#define AFF_TYPE_MASK   (7 | AFF_TYPE_BIN)
 /* values from tcc_object_type(...) */
 #define AFF_BINTYPE_REL 1
 #define AFF_BINTYPE_DYN 2
@@ -1274,6 +1276,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
 
 /* return value of tcc_add_file_internal(): 0, -1, or FILE_NOT_FOUND */
 #define FILE_NOT_FOUND -2
+#define FILE_NOT_RECOGNIZED -3 /* unrecognized file type */
 
 #ifndef ELF_OBJ_ONLY
 ST_FUNC int tcc_add_crt(TCCState *s, const char *filename);
@@ -1289,11 +1292,11 @@ ST_FUNC void tcc_add_btstub(TCCState *s1);
 ST_FUNC void tcc_add_pragma_libs(TCCState *s1);
 PUB_FUNC int tcc_add_library_err(TCCState *s, const char *f);
 PUB_FUNC void tcc_print_stats(TCCState *s, unsigned total_time);
-PUB_FUNC int tcc_parse_args(TCCState *s, int *argc, char ***argv, int optind);
+PUB_FUNC int tcc_parse_args(TCCState *s, int *argc, char ***argv);
 #ifdef _WIN32
 ST_FUNC char *normalize_slashes(char *path);
 #endif
-ST_FUNC DLLReference *tcc_add_dllref(TCCState *s1, const char *dllpath, int level);
+ST_FUNC DLLReference *tcc_add_dllref(TCCState *s1, const char *dllname, int level);
 ST_FUNC char *tcc_load_text(int fd);
 /* for #pragma once */
 ST_FUNC int normalized_PATHCMP(const char *f1, const char *f2);
@@ -1571,7 +1574,7 @@ ST_FUNC void tcc_add_runtime(TCCState *s1);
 
 /* ------------ xxx-link.c ------------ */
 
-#if !defined ELF_OBJ_ONLY || defined TCC_TARGET_MACHO
+#ifndef TCC_TARGET_PE
 ST_FUNC int code_reloc (int reloc_type);
 ST_FUNC int gotplt_entry_type (int reloc_type);
 /* Whether to generate a GOT/PLT entry and when. NO_GOTPLT_ENTRY is first so
@@ -1583,13 +1586,11 @@ enum gotplt_entry {
     ALWAYS_GOTPLT_ENTRY	/* always generate (eg. PLTOFF relocs) */
 };
 #define NEED_RELOC_TYPE
-
 #if !defined TCC_TARGET_MACHO || defined TCC_IS_NATIVE
 ST_FUNC unsigned create_plt_entry(TCCState *s1, unsigned got_offset, struct sym_attr *attr);
 ST_FUNC void relocate_plt(TCCState *s1);
 ST_FUNC void build_got_entries(TCCState *s1, int got_sym); /* in tccelf.c */
 #define NEED_BUILD_GOT
-
 #endif
 #endif
 
@@ -1809,7 +1810,7 @@ ST_FUNC int macho_load_dll(TCCState *s1, int fd, const char *filename, int lev);
 ST_FUNC int macho_load_tbd(TCCState *s1, int fd, const char *filename, int lev);
 #ifdef TCC_IS_NATIVE
 ST_FUNC void tcc_add_macos_sdkpath(TCCState* s);
-ST_FUNC const char* macho_tbd_soname(const char* filename);
+ST_FUNC char* macho_tbd_soname(int fd);
 #endif
 #endif
 /* ------------ tccrun.c ----------------- */

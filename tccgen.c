@@ -2401,10 +2401,15 @@ static void gen_opic(int op)
                             (l2 == -1 || (l2 == 0xFFFFFFFF && t2 != VT_LLONG))))) {
             /* filter out NOP operations like x*1, x-0, x&-1... */
             vtop--;
-        } else if (c2 && (op == '*' || op == TOK_PDIV || op == TOK_UDIV)) {
+        } else if (c2 && (op == '*' || op == TOK_PDIV || op == TOK_UDIV || op == TOK_UMOD)) {
             /* try to use shifts instead of muls or divs */
             if (l2 > 0 && (l2 & (l2 - 1)) == 0) {
                 int n = -1;
+                if (op == TOK_UMOD) {
+                    vtop->c.i = l2 - 1;
+                    op = '&';
+                    goto general_case;
+                }
                 while (l2) {
                     l2 >>= 1;
                     n++;
@@ -4696,29 +4701,14 @@ static int parse_btype(CType *type, AttributeDef *ad, int ignore_label)
             }
             next();
             break;
-#ifdef TCC_TARGET_ARM64
-        case TOK_UINT128:
-            /* GCC's __uint128_t appears in some Linux header files. Make it a
-               synonym for long double to get the size and alignment right. */
-            u = VT_LDOUBLE;
-            goto basic_type;
-#endif
         case TOK_BOOL:
             u = VT_BOOL;
             goto basic_type;
         case TOK_COMPLEX:
             tcc_error("_Complex is not yet supported");
         case TOK_FLOAT:
-            /* macOS SDK uses it in math.h
-               fake the size and alignment
-            */
             u = VT_FLOAT;
-            /* tcc_warning("_Float16 is not yet supported. Skipped.");
-               I hope no one really uses it in the wild. */
             goto basic_type;
-        case TOK_FLOAT16:
-            u = VT_SHORT;
-
         case TOK_DOUBLE:
             if ((t & (VT_BTYPE|VT_LONG)) == VT_LONG) {
                 t = (t & ~(VT_BTYPE|VT_LONG)) | VT_LDOUBLE;

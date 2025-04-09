@@ -185,16 +185,6 @@ Show included files.  As sole argument, print search dirs.  -vvv shows tries too
 @item -bench
 Display compilation statistics.
 
-@item -pthread
-Preprocess with @option{-D_REENTRANT}, link with @option{-lpthread}.
-
-@item -On
-Pretend to optimise: set @option{-D__OPTIMIZE__} to the numeric value of n.
-Note that TCC performs no additional optimisation.
-
-@item -dt
-With @option{-run}/@option{-E}: auto-define 'test_...' macros
-
 @end table
 
 Preprocessor options:
@@ -441,6 +431,12 @@ gnu11; @code{199901} otherwise.
 @item -x[c|a|b|n]
 Specify content of next input file: respectively C, assembly, binary, or none.
 
+@item -O[n]
+Same as @option{-D__OPTIMIZE__} except for -O0.
+
+@item -pthread
+Preprocess with @option{-D_REENTRANT}, link with @option{-lpthread}.
+
 @item -M
 Just output makefile fragment with dependencies
 
@@ -456,12 +452,18 @@ Like -MD except mention only user header files, not system header files.
 @item -MF depfile
 Use @file{depfile} as output for -MD.
 
+@item -MP
+Mention all dependencies as targets too.
+
 @item -print-search-dirs
 Print the configured installation directory and a list of library
 and include directories tcc will search.
 
 @item -dumpversion
 Print version.
+
+@item -dt
+With @option{-run}/@option{-E}: auto-define 'test_...' macros
 
 @end table
 

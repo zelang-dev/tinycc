@@ -67,11 +67,6 @@
      DEF(TOK_TYPEOF2, "__typeof")
      DEF(TOK_TYPEOF3, "__typeof__")
      DEF(TOK_LABEL, "__label__")
-     DEF(TOK_FLOAT16, "_Float16")
-
-#ifdef TCC_TARGET_ARM64
-     DEF(TOK_UINT128, "__uint128_t")
-#endif
 
 /*********************************************************************/
 /* the following are not keywords. They are included to ease parsing */
@@ -106,10 +101,6 @@
      DEF(TOK___NAN__, "__nan__")
      DEF(TOK___SNAN__, "__snan__")
      DEF(TOK___INF__, "__inf__")
-#if defined TCC_TARGET_X86_64
-     DEF(TOK___mzerosf, "__mzerosf") /* -0.0 */
-     DEF(TOK___mzerodf, "__mzerodf") /* -0.0 */
-#endif
 
 /* attribute identifiers */
 /* XXX: handle all tokens generically since speed is not critical */

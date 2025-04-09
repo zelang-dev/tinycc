@@ -158,7 +158,7 @@ static const char help2[] =
 #endif
     "  -Bsymbolic                    set DT_SYMBOLIC elf tag\n"
     "  -oformat=[elf32/64-* binary]  set executable output format\n"
-    "  -init= -fini= -Map= -as-needed -O   (ignored)\n"
+    "  -init= -fini= -Map= -as-needed -O -z= (ignored)\n"
     "Predefined macros:\n"
     "  tcc -E -dM - < /dev/null\n"
 #endif
@@ -221,7 +221,7 @@ static void print_search_dirs(TCCState *s)
     print_dirs("include", s->sysinclude_paths, s->nb_sysinclude_paths);
     print_dirs("libraries", s->library_paths, s->nb_library_paths);
     printf("libtcc1:\n  %s/%s\n", s->library_paths[0], CONFIG_TCC_CROSSPREFIX TCC_LIBTCC1);
-#if !defined TCC_TARGET_PE && !defined TCC_TARGET_MACHO
+#ifdef TCC_TARGET_UNIX
     print_dirs("crt", s->crt_paths, s->nb_crt_paths);
     printf("elfinterp:\n  %s\n",  DEFAULT_ELFINTERP(s));
 #endif
@@ -253,7 +253,9 @@ static char *default_outputfile(TCCState *s, const char *first_file)
 
     if (first_file && strcmp(first_file, "-"))
         name = tcc_basename(first_file);
-    snprintf(buf, sizeof(buf), "%s", name);
+    if (strlen(name) + 4 >= sizeof buf)
+        name = "a";
+    strcpy(buf, name);
     ext = tcc_fileextension(buf);
 #ifdef TCC_TARGET_PE
     if (s->output_type == TCC_OUTPUT_DLL)
@@ -293,7 +295,7 @@ int main(int argc0, char **argv0)
 redo:
     argc = argc0, argv = argv0;
     s = s1 = tcc_new();
-    opt = tcc_parse_args(s, &argc, &argv, 1);
+    opt = tcc_parse_args(s, &argc, &argv);
     if (opt < 0)
         return 1;
 
