@@ -1656,6 +1656,7 @@ static const TCCOption tcc_options[] = {
     { "MD", TCC_OPTION_MD, 0},
     { "MF", TCC_OPTION_MF, TCC_OPTION_HAS_ARG },
     { "MM", TCC_OPTION_MM, 0},
+    { "MMD,", TCC_OPTION_MMD, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
     { "MMD", TCC_OPTION_MMD, 0},
     { "MP", TCC_OPTION_MP, 0},
     { "x", TCC_OPTION_x, TCC_OPTION_HAS_ARG },
@@ -2080,11 +2081,16 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
             // fall through
         case TCC_OPTION_MM:
             s->just_deps = 1;
-            if(!s->deps_outfile)
+            s->gen_deps = 1;
+            if (!s->deps_outfile)
                 tcc_set_str(&s->deps_outfile, "-");
-            // fall through
+            break;
         case TCC_OPTION_MMD:
             s->gen_deps = 1;
+            /* usually, only "-MMD" is used */
+            /* but the Linux Kernel uses "-MMD,depfile" */
+            if (optarg)
+                tcc_set_str(&s->deps_outfile, optarg);
             break;
         case TCC_OPTION_MD:
             s->gen_deps = 1;
