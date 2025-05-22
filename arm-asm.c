@@ -376,8 +376,8 @@ static void asm_coprocessor_opcode(TCCState *s1, int token) {
     for (i = 0; i < 3; ++i) {
         skip(',');
         if (i == 0 && token != TOK_ASM_cdp2 && (ARM_INSTRUCTION_GROUP(token) == TOK_ASM_mrceq || ARM_INSTRUCTION_GROUP(token) == TOK_ASM_mcreq)) {
-            if (tok >= TOK_ASM_r0 && tok <= TOK_ASM_r15) {
-                registers[i] = tok - TOK_ASM_r0;
+            if (tok >= TOK_ASM_r0 && tok <= TOK_ASM_pc) {
+                registers[i] = asm_parse_regvar(tok);
                 next();
             } else {
                 expect("'r<number>'");
@@ -3072,23 +3072,20 @@ ST_FUNC void asm_clobber(uint8_t *clobber_regs, const char *str)
    Otherwise return -1.  */
 ST_FUNC int asm_parse_regvar (int t)
 {
-    if (t >= TOK_ASM_r0 && t <= TOK_ASM_pc) { /* register name */
-        switch (t) {
-            case TOK_ASM_fp:
-                return TOK_ASM_r11 - TOK_ASM_r0;
-            case TOK_ASM_ip:
-                return TOK_ASM_r12 - TOK_ASM_r0;
-            case TOK_ASM_sp:
-                return TOK_ASM_r13 - TOK_ASM_r0;
-            case TOK_ASM_lr:
-                return TOK_ASM_r14 - TOK_ASM_r0;
-            case TOK_ASM_pc:
-                return TOK_ASM_r15 - TOK_ASM_r0;
-            default:
-                return t - TOK_ASM_r0;
-        }
-    } else
+    /* coprocessors (p0-p15) and coprocessor registers (c0-c15) are handled elsewere */
+    /* single fp (s0-s31) and double fp registers (d0-d15) are handled elsewere */
+
+    if (t < TOK_ASM_r0 || t > TOK_ASM_pc) /* filter unrelated registers */
         return -1;
+
+    if (t <= TOK_ASM_r15)       /* default register names r0-r15 */
+        return t - TOK_ASM_r0;
+
+    if (t <= TOK_ASM_v8)        /* synonym register names a1-a4,v1-v8 (alias: r0-r11) */
+        return t - TOK_ASM_a1;
+
+    /* special register names sb/sl/fp/ip/sp/lr/pc (alias: r9-r15) */
+    return t - TOK_ASM_sb + (TOK_ASM_r9 - TOK_ASM_r0);
 }
 
 /*************************************************************/

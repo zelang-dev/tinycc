@@ -837,6 +837,32 @@ static void gcall_or_jmp(int is_jmp)
   }
 }
 
+ST_FUNC void save_return_reg(CType *func_type)
+{
+    int freg = is_float(func_type->t & VT_BTYPE);
+    int ireg = !freg;
+
+    if ((func_type->t & VT_BTYPE) == VT_STRUCT)
+        ireg = freg = 1;
+    if (ireg)
+        o(0xe92d0003);  /* push {r0,r1} */
+    if (freg)
+        o(0xed2d0b04);  /* vpush {d0,d1} */
+}
+
+ST_FUNC void restore_return_reg(CType *func_type)
+{
+    int freg = is_float(func_type->t & VT_BTYPE);
+    int ireg = !freg;
+
+    if ((func_type->t & VT_BTYPE) == VT_STRUCT)
+        ireg = freg = 1;
+    if (freg)
+        o(0xecbd0b04); /* vpop {d0,d1} */
+    if (ireg)
+        o(0xe8bd0003); /* pop {r0,r1} */
+}
+
 #if defined(CONFIG_TCC_BCHECK)
 
 static void gen_bounds_call(int v)
@@ -860,12 +886,13 @@ static void gen_bounds_prolog(void)
     o(0xe1a00000);  /* call __bound_local_new */
 }
 
-static void gen_bounds_epilog(void)
+static void gen_bounds_epilog(Sym *func_sym)
 {
     addr_t saved_ind;
     addr_t *bounds_ptr;
     Sym *sym_data;
     int offset_modified = func_bound_offset != lbounds_section->data_offset;
+    CType *func_type = &func_sym->type.ref->type;
 
     if (!offset_modified && !func_bound_add_epilog)
         return;
@@ -891,16 +918,16 @@ static void gen_bounds_epilog(void)
     }
 
     /* generate bound check local freeing */
-    o(0xe92d0003);  /* push {r0,r1} */
-    o(0xed2d0b04);  /* vpush {d0,d1} */
+    if (func_type->t != VT_VOID)
+	save_return_reg(func_type);
     o(0xe59f0000);  /* ldr r0, [pc] */
     o(0xea000000);  /* b $+4 */
     greloc(cur_text_section, sym_data, ind, R_ARM_REL32);
     o(-12);  /* lbounds_section->data_offset */
     o(0xe080000f);  /* add r0,r0,pc */
     gen_bounds_call(TOK___bound_local_delete);
-    o(0xecbd0b04); /* vpop {d0,d1} */
-    o(0xe8bd0003); /* pop {r0,r1} */
+    if (func_type->t != VT_VOID)
+	restore_return_reg(func_type);
 }
 #endif
 
@@ -1508,15 +1535,17 @@ from_stack:
 }
 
 /* generate function epilog */
-void gfunc_epilog(void)
+void gfunc_epilog(Sym *func_sym)
 {
   uint32_t x;
   int diff;
 
 #ifdef CONFIG_TCC_BCHECK
   if (tcc_state->do_bounds_check)
-    gen_bounds_epilog();
+    gen_bounds_epilog(func_sym);
 #endif
+  func_sym = NULL;
+
   /* Copy float return value to core register if base standard is used and
      float computation is made with VFP */
 #if defined(TCC_ARM_EABI) && defined(TCC_ARM_VFP)
