@@ -2019,9 +2019,22 @@ void gfunc_prolog(Sym *func_sym)
     C67_PUSH(C67_B3);
 }
 
-/* generate function epilog */
-void gfunc_epilog(void)
+ST_FUNC void save_return_reg(CType *func_type)
 {
+    func_type = NULL;
+    // TODO
+}
+
+ST_FUNC void restore_return_reg(CType *func_type)
+{
+    func_type = NULL;
+    // TODO
+}
+
+/* generate function epilog */
+void gfunc_epilog(Sym *func_sym)
+{
+    func_sym = NULL;
     {
 	int local = (-loc + 7) & -8;	// stack must stay aligned to 8 bytes for LDDW instr
 	C67_POP(C67_B3);
