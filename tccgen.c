@@ -6839,18 +6839,28 @@ static void end_switch(void)
 /* ------------------------------------------------------------------------- */
 /* __attribute__((cleanup(fn))) */
 
-static void try_call_scope_cleanup(Sym *stop, CType *func_type)
+/* save SValue of symbol to local stack */
+static void save_cleanup_sym(Sym *s)
+{
+    SValue *sv = vtop;
+    while (sv >= vstack) {
+        if (sv->sym == s) {
+            int align, size = type_size(&sv->type, &align);
+            loc = (loc - size) & -align;
+            vset(&sv->type, VT_LOCAL | VT_LVAL, loc);
+            vpushv(sv), *sv = vtop[-1], vstore(), --vtop;
+        }
+        --sv;
+    }
+}
+
+static void try_call_scope_cleanup(Sym *stop)
 {
     Sym *cls = cur_scope->cl.s;
-
-    if (cls == stop)
-	func_type = NULL;
-    if (func_type && func_type->t != VT_VOID)
-	save_return_reg(func_type);
     for (; cls != stop; cls = cls->next) {
 	Sym *fs = cls->cleanup_func;
 	Sym *vs = cls->prev_tok;
-
+        save_cleanup_sym(vs);
 	vpushsym(&fs->type, fs);
 	vset(&vs->type, vs->r, vs->c);
 	vtop->sym = vs;
@@ -6858,8 +6868,6 @@ static void try_call_scope_cleanup(Sym *stop, CType *func_type)
 	gaddrof();
 	gfunc_call(1);
     }
-    if (func_type && func_type->t != VT_VOID)
-	restore_return_reg(func_type);
 }
 
 static void try_call_cleanup_goto(Sym *cleanupstate)
@@ -6879,7 +6887,7 @@ static void try_call_cleanup_goto(Sym *cleanupstate)
     for (; cc != oc; cc = cc->next, oc = oc->next, --ccd)
       ;
 
-    try_call_scope_cleanup(cc, NULL);
+    try_call_scope_cleanup(cc);
 }
 
 /* call 'func' for each __attribute__((cleanup(func))) */
@@ -6893,7 +6901,7 @@ static void block_cleanup(struct scope *o)
             if (!jmp)
                 jmp = gjmp(0);
             gsym(pcl->jnext);
-            try_call_scope_cleanup(o->cl.s, NULL);
+            try_call_scope_cleanup(o->cl.s);
             pcl->jnext = gjmp(0);
             if (!o->cl.n)
                 goto remove_pending;
@@ -6906,7 +6914,7 @@ static void block_cleanup(struct scope *o)
         }
     }
     gsym(jmp);
-    try_call_scope_cleanup(o->cl.s, NULL);
+    try_call_scope_cleanup(o->cl.s);
 }
 
 /* ------------------------------------------------------------------------- */
@@ -6970,11 +6978,11 @@ static void prev_scope(struct scope *o, int is_expr)
 }
 
 /* leave a scope via break/continue(/goto) */
-static void leave_scope(struct scope *o, CType *func_type)
+static void leave_scope(struct scope *o)
 {
     if (!o)
         return;
-    try_call_scope_cleanup(o->cl.s, func_type);
+    try_call_scope_cleanup(o->cl.s);
     vla_leave(o);
 }
 
@@ -7116,9 +7124,9 @@ again:
             tcc_warning("'return' with no value");
             b = 0;
         }
+        leave_scope(root_scope);
         if (b)
             gfunc_return(&func_vt);
-        leave_scope(root_scope, &func_vt);
         skip(';');
         /* jump unless last stmt in top-level block */
         if (tok != '}' || local_scope != 1)
@@ -7132,9 +7140,9 @@ again:
         if (!cur_scope->bsym)
             tcc_error("cannot break");
         if (cur_switch && cur_scope->bsym == cur_switch->bsym)
-            leave_scope(cur_switch->scope, NULL);
+            leave_scope(cur_switch->scope);
         else
-            leave_scope(loop_scope, NULL);
+            leave_scope(loop_scope);
         *cur_scope->bsym = gjmp(*cur_scope->bsym);
         skip(';');
 
@@ -7142,7 +7150,7 @@ again:
         /* compute jump */
         if (!cur_scope->csym)
             tcc_error("cannot continue");
-        leave_scope(loop_scope, NULL);
+        leave_scope(loop_scope);
         *cur_scope->csym = gjmp(*cur_scope->csym);
         skip(';');
 
@@ -8406,7 +8414,7 @@ static void gen_function(Sym *sym)
     /* reset local stack */
     pop_local_syms(NULL, 0);
     tcc_debug_prolog_epilog(tcc_state, 1);
-    gfunc_epilog(sym);
+    gfunc_epilog();
 
     /* end of function */
     tcc_debug_funcend(tcc_state, ind - func_ind);

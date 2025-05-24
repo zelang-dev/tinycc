@@ -674,32 +674,6 @@ static void arm64_gen_bl_or_b(int b)
     }
 }
 
-ST_FUNC void save_return_reg(CType *func_type)
-{
-    int freg = is_float(func_type->t & VT_BTYPE);
-    int ireg = !freg;
-
-    if ((func_type->t & VT_BTYPE) == VT_STRUCT)
-        ireg = freg = 1;
-    if (ireg)
-        o(0xa9bf07e0); /* stp x0, x1, [sp, #-16]! */
-    if (freg)
-        o(0xadbf07e0); /* stp q0, q1, [sp, #-32]! */
-}   
-    
-ST_FUNC void restore_return_reg(CType *func_type)
-{   
-    int freg = is_float(func_type->t & VT_BTYPE);
-    int ireg = !freg;
-
-    if ((func_type->t & VT_BTYPE) == VT_STRUCT)
-        ireg = freg = 1;
-    if (freg)
-        o(0xacc107e0); /* ldp q0, q1, [sp], #32 */
-    if (ireg)
-        o(0xa8c107e0); /* ldp x0, x1, [sp], #16 */
-}
-
 #if defined(CONFIG_TCC_BCHECK)
 
 static void gen_bounds_call(int v)
@@ -722,13 +696,12 @@ static void gen_bounds_prolog(void)
     o(0xd503201f);  /* nop -> call __bound_local_new */
 }
 
-static void gen_bounds_epilog(Sym *func_sym)
+static void gen_bounds_epilog(void)
 {
     addr_t saved_ind;
     addr_t *bounds_ptr;
     Sym *sym_data;
     int offset_modified = func_bound_offset != lbounds_section->data_offset;
-    CType *func_type = &func_sym->type.ref->type;
 
     if (!offset_modified && !func_bound_add_epilog)
         return;
@@ -753,15 +726,15 @@ static void gen_bounds_epilog(Sym *func_sym)
     }
 
     /* generate bound check local freeing */
-    if (func_type->t != VT_VOID)
-        save_return_reg(func_type);
+    o(0xa9bf07e0); /* stp x0, x1, [sp, #-16]! */
+    o(0x3c9f0fe0); /* str q0, [sp, #-16]! */
     greloca(cur_text_section, sym_data, ind, R_AARCH64_ADR_GOT_PAGE, 0);
     o(0x90000000 | 0);            // adrp x0, #sym_data
     greloca(cur_text_section, sym_data, ind, R_AARCH64_LD64_GOT_LO12_NC, 0);
     o(0xf9400000 | 0 | (0 << 5)); // ld x0,[x0, #sym_data]
     gen_bounds_call(TOK___bound_local_delete);
-    if (func_type->t != VT_VOID)
-        restore_return_reg(func_type);
+    o(0x3cc107e0); /* ldr q0, [sp], #16 */
+    o(0xa8c107e0); /* ldp x0, x1, [sp], #16 */
 }
 #endif
 
@@ -1486,13 +1459,12 @@ ST_FUNC void gfunc_return(CType *func_type)
     vtop--;
 }
 
-ST_FUNC void gfunc_epilog(Sym *func_sym)
+ST_FUNC void gfunc_epilog(void)
 {
 #ifdef CONFIG_TCC_BCHECK
     if (tcc_state->do_bounds_check)
-        gen_bounds_epilog(func_sym);
+        gen_bounds_epilog();
 #endif
-    func_sym = NULL;
 
     if (loc) {
         // Insert instructions to subtract size of stack frame from SP.
