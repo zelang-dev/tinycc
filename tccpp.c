@@ -2240,15 +2240,18 @@ static void parse_string(const char *s, int len)
 #endif
 
 /* bn = (bn << shift) | or_val */
-static void bn_lshift(unsigned int *bn, int shift, int or_val)
+static int bn_lshift(unsigned int *bn, int shift, int or_val)
 {
     int i;
     unsigned int v;
+    if (bn[BN_SIZE - 1] >> (32 - shift))
+	return shift;
     for(i=0;i<BN_SIZE;i++) {
         v = bn[i];
         bn[i] = (v << shift) | or_val;
         or_val = v >> (32 - shift);
     }
+    return 0;
 }
 
 static void bn_zero(unsigned int *bn)
@@ -2321,6 +2324,7 @@ static void parse_number(const char *p)
                it by hand */
             /* hexadecimal or binary floats */
             /* XXX: handle overflows */
+            frac_bits = 0;
             *q = '\0';
             if (b == 16)
                 shift = 4;
@@ -2339,9 +2343,8 @@ static void parse_number(const char *p)
                 } else {
                     t = t - '0';
                 }
-                bn_lshift(bn, shift, t);
+                frac_bits -= bn_lshift(bn, shift, t);
             }
-            frac_bits = 0;
             if (ch == '.') {
                 ch = *p++;
                 while (1) {
@@ -2357,7 +2360,7 @@ static void parse_number(const char *p)
                     }
                     if (t >= b)
                         tcc_error("invalid digit");
-                    bn_lshift(bn, shift, t);
+                    frac_bits -= bn_lshift(bn, shift, t);
                     frac_bits += shift;
                     ch = *p++;
                 }
@@ -2376,7 +2379,9 @@ static void parse_number(const char *p)
             if (ch < '0' || ch > '9')
                 expect("exponent digits");
             while (ch >= '0' && ch <= '9') {
-                exp_val = exp_val * 10 + ch - '0';
+		/* If exp_val is this large ldexp will return HUGE_VAL */
+		if (exp_val < 100000000)
+                    exp_val = exp_val * 10 + ch - '0';
                 ch = *p++;
             }
             exp_val = exp_val * s;
@@ -2405,12 +2410,11 @@ static void parse_number(const char *p)
 #ifdef TCC_USING_DOUBLE_FOR_LDOUBLE
                 tokc.d = d;
 #else
-                /* XXX: not large enough */
-                tokc.ld = (long double)d;
+                tokc.ld = d;
 #endif
             } else {
                 tok = TOK_CDOUBLE;
-                tokc.d = d;
+                tokc.d = (double)d;
             }
         } else {
             /* decimal floats */
