@@ -457,20 +457,9 @@ void gfunc_prolog(int t)
     }
 }
 
-void save_return_reg(CType *func_type)
-{
-    func_type = NULL;
-}
-
-void restore_return_reg(CType *func_type)
-{
-    func_type = NULL;
-}
-
 /* generate function epilog */
-void gfunc_epilog(Sym *func_sym)
+void gfunc_epilog(void)
 {
-    func_sym = NULL;
     out_op(IL_OP_RET);
     fprintf(il_outfile, "}\n\n");
 }

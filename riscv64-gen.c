@@ -436,46 +436,6 @@ static void gcall_or_jmp(int docall)
     }
 }
 
-ST_FUNC void save_return_reg(CType *func_type)
-{
-    int freg = is_float(func_type->t & VT_BTYPE) &&
-	       (func_type->t & VT_BTYPE) != VT_LDOUBLE;
-    int ireg = !freg;
-
-    if ((func_type->t & VT_BTYPE) == VT_STRUCT)
-        ireg = freg = 1;
-    if (ireg && freg) {
-        o(0xe02a1101); /* addi sp,sp,-32  sd   a0,0(sp)   */
-        o(0xa82ae42e); /* sd   a1,8(sp)   fsd  fa0,16(sp) */
-    }
-    else if (ireg) {
-        o(0xe02a1141); /* addi sp,sp,-16  sd   a0,0(sp)   */
-        o(0x0001e42e); /* sd   a1,8(sp)   nop */
-    }
-    else if (freg)
-        o(0xa02a1141); /* addi sp,sp,-16  fsd  fa0,0(sp)   */
-}
-
-ST_FUNC void restore_return_reg(CType *func_type)
-{
-    int freg = is_float(func_type->t & VT_BTYPE) &&
-	       (func_type->t & VT_BTYPE) != VT_LDOUBLE;
-    int ireg = !freg;
-
-    if ((func_type->t & VT_BTYPE) == VT_STRUCT)
-        ireg = freg = 1;
-    if (ireg && freg) {
-        o(0x65a26502); /* ld   a0,0(sp)   ld   a1,8(sp)   */
-        o(0x61052542); /* fld  fa0,16(sp) addi sp,sp,32   */
-    }
-    else if (ireg) {
-        o(0x65a26502); /* ld   a0,0(sp)   ld   a1,8(sp)   */
-        o(0x00010141); /* addi sp,sp,16   nop */
-    }
-    else if (freg)
-        o(0x01412502); /* fld  fa0,0(sp)  addi sp,sp,16   */
-}
-
 #if defined(CONFIG_TCC_BCHECK)
 
 static void gen_bounds_call(int v)
@@ -499,14 +459,14 @@ static void gen_bounds_prolog(void)
     o(0x00000013);
 }
 
-static void gen_bounds_epilog(Sym *func_sym)
+static void gen_bounds_epilog(void)
 {
     addr_t saved_ind;
     addr_t *bounds_ptr;
     Sym *sym_data;
     Sym label = {0};
+
     int offset_modified = func_bound_offset != lbounds_section->data_offset;
-    CType *func_type = &func_sym->type.ref->type;
 
     if (!offset_modified && !func_bound_add_epilog)
         return;
@@ -534,16 +494,16 @@ static void gen_bounds_epilog(Sym *func_sym)
     }
 
     /* generate bound check local freeing */
-    if (func_type->t != VT_VOID)
-        save_return_reg(func_type);
+    o(0xe02a1101); /* addi sp,sp,-32  sd   a0,0(sp)   */
+    o(0xa82ae42e); /* sd   a1,8(sp)   fsd  fa0,16(sp) */
     put_extern_sym(&label, cur_text_section, ind, 0);
     greloca(cur_text_section, sym_data, ind, R_RISCV_GOT_HI20, 0);
     o(0x17 | (10 << 7));    // auipc a0, 0 %pcrel_hi(sym)+addend
     greloca(cur_text_section, &label, ind, R_RISCV_PCREL_LO12_I, 0);
     EI(0x03, 3, 10, 10, 0); // ld a0, 0(a0)
     gen_bounds_call(TOK___bound_local_delete);
-    if (func_type->t != VT_VOID)
-        restore_return_reg(func_type);
+    o(0x65a26502); /* ld   a0,0(sp)   ld   a1,8(sp)   */
+    o(0x61052542); /* fld  fa0,16(sp) addi sp,sp,32   */
 }
 #endif
 
@@ -933,15 +893,14 @@ ST_FUNC void arch_transfer_ret_regs(int aftercall)
     vtop--;
 }
 
-ST_FUNC void gfunc_epilog(Sym *func_sym)
+ST_FUNC void gfunc_epilog(void)
 {
     int v, saved_ind, d, large_ofs_ind;
 
 #ifdef CONFIG_TCC_BCHECK
     if (tcc_state->do_bounds_check)
-        gen_bounds_epilog(func_sym);
+        gen_bounds_epilog();
 #endif
-    func_sym = NULL;
 
     loc = (loc - num_va_regs * 8);
     d = v = (-loc + 15) & -16;
