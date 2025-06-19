@@ -2089,7 +2089,7 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
             s->gen_deps = 1;
             /* usually, only "-MMD" is used */
             /* but the Linux Kernel uses "-MMD,depfile" */
-            if (optarg)
+            if ((optarg) && (*optarg != '\0'))
                 tcc_set_str(&s->deps_outfile, optarg);
             break;
         case TCC_OPTION_MD:
