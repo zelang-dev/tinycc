@@ -3937,7 +3937,7 @@ static int ld_add_file(TCCState *s1, const char filename[])
 {
     if (filename[0] == '-' && filename[1] == 'l')
         return tcc_add_library(s1, filename + 2);
-    if (CONFIG_SYSROOT[0] != '\0') {
+    {
         /* lookup via library paths */
         int ret = tcc_add_dll(s1, tcc_basename(filename), 0);
         if (ret != FILE_NOT_FOUND)

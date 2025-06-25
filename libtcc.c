@@ -1993,7 +1993,6 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
         case TCC_OPTION_o:
             if (s->outfile) {
                 tcc_warning("multiple -o option");
-                tcc_free(s->outfile);
             }
             tcc_set_str(&s->outfile, optarg);
             break;
@@ -2089,7 +2088,7 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
             s->gen_deps = 1;
             /* usually, only "-MMD" is used */
             /* but the Linux Kernel uses "-MMD,depfile" */
-            if (optarg)
+            if ((optarg) && (*optarg != '\0'))
                 tcc_set_str(&s->deps_outfile, optarg);
             break;
         case TCC_OPTION_MD:
