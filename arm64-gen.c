@@ -1101,6 +1101,9 @@ ST_FUNC void gfunc_call(int nb_args)
             // value in floating-point registers
             if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
                 uint32_t j, sz, n = arm64_hfa(&vtop->type, &sz);
+                // save regs because struct may overwrite previous func call result
+                save_regs(0);
+
                 vtop->type.t = VT_PTR;
                 gaddrof();
                 gv(RC_R30);
