@@ -30,7 +30,7 @@ jobs:
       run: ./configure && make && make test -k
 
   test-x86-win32:
-    runs-on: windows-2019
+    runs-on: windows-2022
     timeout-minutes: 6
     steps:
     - uses: actions/checkout@v4
