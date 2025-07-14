@@ -1,7 +1,10 @@
 #include <stdatomic.h>
 #include <stdbool.h>
-#include <assert.h>
 #include <stdio.h>
+
+// standard assert would popup a dialog box on windows
+#define assert(x) \
+    printf("assert \"%s\" : %s\n", #x, (x) ? "yes" : "no");
 
 int main() {
     // Test 1: Basic functionality of __atomic_store_n and __atomic_load_n

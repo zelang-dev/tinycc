@@ -23,8 +23,10 @@
 
 /* ---------------------------------------------- */
 #if defined __i386__
+
+#define endbr32
+
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
@@ -297,9 +299,11 @@ _(atomic_flag_clear_explicit):
 #endif //__i386__
 
 /* ---------------------------------------------- */
-#if defined __x86_64__ && !defined TCC_TARGET_PE
+#if defined __x86_64__ && !defined _WIN32
+
+#define endbr64
+
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
@@ -508,12 +512,11 @@ _(atomic_flag_clear_explicit):
         ret
 	.size   _(atomic_flag_clear_explicit), .-_(atomic_flag_clear_explicit)
 
-#endif //__x86_64__ && !TCC_TARGET_PE
+#endif //__x86_64__ && !_WIN32
 
 /* ---------------------------------------------- */
-#if defined __x86_64__ && defined TCC_TARGET_PE
+#if defined __x86_64__ && defined _WIN32
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
@@ -700,12 +703,11 @@ _(atomic_flag_clear_explicit):
         ret
 	.size   _(atomic_flag_clear_explicit), .-_(atomic_flag_clear_explicit)
 
-#endif //__x86_64__ && TCC_TARGET_PE
+#endif //__x86_64__ && _WIN32
 
 /* ---------------------------------------------- */
 #if defined __arm__
         .text
-        .align  2
 #ifndef __TINYC__
         .arch   armv6k
         .syntax unified
@@ -1496,7 +1498,6 @@ _(atomic_flag_clear_explicit):
 /* ---------------------------------------------- */
 #if defined __aarch64__
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
@@ -2115,7 +2116,6 @@ _(atomic_flag_clear_explicit):
 /* ---------------------------------------------- */
 #if defined __riscv
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function

@@ -6839,15 +6839,15 @@ static void end_switch(void)
 /* ------------------------------------------------------------------------- */
 /* __attribute__((cleanup(fn))) */
 
-/* save SValue of symbol to local stack */
-static void save_cleanup_sym(Sym *s)
+/* protect symbol lvalues from further modification  */
+static void save_lvalues(void)
 {
     SValue *sv = vtop;
     while (sv >= vstack) {
-        if (sv->sym == s) {
+        if (sv->sym && (sv->r & VT_LVAL)) {
             int align, size = type_size(&sv->type, &align);
-            loc = (loc - size) & -align;
-            vset(&sv->type, VT_LOCAL | VT_LVAL, loc);
+            int r2, l = get_temp_local_var(size, align, &r2);
+            vset(&sv->type, VT_LOCAL | VT_LVAL, l), vtop->r2 = r2;
             vpushv(sv), *sv = vtop[-1], vstore(), --vtop;
         }
         --sv;
@@ -6860,7 +6860,7 @@ static void try_call_scope_cleanup(Sym *stop)
     for (; cls != stop; cls = cls->next) {
 	Sym *fs = cls->cleanup_func;
 	Sym *vs = cls->prev_tok;
-        save_cleanup_sym(vs);
+	save_lvalues();
 	vpushsym(&fs->type, fs);
 	vset(&vs->type, vs->r, vs->c);
 	vtop->sym = vs;

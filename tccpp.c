@@ -3076,6 +3076,11 @@ static int *macro_arg_subst(Sym **nested_list, const int *macro_str, Sym *args)
                 cval.str.size = tokcstr.size;
                 cval.str.data = tokcstr.data;
                 tok_str_add2(&str, TOK_PPSTR, &cval);
+#ifdef TCC_TARGET_ARM
+            } else if ((parse_flags & PARSE_FLAG_ASM_FILE) && t == TOK_PPNUM) {
+                /* for example: mov r1,#0 */
+                --macro_str, tok_str_add(&str, '#');
+#endif
             } else {
                 expect("macro parameter after '#'");
             }

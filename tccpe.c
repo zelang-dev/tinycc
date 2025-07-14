@@ -1254,7 +1254,7 @@ static int pe_check_symbols(struct pe_info *pe)
         if (sym->st_shndx == SHN_UNDEF) {
             const char *name = (char*)symtab_section->link->data + sym->st_name;
             unsigned type = ELFW(ST_TYPE)(sym->st_info);
-            int imp_sym;
+            int imp_sym = 0;
             struct import_symbol *is;
 
             int _imp_, n;
@@ -1926,6 +1926,34 @@ static void pe_add_runtime(TCCState *s1, struct pe_info *pe)
     if (TCC_OUTPUT_MEMORY == s1->output_type)
         pe_type = PE_RUN;
     pe->type = pe_type;
+}
+
+ST_FUNC int pe_setsubsy(TCCState *s1, const char *arg)
+{
+    static const struct subsy { const char* p; int v; } x[] = {
+#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
+        { "native", 1 },
+        { "gui", 2 },
+        { "windows", 2 },
+        { "console", 3 },
+        { "posix", 7 },
+        { "efiapp", 10 },
+        { "efiboot", 11 },
+        { "efiruntime", 12 },
+        { "efirom", 13 },
+#elif defined(TCC_TARGET_ARM)
+        { "wince", 9 },
+#endif
+        { 0, -1 }};
+    const struct subsy *y;
+    for (y = x;; ++y) {
+        if (!y->p)
+            return -1;
+        if (0 == strcmp(y->p, arg)) {
+            s1->pe_subsystem = y->v;
+            return 0;
+        }
+    }
 }
 
 static void pe_set_options(TCCState * s1, struct pe_info *pe)
