@@ -997,6 +997,8 @@ ST_FUNC void gfunc_call(int nb_args)
     int variadic = (vtop[-nb_args].type.ref->f.func_type == FUNC_ELLIPSIS);
     int var_nb_arg = n_func_args(&vtop[-nb_args].type);
 
+    save_regs(nb_args + 1);
+
 #ifdef CONFIG_TCC_BCHECK
     if (tcc_state->do_bounds_check)
         gbound_args(nb_args);
@@ -1101,9 +1103,6 @@ ST_FUNC void gfunc_call(int nb_args)
             // value in floating-point registers
             if ((vtop->type.t & VT_BTYPE) == VT_STRUCT) {
                 uint32_t j, sz, n = arm64_hfa(&vtop->type, &sz);
-                // save regs because struct may overwrite previous func call result
-                save_regs(0);
-
                 vtop->type.t = VT_PTR;
                 gaddrof();
                 gv(RC_R30);
@@ -1129,7 +1128,6 @@ ST_FUNC void gfunc_call(int nb_args)
             vswap();
     }
 
-    save_regs(0);
     arm64_gen_bl_or_b(0);
     --vtop;
     if (stack & 0xfff)

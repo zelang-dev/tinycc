@@ -1465,31 +1465,9 @@ static int tcc_set_linker(TCCState *s, const char *optarg)
         } else if (link_option(&o, "stack=")) {
             s->pe_stack_size = strtoul(o.arg, &end, 10);
         } else if (link_option(&o, "subsystem=")) {
-#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
-            if (0==strcmp("native", o.arg)) {
-                s->pe_subsystem = 1;
-            } else if (0==strcmp("console", o.arg)) {
-                s->pe_subsystem = 3;
-            } else if (0==strcmp("gui", o.arg) || 0==strcmp("windows", o.arg)) {
-                s->pe_subsystem = 2;
-            } else if (0==strcmp("posix", o.arg)) {
-                s->pe_subsystem = 7;
-            } else if (0==strcmp("efiapp", o.arg)) {
-                s->pe_subsystem = 10;
-            } else if (0==strcmp("efiboot", o.arg)) {
-                s->pe_subsystem = 11;
-            } else if (0==strcmp("efiruntime", o.arg)) {
-                s->pe_subsystem = 12;
-            } else if (0==strcmp("efirom", o.arg)) {
-                s->pe_subsystem = 13;
-#elif defined(TCC_TARGET_ARM)
-            if (0==strcmp("wince", o.arg)) {
-                s->pe_subsystem = 9;
-#endif
-            } else
+            if (pe_setsubsy(s, o.arg) < 0)
                 goto err;
-#endif /* PE */
-#ifdef TCC_TARGET_MACHO
+#elif defined TCC_TARGET_MACHO
         } else if (link_option(&o, "all_load")) {
 	    s->filetype |= AFF_WHOLE_ARCHIVE;
         } else if (link_option(&o, "force_load=")) {
@@ -1653,11 +1631,10 @@ static const TCCOption tcc_options[] = {
     { "w", TCC_OPTION_w, 0 },
     { "E", TCC_OPTION_E, 0},
     { "M", TCC_OPTION_M, 0},
-    { "MD", TCC_OPTION_MD, 0},
-    { "MF", TCC_OPTION_MF, TCC_OPTION_HAS_ARG },
     { "MM", TCC_OPTION_MM, 0},
-    { "MMD,", TCC_OPTION_MMD, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
-    { "MMD", TCC_OPTION_MMD, 0},
+    { "MD", TCC_OPTION_MD, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
+    { "MMD", TCC_OPTION_MMD, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
+    { "MF", TCC_OPTION_MF, TCC_OPTION_HAS_ARG },
     { "MP", TCC_OPTION_MP, 0},
     { "x", TCC_OPTION_x, TCC_OPTION_HAS_ARG },
     /* tcctools */
@@ -2075,6 +2052,7 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
         case TCC_OPTION_P:
             s->Pflag = atoi(optarg) + 1;
             break;
+
         case TCC_OPTION_M:
             s->include_sys_deps = 1;
             // fall through
@@ -2084,29 +2062,31 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
             if (!s->deps_outfile)
                 tcc_set_str(&s->deps_outfile, "-");
             break;
+        case TCC_OPTION_MD:
+            s->include_sys_deps = 1;
+            // fall through
         case TCC_OPTION_MMD:
             s->gen_deps = 1;
             /* usually, only "-MMD" is used */
             /* but the Linux Kernel uses "-MMD,depfile" */
-            if ((optarg) && (*optarg != '\0'))
-                tcc_set_str(&s->deps_outfile, optarg);
-            break;
-        case TCC_OPTION_MD:
-            s->gen_deps = 1;
-            s->include_sys_deps = 1;
-            break;
+            if (*optarg != ',')
+                break;
+            ++optarg;
+            // fall through
         case TCC_OPTION_MF:
             tcc_set_str(&s->deps_outfile, optarg);
             break;
         case TCC_OPTION_MP:
             s->gen_phony_deps = 1;
             break;
+
         case TCC_OPTION_dumpmachine:
             printf("%s\n", dumpmachine_str);
             exit(0);
         case TCC_OPTION_dumpversion:
             printf ("%s\n", TCC_VERSION);
             exit(0);
+
         case TCC_OPTION_x:
             x = 0;
             if (*optarg == 'c')

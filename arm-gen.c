@@ -1311,10 +1311,6 @@ again:
   if (++pass < 2)
     goto again;
 
-  /* Manually free remaining registers since next parameters are loaded
-   * manually, without the help of gv(int). */
-  save_regs(nb_args);
-
   if(todo) {
     o(0xE8BD0000|todo); /* pop {todo} */
     for(pplan = plan->clsplans[CORE_STRUCT_CLASS]; pplan; pplan = pplan->prev) {
@@ -1353,6 +1349,8 @@ void gfunc_call(int nb_args)
   if (tcc_state->do_bounds_check)
     gbound_args(nb_args);
 #endif
+
+  save_regs(nb_args + 1);
 
 #ifdef TCC_ARM_EABI
   if (float_abi == ARM_HARD_FLOAT) {

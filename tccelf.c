@@ -3937,7 +3937,7 @@ static int ld_add_file(TCCState *s1, const char filename[])
 {
     if (filename[0] == '-' && filename[1] == 'l')
         return tcc_add_library(s1, filename + 2);
-    {
+    if (CONFIG_SYSROOT[0] != '\0' || !IS_ABSPATH(filename)) {
         /* lookup via library paths */
         int ret = tcc_add_dll(s1, tcc_basename(filename), 0);
         if (ret != FILE_NOT_FOUND)
@@ -3981,19 +3981,19 @@ repeat:
         } else if (t != LD_TOK_NAME) {
             return tcc_error_noabort("unexpected token '%c'", t);
         } else if (!strcmp(filename, "AS_NEEDED")) {
-            ret = ld_add_file_list(s1, filename);
+            ret |= ld_add_file_list(s1, filename);
         } else if (c == 'I' || c == 'G' || c == 'A') {
-            ret = ld_add_file(s1, filename);
+            ret |= !!ld_add_file(s1, filename);
         }
-        if (ret)
-            return -1;
+        if (ret < 0)
+            return ret;
         t = ld_next(s1, filename, sizeof(filename));
         if (t == ',')
             t = ld_next(s1, filename, sizeof(filename));
     }
-    if (c == 'G' && new_undef_sym(s1, sym_offset))
+    if (c == 'G' && ret == 0 && new_undef_sym(s1, sym_offset))
         goto repeat;
-    return 0;
+    return ret;
 }
 
 /* interpret a subset of GNU ldscripts to handle the dummy libc.so
@@ -4001,7 +4001,7 @@ repeat:
 ST_FUNC int tcc_load_ldscript(TCCState *s1, int fd)
 {
     char cmd[64];
-    int t, ret = FILE_NOT_RECOGNIZED;
+    int t, ret = 0, noscript = 1;
     unsigned char *text_ptr, *saved_ptr;
 
     saved_ptr = s1->ld_p;
@@ -4012,19 +4012,22 @@ ST_FUNC int tcc_load_ldscript(TCCState *s1, int fd)
             break;
         if (!strcmp(cmd, "INPUT") ||
             !strcmp(cmd, "GROUP")) {
-            ret = ld_add_file_list(s1, cmd);
+            ret |= ld_add_file_list(s1, cmd);
         } else if (!strcmp(cmd, "OUTPUT_FORMAT") ||
                    !strcmp(cmd, "TARGET")) {
             /* ignore some commands */
-            ret = ld_add_file_list(s1, cmd);
-        } else if (0 == ret) {
+            ret |= ld_add_file_list(s1, cmd);
+        } else if (noscript) {
+            ret = FILE_NOT_RECOGNIZED;
+        } else {
             ret = tcc_error_noabort("unexpected '%s'", cmd);
         }
-        if (ret)
+        if (ret < 0)
             break;
+        noscript = 0;
     }
     tcc_free(text_ptr);
     s1->ld_p = saved_ptr;
-    return ret;
+    return ret < 0 ? ret : -ret;
 }
 #endif /* !ELF_OBJ_ONLY */

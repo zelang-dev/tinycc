@@ -23,8 +23,10 @@
 
 /* ---------------------------------------------- */
 #if defined __i386__
+
+#define endbr32
+
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
@@ -297,9 +299,11 @@ _(atomic_flag_clear_explicit):
 #endif //__i386__
 
 /* ---------------------------------------------- */
-#if defined __x86_64__
+#if defined __x86_64__ && !defined _WIN32
+
+#define endbr64
+
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
@@ -508,37 +512,231 @@ _(atomic_flag_clear_explicit):
         ret
 	.size   _(atomic_flag_clear_explicit), .-_(atomic_flag_clear_explicit)
 
-#endif //__x86_64__
+#endif //__x86_64__ && !_WIN32
+
+/* ---------------------------------------------- */
+#if defined __x86_64__ && defined _WIN32
+        .text
+
+        .global _(__atomic_load_1)
+        .type   _(__atomic_load_1), %function
+_(__atomic_load_1):
+        movzbl (%rcx),%eax
+        ret
+	.size   _(__atomic_load_1), .-_(__atomic_load_1)
+
+        .global _(__atomic_load_2)
+        .type   _(__atomic_load_2), %function
+_(__atomic_load_2):
+        movzwl (%rcx),%eax
+        ret
+	.size   _(__atomic_load_2), .-_(__atomic_load_2)
+
+        .global _(__atomic_load_4)
+        .type   _(__atomic_load_4), %function
+_(__atomic_load_4):
+        mov    (%rcx),%eax
+        ret
+	.size   _(__atomic_load_4), .-_(__atomic_load_4)
+
+        .global _(__atomic_load_8)
+        .type   _(__atomic_load_8), %function
+_(__atomic_load_8):
+        mov    (%rcx),%rax
+        ret
+	.size   _(__atomic_load_8), .-_(__atomic_load_8)
+
+        .global _(__atomic_store_1)
+        .type   _(__atomic_store_1), %function
+_(__atomic_store_1):
+        xchg   %dl,(%rcx)
+        ret
+	.size   _(__atomic_store_1), .-_(__atomic_store_1)
+
+        .global _(__atomic_store_2)
+        .type   _(__atomic_store_2), %function
+_(__atomic_store_2):
+        xchg   %dx,(%rcx)
+        ret
+	.size   _(__atomic_store_2), .-_(__atomic_store_2)
+
+        .global _(__atomic_store_4)
+        .type   _(__atomic_store_4), %function
+_(__atomic_store_4):
+        xchg   %edx,(%rcx)
+        ret
+	.size   _(__atomic_store_4), .-_(__atomic_store_4)
+
+        .global _(__atomic_store_8)
+        .type   _(__atomic_store_8), %function
+_(__atomic_store_8):
+        xchg   %rdx,(%rcx)
+        ret
+	.size   _(__atomic_store_8), .-_(__atomic_store_8)
+
+        .global _(__atomic_compare_exchange_1)
+        .type   _(__atomic_compare_exchange_1), %function
+_(__atomic_compare_exchange_1):
+        movzbl (%rdx),%eax
+        lock cmpxchg %r8b,(%rcx)
+        sete   %cl
+        je      .L___atomic_compare_exchange_1_00f
+        mov    %al,(%rdx)
+.L___atomic_compare_exchange_1_00f:
+        mov    %ecx,%eax
+        ret
+	.size   _(__atomic_compare_exchange_1), .-_(__atomic_compare_exchange_1)
+
+        .global _(__atomic_compare_exchange_2)
+        .type   _(__atomic_compare_exchange_2), %function
+_(__atomic_compare_exchange_2):
+        movzwl (%rdx),%eax
+        lock cmpxchg %r8w,(%rcx)
+        sete   %cl
+        je      .L___atomic_compare_exchange_2_011
+        mov    %ax,(%rdx)
+.L___atomic_compare_exchange_2_011:
+        mov    %ecx,%eax
+        ret
+	.size   _(__atomic_compare_exchange_2), .-_(__atomic_compare_exchange_2)
+
+        .global _(__atomic_compare_exchange_4)
+        .type   _(__atomic_compare_exchange_4), %function
+_(__atomic_compare_exchange_4):
+        mov    (%rdx),%eax
+        lock cmpxchg %r8d,(%rcx)
+        sete   %cl
+        je      .L___atomic_compare_exchange_4_00e
+        mov    %eax,(%rdx)
+.L___atomic_compare_exchange_4_00e:
+        mov    %ecx,%eax
+        ret
+	.size   _(__atomic_compare_exchange_4), .-_(__atomic_compare_exchange_4)
+
+        .global _(__atomic_compare_exchange_8)
+        .type   _(__atomic_compare_exchange_8), %function
+_(__atomic_compare_exchange_8):
+        mov    (%rdx),%rax
+        lock cmpxchg %r8,(%rcx)
+        sete   %cl
+        je      .L___atomic_compare_exchange_8_010
+        mov    %rax,(%rdx)
+.L___atomic_compare_exchange_8_010:
+        mov    %ecx,%eax
+        ret
+	.size   _(__atomic_compare_exchange_8), .-_(__atomic_compare_exchange_8)
+
+        .global _(__atomic_test_and_set_1)
+        .type   _(__atomic_test_and_set_1), %function
+_(__atomic_test_and_set_1):
+        mov    $0x1,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(__atomic_test_and_set_1), .-_(__atomic_test_and_set_1)
+
+        .global _(__atomic_test_and_set_2)
+        .type   _(__atomic_test_and_set_2), %function
+_(__atomic_test_and_set_2):
+        mov    $0x1,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(__atomic_test_and_set_2), .-_(__atomic_test_and_set_2)
+
+        .global _(__atomic_test_and_set_4)
+        .type   _(__atomic_test_and_set_4), %function
+_(__atomic_test_and_set_4):
+        mov    $0x1,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(__atomic_test_and_set_4), .-_(__atomic_test_and_set_4)
+
+        .global _(__atomic_test_and_set_8)
+        .type   _(__atomic_test_and_set_8), %function
+_(__atomic_test_and_set_8):
+        mov    $0x1,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(__atomic_test_and_set_8), .-_(__atomic_test_and_set_8)
+
+        .global _(atomic_thread_fence)
+        .type   _(atomic_thread_fence), %function
+_(atomic_thread_fence):
+        lock orq $0x0,(%rsp)
+        ret
+	.size   _(atomic_thread_fence), .-_(atomic_thread_fence)
+
+        .global _(atomic_signal_fence)
+        .type   _(atomic_signal_fence), %function
+_(atomic_signal_fence):
+        ret
+	.size   _(atomic_signal_fence), .-_(atomic_signal_fence)
+
+        .global _(atomic_flag_test_and_set)
+        .type   _(atomic_flag_test_and_set), %function
+_(atomic_flag_test_and_set):
+        mov    $0x1,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(atomic_flag_test_and_set), .-_(atomic_flag_test_and_set)
+
+        .global _(atomic_flag_test_and_set_explicit)
+        .type   _(atomic_flag_test_and_set_explicit), %function
+_(atomic_flag_test_and_set_explicit):
+        mov    $0x1,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(atomic_flag_test_and_set_explicit), .-_(atomic_flag_test_and_set_explicit)
+
+        .global _(atomic_flag_clear)
+        .type   _(atomic_flag_clear), %function
+_(atomic_flag_clear):
+        xor    %eax,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(atomic_flag_clear), .-_(atomic_flag_clear)
+
+        .global _(atomic_flag_clear_explicit)
+        .type   _(atomic_flag_clear_explicit), %function
+_(atomic_flag_clear_explicit):
+        xor    %eax,%eax
+        xchg   %al,(%rcx)
+        ret
+	.size   _(atomic_flag_clear_explicit), .-_(atomic_flag_clear_explicit)
+
+#endif //__x86_64__ && _WIN32
 
 /* ---------------------------------------------- */
 #if defined __arm__
         .text
-        .align  2
-        .thumb
+#ifndef __TINYC__
+        .arch   armv6k
         .syntax unified
+#endif
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
 _(__atomic_load_1):
 #ifdef __TINYC__
-        .short 0xb911
-        .short 0x7800
-        .short 0xb2c0
-        .short 0x4770
-        .short 0xf3bf
-        .short 0x7800
-        .short 0xf3bf
-        .short 0xb2c0
-        .short 0x4770
+        .int 0xe3510000
+        .int 0x1a000002
+        .int 0xe5d00000
+        .int 0xe6ef0070
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe5d00000
+        .int 0xee070fba
+        .int 0xe6ef0070
+        .int 0xe12fff1e
 #else
-        cbnz    r1,  .L___atomic_load_1_008
-        ldrb    r0, [r0, #0]
+        cmp r1, #0
+        bne  .L___atomic_load_1_014
+        ldrb    r0, [r0]
         uxtb    r0, r0
         bx  lr
-.L___atomic_load_1_008:
-        dmb ish
-        ldrb    r0, [r0, #0]
-        dmb ish
+.L___atomic_load_1_014:
+        mcr     p15, #0, r0, c7, c10, #5
+        ldrb    r0, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         uxtb    r0, r0
         bx  lr
 	.size   _(__atomic_load_1), .-_(__atomic_load_1)
@@ -548,24 +746,26 @@ _(__atomic_load_1):
         .type   _(__atomic_load_2), %function
 _(__atomic_load_2):
 #ifdef __TINYC__
-        .short 0xb911
-        .short 0x8800
-        .short 0xb280
-        .short 0x4770
-        .short 0xf3bf
-        .short 0x8800
-        .short 0xf3bf
-        .short 0xb280
-        .short 0x4770
+        .int 0xe3510000
+        .int 0x1a000002
+        .int 0xe1d000b0
+        .int 0xe6ff0070
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1d000b0
+        .int 0xee070fba
+        .int 0xe6ff0070
+        .int 0xe12fff1e
 #else
-        cbnz    r1,  .L___atomic_load_2_008
-        ldrh    r0, [r0, #0]
+        cmp r1, #0
+        bne  .L___atomic_load_2_03c
+        ldrh    r0, [r0]
         uxth    r0, r0
         bx  lr
-.L___atomic_load_2_008:
-        dmb ish
-        ldrh    r0, [r0, #0]
-        dmb ish
+.L___atomic_load_2_03c:
+        mcr     p15, #0, r0, c7, c10, #5
+        ldrh    r0, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         uxth    r0, r0
         bx  lr
 	.size   _(__atomic_load_2), .-_(__atomic_load_2)
@@ -575,21 +775,23 @@ _(__atomic_load_2):
         .type   _(__atomic_load_4), %function
 _(__atomic_load_4):
 #ifdef __TINYC__
-        .short 0xb909
-        .short 0x6800
-        .short 0x4770
-        .short 0xf3bf
-        .short 0x6800
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3510000
+        .int 0x1a000001
+        .int 0xe5900000
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe5900000
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        cbnz    r1,  .L___atomic_load_4_006
-        ldr r0, [r0, #0]
+        cmp r1, #0
+        bne  .L___atomic_load_4_060
+        ldr r0, [r0]
         bx  lr
-.L___atomic_load_4_006:
-        dmb ish
-        ldr r0, [r0, #0]
-        dmb ish
+.L___atomic_load_4_060:
+        mcr     p15, #0, r0, c7, c10, #5
+        ldr r0, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_load_4), .-_(__atomic_load_4)
 
@@ -598,21 +800,23 @@ _(__atomic_load_4):
         .type   _(__atomic_load_8), %function
 _(__atomic_load_8):
 #ifdef __TINYC__
-        .short 0xb911
-        .short 0xe8d0
-        .short 0x4770
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3510000
+        .int 0x1a000001
+        .int 0xe1b00f9f
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1b00f9f
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        cbnz    r1,  .L___atomic_load_8_008
-        ldrexd  r0, r1, [r0]
+        cmp r1, #0
+        bne  .L___atomic_load_8_080
+        ldrexd  r0, [r0]
         bx  lr
-.L___atomic_load_8_008:
-        dmb ish
-        ldrexd  r0, r1, [r0]
-        dmb ish
+.L___atomic_load_8_080:
+        mcr     p15, #0, r0, c7, c10, #5
+        ldrexd  r0, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_load_8), .-_(__atomic_load_8)
 
@@ -621,21 +825,23 @@ _(__atomic_load_8):
         .type   _(__atomic_store_1), %function
 _(__atomic_store_1):
 #ifdef __TINYC__
-        .short 0xb90a
-        .short 0x7001
-        .short 0x4770
-        .short 0xf3bf
-        .short 0x7001
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3520000
+        .int 0x1a000001
+        .int 0xe5c01000
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe5c01000
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        cbnz    r2,  .L___atomic_store_1_006
-        strb    r1, [r0, #0]
+        cmp r2, #0
+        bne  .L___atomic_store_1_0a0
+        strb    r1, [r0]
         bx  lr
-.L___atomic_store_1_006:
-        dmb ish
-        strb    r1, [r0, #0]
-        dmb ish
+.L___atomic_store_1_0a0:
+        mcr     p15, #0, r0, c7, c10, #5
+        strb    r1, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_store_1), .-_(__atomic_store_1)
 
@@ -644,21 +850,23 @@ _(__atomic_store_1):
         .type   _(__atomic_store_2), %function
 _(__atomic_store_2):
 #ifdef __TINYC__
-        .short 0xb90a
-        .short 0x8001
-        .short 0x4770
-        .short 0xf3bf
-        .short 0x8001
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3520000
+        .int 0x1a000001
+        .int 0xe1c010b0
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1c010b0
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        cbnz    r2,  .L___atomic_store_2_006
-        strh    r1, [r0, #0]
+        cmp r2, #0
+        bne  .L___atomic_store_2_0c0
+        strh    r1, [r0]
         bx  lr
-.L___atomic_store_2_006:
-        dmb ish
-        strh    r1, [r0, #0]
-        dmb ish
+.L___atomic_store_2_0c0:
+        mcr     p15, #0, r0, c7, c10, #5
+        strh    r1, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_store_2), .-_(__atomic_store_2)
 
@@ -667,21 +875,23 @@ _(__atomic_store_2):
         .type   _(__atomic_store_4), %function
 _(__atomic_store_4):
 #ifdef __TINYC__
-        .short 0xb90a
-        .short 0x6001
-        .short 0x4770
-        .short 0xf3bf
-        .short 0x6001
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3520000
+        .int 0x1a000001
+        .int 0xe5801000
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe5801000
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        cbnz    r2,  .L___atomic_store_4_006
-        str r1, [r0, #0]
+        cmp r2, #0
+        bne  .L___atomic_store_4_0e0
+        str r1, [r0]
         bx  lr
-.L___atomic_store_4_006:
-        dmb ish
-        str r1, [r0, #0]
-        dmb ish
+.L___atomic_store_4_0e0:
+        mcr     p15, #0, r0, c7, c10, #5
+        str r1, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_store_4), .-_(__atomic_store_4)
 
@@ -690,46 +900,48 @@ _(__atomic_store_4):
         .type   _(__atomic_store_8), %function
 _(__atomic_store_8):
 #ifdef __TINYC__
-        .short 0xb430
-        .short 0x4614
-        .short 0x9902
-        .short 0x461d
-        .short 0xb939
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xbc30
-        .short 0x4770
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xf3bf
-        .short 0xbc30
-        .short 0x4770
+        .int 0xe92d0030
+        .int 0xe1a04002
+        .int 0xe59d1008
+        .int 0xe1a05003
+        .int 0xe3510000
+        .int 0x1a000005
+        .int 0xe1b02f9f
+        .int 0xe1a01f94
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe8bd0030
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1b02f9f
+        .int 0xe1a01f94
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xee070fba
+        .int 0xe8bd0030
+        .int 0xe12fff1e
 #else
         push    {r4, r5}
         mov r4, r2
         ldr r1, [sp, #8]
         mov r5, r3
-        cbnz    r1,  .L___atomic_store_8_01a
-.L___atomic_store_8_00a:
-        ldrexd  r2, r3, [r0]
-        strexd  r1, r4, r5, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_store_8_00a
+        bne  .L___atomic_store_8_120
+.L___atomic_store_8_108:
+        ldrexd  r2, [r0]
+        strexd  r1, r4, [r0]
+        cmp r1, #0
+        bne  .L___atomic_store_8_108
         pop {r4, r5}
         bx  lr
-.L___atomic_store_8_01a:
-        dmb ish
-.L___atomic_store_8_01e:
-        ldrexd  r2, r3, [r0]
-        strexd  r1, r4, r5, [r0]
+.L___atomic_store_8_120:
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_store_8_124:
+        ldrexd  r2, [r0]
+        strexd  r1, r4, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_store_8_01e
-        dmb ish
+        bne  .L___atomic_store_8_124
+        mcr     p15, #0, r0, c7, c10, #5
         pop {r4, r5}
         bx  lr
 	.size   _(__atomic_store_8), .-_(__atomic_store_8)
@@ -739,59 +951,59 @@ _(__atomic_store_8):
         .type   _(__atomic_compare_exchange_1), %function
 _(__atomic_compare_exchange_1):
 #ifdef __TINYC__
-        .short 0xb500
-        .short 0xb983
-        .short 0x780b
-        .short 0xe8d0
-        .short 0x459c
-        .short 0xd104
-        .short 0xe8c0
-        .short 0xf1be
-        .short 0xd1f6
-        .short 0xbf0e
-        .short 0x2001
-        .short 0x2000
-        .short 0xf881
-        .short 0xf85d
-        .short 0x780b
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0x459c
-        .short 0xd1f1
-        .short 0xe8c0
-        .short 0xf1be
-        .short 0xd1f6
-        .short 0xf3bf
-        .short 0xe7e9
+        .int 0xe52de004
+        .int 0xe3530000
+        .int 0x1a00000a
+        .int 0xe5d13000
+        .int 0xe1d0cf9f
+        .int 0xe15c0003
+        .int 0x1a000002
+        .int 0xe1c0ef92
+        .int 0xe35e0000
+        .int 0x1afffff9
+        .int 0x03a00001
+        .int 0x13a00000
+        .int 0x15c1c000
+        .int 0xe49df004
+        .int 0xe5d13000
+        .int 0xee070fba
+        .int 0xe1d0cf9f
+        .int 0xe15c0003
+        .int 0x1afffff6
+        .int 0xe1c0ef92
+        .int 0xe35e0000
+        .int 0x1afffff9
+        .int 0xee070fba
+        .int 0xeafffff1
 #else
-        push    {lr}
-        cbnz    r3,  .L___atomic_compare_exchange_1_026
-        ldrb    r3, [r1, #0]
-.L___atomic_compare_exchange_1_006:
+        push    {lr}        @ (str lr, [sp, #-4]!)
+        cmp r3, #0
+        bne  .L___atomic_compare_exchange_1_178
+        ldrb    r3, [r1]
+.L___atomic_compare_exchange_1_150:
         ldrexb  ip, [r0]
         cmp ip, r3
-        bne.n    .L___atomic_compare_exchange_1_018
+        bne  .L___atomic_compare_exchange_1_168
         strexb  lr, r2, [r0]
-        cmp.w   lr, #0
-        bne.n    .L___atomic_compare_exchange_1_006
-.L___atomic_compare_exchange_1_018:
-        itee    eq
+        cmp lr, #0
+        bne  .L___atomic_compare_exchange_1_150
+.L___atomic_compare_exchange_1_168:
         moveq   r0, #1
         movne   r0, #0
-        strbne.w    ip, [r1]
-        ldr.w   pc, [sp], #4
-.L___atomic_compare_exchange_1_026:
-        ldrb    r3, [r1, #0]
-        dmb ish
-.L___atomic_compare_exchange_1_02c:
+        strbne  ip, [r1]
+        pop {pc}        @ (ldr pc, [sp], #4)
+.L___atomic_compare_exchange_1_178:
+        ldrb    r3, [r1]
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_compare_exchange_1_180:
         ldrexb  ip, [r0]
         cmp ip, r3
-        bne.n    .L___atomic_compare_exchange_1_018
+        bne  .L___atomic_compare_exchange_1_168
         strexb  lr, r2, [r0]
-        cmp.w   lr, #0
-        bne.n    .L___atomic_compare_exchange_1_02c
-        dmb ish
-        b.n  .L___atomic_compare_exchange_1_018
+        cmp lr, #0
+        bne  .L___atomic_compare_exchange_1_180
+        mcr     p15, #0, r0, c7, c10, #5
+        b    .L___atomic_compare_exchange_1_168
 	.size   _(__atomic_compare_exchange_1), .-_(__atomic_compare_exchange_1)
 
 #endif
@@ -799,59 +1011,59 @@ _(__atomic_compare_exchange_1):
         .type   _(__atomic_compare_exchange_2), %function
 _(__atomic_compare_exchange_2):
 #ifdef __TINYC__
-        .short 0xb500
-        .short 0xb983
-        .short 0x880b
-        .short 0xe8d0
-        .short 0x459c
-        .short 0xd104
-        .short 0xe8c0
-        .short 0xf1be
-        .short 0xd1f6
-        .short 0xbf0e
-        .short 0x2001
-        .short 0x2000
-        .short 0xf8a1
-        .short 0xf85d
-        .short 0x880b
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0x459c
-        .short 0xd1f1
-        .short 0xe8c0
-        .short 0xf1be
-        .short 0xd1f6
-        .short 0xf3bf
-        .short 0xe7e9
+        .int 0xe52de004
+        .int 0xe3530000
+        .int 0x1a00000a
+        .int 0xe1d130b0
+        .int 0xe1f0cf9f
+        .int 0xe15c0003
+        .int 0x1a000002
+        .int 0xe1e0ef92
+        .int 0xe35e0000
+        .int 0x1afffff9
+        .int 0x03a00001
+        .int 0x13a00000
+        .int 0x11c1c0b0
+        .int 0xe49df004
+        .int 0xe1d130b0
+        .int 0xee070fba
+        .int 0xe1f0cf9f
+        .int 0xe15c0003
+        .int 0x1afffff6
+        .int 0xe1e0ef92
+        .int 0xe35e0000
+        .int 0x1afffff9
+        .int 0xee070fba
+        .int 0xeafffff1
 #else
-        push    {lr}
-        cbnz    r3,  .L___atomic_compare_exchange_2_026
-        ldrh    r3, [r1, #0]
-.L___atomic_compare_exchange_2_006:
+        push    {lr}        @ (str lr, [sp, #-4]!)
+        cmp r3, #0
+        bne  .L___atomic_compare_exchange_2_1d8
+        ldrh    r3, [r1]
+.L___atomic_compare_exchange_2_1b0:
         ldrexh  ip, [r0]
         cmp ip, r3
-        bne.n    .L___atomic_compare_exchange_2_018
+        bne  .L___atomic_compare_exchange_2_1c8
         strexh  lr, r2, [r0]
-        cmp.w   lr, #0
-        bne.n    .L___atomic_compare_exchange_2_006
-.L___atomic_compare_exchange_2_018:
-        itee    eq
+        cmp lr, #0
+        bne  .L___atomic_compare_exchange_2_1b0
+.L___atomic_compare_exchange_2_1c8:
         moveq   r0, #1
         movne   r0, #0
-        strhne.w    ip, [r1]
-        ldr.w   pc, [sp], #4
-.L___atomic_compare_exchange_2_026:
-        ldrh    r3, [r1, #0]
-        dmb ish
-.L___atomic_compare_exchange_2_02c:
+        strhne  ip, [r1]
+        pop {pc}        @ (ldr pc, [sp], #4)
+.L___atomic_compare_exchange_2_1d8:
+        ldrh    r3, [r1]
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_compare_exchange_2_1e0:
         ldrexh  ip, [r0]
         cmp ip, r3
-        bne.n    .L___atomic_compare_exchange_2_018
+        bne  .L___atomic_compare_exchange_2_1c8
         strexh  lr, r2, [r0]
-        cmp.w   lr, #0
-        bne.n    .L___atomic_compare_exchange_2_02c
-        dmb ish
-        b.n  .L___atomic_compare_exchange_2_018
+        cmp lr, #0
+        bne  .L___atomic_compare_exchange_2_1e0
+        mcr     p15, #0, r0, c7, c10, #5
+        b    .L___atomic_compare_exchange_2_1c8
 	.size   _(__atomic_compare_exchange_2), .-_(__atomic_compare_exchange_2)
 
 #endif
@@ -859,61 +1071,61 @@ _(__atomic_compare_exchange_2):
         .type   _(__atomic_compare_exchange_4), %function
 _(__atomic_compare_exchange_4):
 #ifdef __TINYC__
-        .short 0xb410
-        .short 0xb983
-        .short 0x680b
-        .short 0xe850
-        .short 0x429c
-        .short 0xd104
-        .short 0xe840
-        .short 0xf1bc
-        .short 0xd1f6
-        .short 0xbf0e
-        .short 0x2001
-        .short 0x2000
-        .short 0x600c
-        .short 0xf85d
-        .short 0x4770
-        .short 0x680b
-        .short 0xf3bf
-        .short 0xe850
-        .short 0x429c
-        .short 0xd1f1
-        .short 0xe840
-        .short 0xf1bc
-        .short 0xd1f6
-        .short 0xf3bf
-        .short 0xe7e9
+        .int 0xe52d4004
+        .int 0xe3530000
+        .int 0x1a00000b
+        .int 0xe5913000
+        .int 0xe1904f9f
+        .int 0xe1540003
+        .int 0x1a000002
+        .int 0xe180cf92
+        .int 0xe35c0000
+        .int 0x1afffff9
+        .int 0x03a00001
+        .int 0x13a00000
+        .int 0x15814000
+        .int 0xe49d4004
+        .int 0xe12fff1e
+        .int 0xe5913000
+        .int 0xee070fba
+        .int 0xe1904f9f
+        .int 0xe1540003
+        .int 0x1afffff5
+        .int 0xe180cf92
+        .int 0xe35c0000
+        .int 0x1afffff9
+        .int 0xee070fba
+        .int 0xeafffff0
 #else
-        push    {r4}
-        cbnz    r3,  .L___atomic_compare_exchange_4_026
-        ldr r3, [r1, #0]
-.L___atomic_compare_exchange_4_006:
+        push    {r4}        @ (str r4, [sp, #-4]!)
+        cmp r3, #0
+        bne  .L___atomic_compare_exchange_4_23c
+        ldr r3, [r1]
+.L___atomic_compare_exchange_4_210:
         ldrex   r4, [r0]
         cmp r4, r3
-        bne.n    .L___atomic_compare_exchange_4_018
+        bne  .L___atomic_compare_exchange_4_228
         strex   ip, r2, [r0]
-        cmp.w   ip, #0
-        bne.n    .L___atomic_compare_exchange_4_006
-.L___atomic_compare_exchange_4_018:
-        itee    eq
+        cmp ip, #0
+        bne  .L___atomic_compare_exchange_4_210
+.L___atomic_compare_exchange_4_228:
         moveq   r0, #1
         movne   r0, #0
-        strne   r4, [r1, #0]
-        ldr.w   r4, [sp], #4
+        strne   r4, [r1]
+        pop {r4}        @ (ldr r4, [sp], #4)
         bx  lr
-.L___atomic_compare_exchange_4_026:
-        ldr r3, [r1, #0]
-        dmb ish
-.L___atomic_compare_exchange_4_02c:
+.L___atomic_compare_exchange_4_23c:
+        ldr r3, [r1]
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_compare_exchange_4_244:
         ldrex   r4, [r0]
         cmp r4, r3
-        bne.n    .L___atomic_compare_exchange_4_018
+        bne  .L___atomic_compare_exchange_4_228
         strex   ip, r2, [r0]
-        cmp.w   ip, #0
-        bne.n    .L___atomic_compare_exchange_4_02c
-        dmb ish
-        b.n  .L___atomic_compare_exchange_4_018
+        cmp ip, #0
+        bne  .L___atomic_compare_exchange_4_244
+        mcr     p15, #0, r0, c7, c10, #5
+        b    .L___atomic_compare_exchange_4_228
 	.size   _(__atomic_compare_exchange_4), .-_(__atomic_compare_exchange_4)
 
 #endif
@@ -921,75 +1133,71 @@ _(__atomic_compare_exchange_4):
         .type   _(__atomic_compare_exchange_8), %function
 _(__atomic_compare_exchange_8):
 #ifdef __TINYC__
-        .short 0xb4f0
-        .short 0x461d
-        .short 0x9b04
-        .short 0x4614
-        .short 0xb99b
-        .short 0xe9d1
-        .short 0xe8d0
-        .short 0x429f
-        .short 0xbf08
-        .short 0x4296
-        .short 0xd104
-        .short 0xe8c0
-        .short 0xf1bc
-        .short 0xd1f4
-        .short 0xbf0e
-        .short 0x2001
-        .short 0x2000
-        .short 0xe9c1
-        .short 0xbcf0
-        .short 0x4770
-        .short 0xe9d1
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0x429f
-        .short 0xbf08
-        .short 0x4296
-        .short 0xd1ee
-        .short 0xe8c0
-        .short 0xf1bc
-        .short 0xd1f4
-        .short 0xf3bf
-        .short 0xe7e6
+        .int 0xe92d00f0
+        .int 0xe1a05003
+        .int 0xe59d3010
+        .int 0xe1a04002
+        .int 0xe3530000
+        .int 0x1a00000c
+        .int 0xe1c120d0
+        .int 0xe1b06f9f
+        .int 0xe1570003
+        .int 0x01560002
+        .int 0x1a000002
+        .int 0xe1a0cf94
+        .int 0xe35c0000
+        .int 0x1afffff8
+        .int 0x03a00001
+        .int 0x13a00000
+        .int 0x11c160f0
+        .int 0xe8bd00f0
+        .int 0xe12fff1e
+        .int 0xe1c120d0
+        .int 0xee070fba
+        .int 0xe1b06f9f
+        .int 0xe1570003
+        .int 0x01560002
+        .int 0x1afffff4
+        .int 0xe1a0cf94
+        .int 0xe35c0000
+        .int 0x1afffff8
+        .int 0xee070fba
+        .int 0xeaffffef
 #else
         push    {r4, r5, r6, r7}
         mov r5, r3
         ldr r3, [sp, #16]
         mov r4, r2
-        cbnz    r3,  .L___atomic_compare_exchange_8_032
-        ldrd    r2, r3, [r1]
-.L___atomic_compare_exchange_8_00e:
-        ldrexd  r6, r7, [r0]
+        cmp r3, #0
+        bne  .L___atomic_compare_exchange_8_2b0
+        ldrd    r2, [r1]
+.L___atomic_compare_exchange_8_280:
+        ldrexd  r6, [r0]
         cmp r7, r3
-        it  eq
         cmpeq   r6, r2
-        bne.n    .L___atomic_compare_exchange_8_024
-        strexd  ip, r4, r5, [r0]
-        cmp.w   ip, #0
-        bne.n    .L___atomic_compare_exchange_8_00e
-.L___atomic_compare_exchange_8_024:
-        itee    eq
+        bne  .L___atomic_compare_exchange_8_29c
+        strexd  ip, r4, [r0]
+        cmp ip, #0
+        bne  .L___atomic_compare_exchange_8_280
+.L___atomic_compare_exchange_8_29c:
         moveq   r0, #1
         movne   r0, #0
-        strdne  r6, r7, [r1]
+        strdne  r6, [r1]
         pop {r4, r5, r6, r7}
         bx  lr
-.L___atomic_compare_exchange_8_032:
-        ldrd    r2, r3, [r1]
-        dmb ish
-.L___atomic_compare_exchange_8_03a:
-        ldrexd  r6, r7, [r0]
+.L___atomic_compare_exchange_8_2b0:
+        ldrd    r2, [r1]
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_compare_exchange_8_2b8:
+        ldrexd  r6, [r0]
         cmp r7, r3
-        it  eq
         cmpeq   r6, r2
-        bne.n    .L___atomic_compare_exchange_8_024
-        strexd  ip, r4, r5, [r0]
-        cmp.w   ip, #0
-        bne.n    .L___atomic_compare_exchange_8_03a
-        dmb ish
-        b.n  .L___atomic_compare_exchange_8_024
+        bne  .L___atomic_compare_exchange_8_29c
+        strexd  ip, r4, [r0]
+        cmp ip, #0
+        bne  .L___atomic_compare_exchange_8_2b8
+        mcr     p15, #0, r0, c7, c10, #5
+        b    .L___atomic_compare_exchange_8_29c
 	.size   _(__atomic_compare_exchange_8), .-_(__atomic_compare_exchange_8)
 
 #endif
@@ -997,41 +1205,43 @@ _(__atomic_compare_exchange_8):
         .type   _(__atomic_test_and_set_1), %function
 _(__atomic_test_and_set_1):
 #ifdef __TINYC__
-        .short 0xf04f
-        .short 0xb939
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0x4770
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3a02001
+        .int 0xe3510000
+        .int 0x1a000005
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        mov.w   r2, #1
-        cbnz    r1,  .L___atomic_test_and_set_1_016
-.L___atomic_test_and_set_1_006:
+        mov r2, #1
+        cmp r1, #0
+        bne  .L___atomic_test_and_set_1_300
+.L___atomic_test_and_set_1_2e8:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_1_006
+        bne  .L___atomic_test_and_set_1_2e8
         uxtb    r0, r3
         bx  lr
-.L___atomic_test_and_set_1_016:
-        dmb ish
-.L___atomic_test_and_set_1_01a:
+.L___atomic_test_and_set_1_300:
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_test_and_set_1_304:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_1_01a
+        bne  .L___atomic_test_and_set_1_304
         uxtb    r0, r3
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_test_and_set_1), .-_(__atomic_test_and_set_1)
 
@@ -1040,41 +1250,43 @@ _(__atomic_test_and_set_1):
         .type   _(__atomic_test_and_set_2), %function
 _(__atomic_test_and_set_2):
 #ifdef __TINYC__
-        .short 0xf04f
-        .short 0xb939
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0x4770
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3a02001
+        .int 0xe3510000
+        .int 0x1a000005
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        mov.w   r2, #1
-        cbnz    r1,  .L___atomic_test_and_set_2_016
-.L___atomic_test_and_set_2_006:
+        mov r2, #1
+        cmp r1, #0
+        bne  .L___atomic_test_and_set_2_344
+.L___atomic_test_and_set_2_32c:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_2_006
+        bne  .L___atomic_test_and_set_2_32c
         uxtb    r0, r3
         bx  lr
-.L___atomic_test_and_set_2_016:
-        dmb ish
-.L___atomic_test_and_set_2_01a:
+.L___atomic_test_and_set_2_344:
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_test_and_set_2_348:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_2_01a
+        bne  .L___atomic_test_and_set_2_348
         uxtb    r0, r3
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_test_and_set_2), .-_(__atomic_test_and_set_2)
 
@@ -1083,41 +1295,43 @@ _(__atomic_test_and_set_2):
         .type   _(__atomic_test_and_set_4), %function
 _(__atomic_test_and_set_4):
 #ifdef __TINYC__
-        .short 0xf04f
-        .short 0xb939
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0x4770
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3a02001
+        .int 0xe3510000
+        .int 0x1a000005
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        mov.w   r2, #1
-        cbnz    r1,  .L___atomic_test_and_set_4_016
-.L___atomic_test_and_set_4_006:
+        mov r2, #1
+        cmp r1, #0
+        bne  .L___atomic_test_and_set_4_388
+.L___atomic_test_and_set_4_370:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_4_006
+        bne  .L___atomic_test_and_set_4_370
         uxtb    r0, r3
         bx  lr
-.L___atomic_test_and_set_4_016:
-        dmb ish
-.L___atomic_test_and_set_4_01a:
+.L___atomic_test_and_set_4_388:
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_test_and_set_4_38c:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_4_01a
+        bne  .L___atomic_test_and_set_4_38c
         uxtb    r0, r3
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_test_and_set_4), .-_(__atomic_test_and_set_4)
 
@@ -1126,41 +1340,43 @@ _(__atomic_test_and_set_4):
         .type   _(__atomic_test_and_set_8), %function
 _(__atomic_test_and_set_8):
 #ifdef __TINYC__
-        .short 0xf04f
-        .short 0xb939
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0x4770
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3a02001
+        .int 0xe3510000
+        .int 0x1a000005
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xe12fff1e
+        .int 0xee070fba
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        mov.w   r2, #1
-        cbnz    r1,  .L___atomic_test_and_set_8_016
-.L___atomic_test_and_set_8_006:
+        mov r2, #1
+        cmp r1, #0
+        bne  .L___atomic_test_and_set_8_3cc
+.L___atomic_test_and_set_8_3b4:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_8_006
+        bne  .L___atomic_test_and_set_8_3b4
         uxtb    r0, r3
         bx  lr
-.L___atomic_test_and_set_8_016:
-        dmb ish
-.L___atomic_test_and_set_8_01a:
+.L___atomic_test_and_set_8_3cc:
+        mcr     p15, #0, r0, c7, c10, #5
+.L___atomic_test_and_set_8_3d0:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L___atomic_test_and_set_8_01a
+        bne  .L___atomic_test_and_set_8_3d0
         uxtb    r0, r3
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(__atomic_test_and_set_8), .-_(__atomic_test_and_set_8)
 
@@ -1169,10 +1385,10 @@ _(__atomic_test_and_set_8):
         .type   _(atomic_thread_fence), %function
 _(atomic_thread_fence):
 #ifdef __TINYC__
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(atomic_thread_fence), .-_(atomic_thread_fence)
 
@@ -1181,7 +1397,7 @@ _(atomic_thread_fence):
         .type   _(atomic_signal_fence), %function
 _(atomic_signal_fence):
 #ifdef __TINYC__
-        .short 0x4770
+        .int 0xe12fff1e
 #else
         bx  lr
 	.size   _(atomic_signal_fence), .-_(atomic_signal_fence)
@@ -1191,25 +1407,25 @@ _(atomic_signal_fence):
         .type   _(atomic_flag_test_and_set), %function
 _(atomic_flag_test_and_set):
 #ifdef __TINYC__
-        .short 0xf04f
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3a02001
+        .int 0xee070fba
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        mov.w   r2, #1
-        dmb ish
-.L_atomic_flag_test_and_set_008:
+        mov r2, #1
+        mcr     p15, #0, r0, c7, c10, #5
+.L_atomic_flag_test_and_set_400:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L_atomic_flag_test_and_set_008
+        bne  .L_atomic_flag_test_and_set_400
         uxtb    r0, r3
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(atomic_flag_test_and_set), .-_(atomic_flag_test_and_set)
 
@@ -1218,25 +1434,25 @@ _(atomic_flag_test_and_set):
         .type   _(atomic_flag_test_and_set_explicit), %function
 _(atomic_flag_test_and_set_explicit):
 #ifdef __TINYC__
-        .short 0xf04f
-        .short 0xf3bf
-        .short 0xe8d0
-        .short 0xe8c0
-        .short 0x2900
-        .short 0xd1f9
-        .short 0xb2d8
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3a02001
+        .int 0xee070fba
+        .int 0xe1d03f9f
+        .int 0xe1c01f92
+        .int 0xe3510000
+        .int 0x1afffffb
+        .int 0xe6ef0073
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
-        mov.w   r2, #1
-        dmb ish
-.L_atomic_flag_test_and_set_explicit_024:
+        mov r2, #1
+        mcr     p15, #0, r0, c7, c10, #5
+.L_atomic_flag_test_and_set_explicit_424:
         ldrexb  r3, [r0]
         strexb  r1, r2, [r0]
         cmp r1, #0
-        bne.n    .L_atomic_flag_test_and_set_explicit_024
+        bne  .L_atomic_flag_test_and_set_explicit_424
         uxtb    r0, r3
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(atomic_flag_test_and_set_explicit), .-_(atomic_flag_test_and_set_explicit)
 
@@ -1245,16 +1461,16 @@ _(atomic_flag_test_and_set_explicit):
         .type   _(atomic_flag_clear), %function
 _(atomic_flag_clear):
 #ifdef __TINYC__
-        .short 0x2300
-        .short 0xf3bf
-        .short 0x7003
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3b03000
+        .int 0xee070fba
+        .int 0xe5c03000
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
         movs    r3, #0
-        dmb ish
-        strb    r3, [r0, #0]
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
+        strb    r3, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(atomic_flag_clear), .-_(atomic_flag_clear)
 
@@ -1263,16 +1479,16 @@ _(atomic_flag_clear):
         .type   _(atomic_flag_clear_explicit), %function
 _(atomic_flag_clear_explicit):
 #ifdef __TINYC__
-        .short 0x2300
-        .short 0xf3bf
-        .short 0x7003
-        .short 0xf3bf
-        .short 0x4770
+        .int 0xe3b03000
+        .int 0xee070fba
+        .int 0xe5c03000
+        .int 0xee070fba
+        .int 0xe12fff1e
 #else
         movs    r3, #0
-        dmb ish
-        strb    r3, [r0, #0]
-        dmb ish
+        mcr     p15, #0, r0, c7, c10, #5
+        strb    r3, [r0]
+        mcr     p15, #0, r0, c7, c10, #5
         bx  lr
 	.size   _(atomic_flag_clear_explicit), .-_(atomic_flag_clear_explicit)
 
@@ -1282,7 +1498,6 @@ _(atomic_flag_clear_explicit):
 /* ---------------------------------------------- */
 #if defined __aarch64__
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
@@ -1901,7 +2116,6 @@ _(atomic_flag_clear_explicit):
 /* ---------------------------------------------- */
 #if defined __riscv
         .text
-        .align  2
 
         .global _(__atomic_load_1)
         .type   _(__atomic_load_1), %function
