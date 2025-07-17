@@ -233,6 +233,7 @@ ST_FUNC void load(int r, SValue *sv)
     int v = fr & VT_VALMASK;
     int rr = is_ireg(r) ? ireg(r) : freg(r);
     int fc = sv->c.i;
+    int save_fc = fc;
     int bt = sv->type.t & VT_BTYPE;
     int align, size;
     if (fr & VT_LVAL) {
@@ -370,6 +371,7 @@ ST_FUNC void load(int r, SValue *sv)
         EI(0x13, 0, rr, 0, t ^ 1);  // addi RR, x0, !t
     } else
       tcc_error("unimp: load(non-const)");
+    sv->c.i = save_fc;
 }
 
 ST_FUNC void store(int r, SValue *sv)
@@ -377,6 +379,7 @@ ST_FUNC void store(int r, SValue *sv)
     int fr = sv->r & VT_VALMASK;
     int rr = is_ireg(r) ? ireg(r) : freg(r), ptrreg;
     int fc = sv->c.i;
+    int save_fc = fc;
     int bt = sv->type.t & VT_BTYPE;
     int align, size = type_size(&sv->type, &align);
     assert(!is_float(bt) || is_freg(r) || bt == VT_LDOUBLE);
@@ -413,6 +416,7 @@ ST_FUNC void store(int r, SValue *sv)
     ES(is_freg(r) ? 0x27 : 0x23,                          // fs... | s...
        size == 1 ? 0 : size == 2 ? 1 : size == 4 ? 2 : 3, // ... [wd] | [bhwd]
        ptrreg, rr, fc);                                   // RR, fc(base)
+    sv->c.i = save_fc;
 }
 
 static void gcall_or_jmp(int docall)
