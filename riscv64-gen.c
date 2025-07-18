@@ -222,7 +222,7 @@ static void load_large_constant(int rr, int fc, uint32_t pi)
     EI(0x13, 1, rr, rr, 12); // slli RR, RR, 12
     EI(0x13, 0, rr, rr, (fc + (1 << 19)) >> 20);  // addi RR, RR, up(lo(fc))
     EI(0x13, 1, rr, rr, 12); // slli RR, RR, 12
-    fc = fc << 12 >> 12;
+    fc = (fc + (1 << 7)) << 12 >> 12;
     EI(0x13, 0, rr, rr, fc >> 8);  // addi RR, RR, lo1(lo(fc))
     EI(0x13, 1, rr, rr, 8); // slli RR, RR, 8
 }
@@ -233,7 +233,7 @@ ST_FUNC void load(int r, SValue *sv)
     int v = fr & VT_VALMASK;
     int rr = is_ireg(r) ? ireg(r) : freg(r);
     int fc = sv->c.i;
-    int save_fc = fc;
+    uint64_t save_fc = sv->c.i;
     int bt = sv->type.t & VT_BTYPE;
     int align, size;
     if (fr & VT_LVAL) {
@@ -264,7 +264,7 @@ ST_FUNC void load(int r, SValue *sv)
             si >>= 32;
             if (si != 0) {
 		load_large_constant(rr, fc, si);
-                fc &= 0xff;
+                fc = fc << 24 >> 24;
             } else {
                 o(0x37 | (rr << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
                 fc = fc << 20 >> 20;
@@ -289,7 +289,7 @@ ST_FUNC void load(int r, SValue *sv)
             si >>= 32;
             if (si != 0) {
 		load_large_constant(rr, fc, si);
-                fc &= 0xff;
+                fc = fc << 24 >> 24;
                 rb = rr;
                 do32bit = 0;
             } else if (bt == VT_LLONG) {
@@ -379,7 +379,7 @@ ST_FUNC void store(int r, SValue *sv)
     int fr = sv->r & VT_VALMASK;
     int rr = is_ireg(r) ? ireg(r) : freg(r), ptrreg;
     int fc = sv->c.i;
-    int save_fc = fc;
+    uint64_t save_fc = sv->c.i;
     int bt = sv->type.t & VT_BTYPE;
     int align, size = type_size(&sv->type, &align);
     assert(!is_float(bt) || is_freg(r) || bt == VT_LDOUBLE);
@@ -406,7 +406,7 @@ ST_FUNC void store(int r, SValue *sv)
         si >>= 32;
         if (si != 0) {
 	    load_large_constant(ptrreg, fc, si);
-            fc &= 0xff;
+            fc = fc << 24 >> 24;
         } else {
             o(0x37 | (ptrreg << 7) | ((0x800 + fc) & 0xfffff000)); //lui RR, upper(fc)
             fc = fc << 20 >> 20;
