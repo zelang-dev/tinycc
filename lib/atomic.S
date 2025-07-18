@@ -14,6 +14,9 @@
  * atomic_flag_clear
  * atomic_flag_clear_explicit
  */
+/* SPDX-License-Identifier: GPL-3.0-or-later WITH GCC-exception-3.1
+ * Copyright (C) 2012-2025 Free Software Foundation, Inc.
+ */
 #ifdef __leading_underscore
 # define _(s) _##s
 #else
