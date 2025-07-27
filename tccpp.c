@@ -157,7 +157,7 @@ typedef struct TinyAlloc {
 } TinyAlloc;
 
 typedef struct tal_header_t {
-    unsigned  size;
+    ALIGNED(PTR_SIZE) unsigned size;
 #ifdef TAL_DEBUG
     int     line_num; /* negative line_num used for double free check */
     char    file_name[TAL_DEBUG_FILE_LEN + 1];
@@ -246,7 +246,7 @@ static void *tal_realloc_impl(TinyAlloc **pal, void *p, unsigned size TAL_DEBUG_
     tal_header_t *header;
     void *ret;
     int is_own;
-    unsigned adj_size = (size + 3) & -4;
+    unsigned adj_size = (size + PTR_SIZE - 1) & -PTR_SIZE;
     TinyAlloc *al = *pal;
 
 tail_call:

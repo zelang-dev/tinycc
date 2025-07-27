@@ -136,7 +136,7 @@ enum {
 # define OP_EA32  0
 #endif
 
-#define OP_EA     0x40000000
+#define OP_EA     0x40000000u
 #define OP_REG    (OP_REG8 | OP_REG16 | OP_REG32 | OP_REG64)
 
 #ifdef TCC_TARGET_X86_64

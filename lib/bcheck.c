@@ -351,7 +351,7 @@ static unsigned char print_heap;
 static unsigned char print_statistic;
 static unsigned char no_strdup;
 static unsigned char use_sem;
-static int never_fatal;
+static _Atomic int never_fatal;
 #if HAVE_TLS_FUNC
 #if defined(_WIN32)
 static int no_checking = 0;
@@ -393,7 +393,7 @@ static __thread int no_checking = 0;
 #define NO_CHECKING_GET()  no_checking
 #define NO_CHECKING_SET(v) no_checking = v 
 #else
-static int no_checking = 0;
+static _Atomic int no_checking = 0;
 #define NO_CHECKING_GET()  no_checking
 #define NO_CHECKING_SET(v) no_checking = v 
 #endif

@@ -314,7 +314,7 @@ PUB_FUNC char *tcc_strdup(const char *str)
 #define MEM_DEBUG_MAGIC3 0xFEEDDEB3
 #define MEM_DEBUG_FILE_LEN 40
 #define MEM_DEBUG_CHECK3(header) \
-    ((mem_debug_header_t*)((char*)header + header->size))->magic3
+    (((unsigned char *) header->magic3) + header->size)
 #define MEM_USER_PTR(header) \
     ((char *)header + offsetof(mem_debug_header_t, magic3))
 #define MEM_HEADER_PTR(ptr) \
