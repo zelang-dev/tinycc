@@ -1129,6 +1129,7 @@ static void relocate_section(TCCState *s1, Section *s, Section *sr)
 
     qrel = (ElfW_Rel *)sr->data;
     for_each_elem(sr, 0, rel, ElfW_Rel) {
+	if (s->data == NULL) continue; /* bss */
         ptr = s->data + rel->r_offset;
         sym_index = ELFW(R_SYM)(rel->r_info);
         sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
@@ -1595,7 +1596,8 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
 
     s = data_section;
     /* Align to PTR_SIZE */
-    section_ptr_add(s, -s->data_offset & (PTR_SIZE - 1));
+    if (s->data_offset)
+        section_ptr_add(s, -s->data_offset & (PTR_SIZE - 1));
     o = s->data_offset;
     /* create a struct rt_context (see tccrun.c) */
     if (s1->dwarf) {
@@ -3257,7 +3259,7 @@ invalid:
         sm_table[i].s = s;
         /* concatenate sections */
         size = sh->sh_size;
-        if (sh->sh_type != SHT_NOBITS) {
+        if (sh->sh_type != SHT_NOBITS && size) {
             unsigned char *ptr;
             lseek(fd, file_offset + sh->sh_offset, SEEK_SET);
             ptr = section_ptr_add(s, size);
@@ -3308,6 +3310,7 @@ invalid:
     /* resolve symbols */
     old_to_new_syms = tcc_mallocz(nb_syms * sizeof(int));
 
+    if (nb_syms == 0) goto skip;
     sym = symtab + 1;
     for(i = 1; i < nb_syms; i++, sym++) {
         if (sym->st_shndx != SHN_UNDEF &&
@@ -3340,7 +3343,7 @@ invalid:
                                 sym->st_shndx, name);
         old_to_new_syms[i] = sym_index;
     }
-
+skip:
     /* third pass to patch relocation entries */
     for(i = 1; i < ehdr.e_shnum; i++) {
         s = sm_table[i].s;
