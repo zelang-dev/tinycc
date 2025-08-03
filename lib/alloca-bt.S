@@ -15,10 +15,10 @@ _(__bound_alloca):
     pop     %edx
     pop     %eax
     mov     %eax, %ecx
+    test    %eax,%eax
+    jz      p6
     add     $15+1,%eax
     and     $-16,%eax
-    sub     $4,%eax
-    jz      p6
 
 #ifdef _WIN32
 p4:
@@ -33,6 +33,7 @@ p5:
 #endif
 
     sub     %eax,%esp
+    and     $-16,%esp
     mov     %esp,%eax
 
     push    %edx
