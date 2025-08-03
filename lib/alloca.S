@@ -16,8 +16,9 @@ _(__alloca):
     push    %ebp
     mov     %esp,%ebp
     mov     8(%ebp),%eax
-    add     $3,%eax
-    and     $-4,%eax
+    add     $15,%eax
+    and     $-16,%eax
+    sub     $4,%eax
 #ifdef _WIN32
     jmp     .+16 #p2
 p1:

@@ -1503,7 +1503,7 @@ void gfunc_prolog(Sym *func_sym)
 	gen_le32(seen_stack_size);
 	/* movq %r11, -0x10(%rbp) */
 	o(0xf05d894c);
-	/* leaq $-192(%rbp), %r11 */
+	/* leaq $-200(%rbp), %r11 */
 	o(0x9d8d4c);
 	gen_le32(-176 - 24);
 	/* movq %r11, -0x8(%rbp) */
