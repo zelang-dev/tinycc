@@ -1129,7 +1129,8 @@ static void relocate_section(TCCState *s1, Section *s, Section *sr)
 
     qrel = (ElfW_Rel *)sr->data;
     for_each_elem(sr, 0, rel, ElfW_Rel) {
-	if (s->data == NULL) continue; /* bss */
+	if (s->data == NULL) /* bss */
+	    continue;
         ptr = s->data + rel->r_offset;
         sym_index = ELFW(R_SYM)(rel->r_info);
         sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
@@ -3310,7 +3311,6 @@ invalid:
     /* resolve symbols */
     old_to_new_syms = tcc_mallocz(nb_syms * sizeof(int));
 
-    if (nb_syms == 0) goto skip;
     sym = symtab + 1;
     for(i = 1; i < nb_syms; i++, sym++) {
         if (sym->st_shndx != SHN_UNDEF &&
@@ -3343,7 +3343,7 @@ invalid:
                                 sym->st_shndx, name);
         old_to_new_syms[i] = sym_index;
     }
-skip:
+
     /* third pass to patch relocation entries */
     for(i = 1; i < ehdr.e_shnum; i++) {
         s = sm_table[i].s;

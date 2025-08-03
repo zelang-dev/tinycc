@@ -36,6 +36,7 @@
 #include <assert.h>
 
 #define UPPER(x)	(((unsigned)(x) + 0x800u) & 0xfffff000)
+#define LOW_OVERFLOW(x)	UPPER(x)
 #define SIGN7(x)	((((x) & 0xff) ^ 0x80) - 0x80)
 #define SIGN11(x)	((((x) & 0xfff) ^ 0x800) - 0x800)
 
@@ -135,14 +136,14 @@ static void ER(uint32_t opcode, uint32_t func3,
 static void EI(uint32_t opcode, uint32_t func3,
                uint32_t rd, uint32_t rs1, uint32_t imm)
 {
-    assert(! ((imm + (1 << 11)) >> 12));
+    assert(! LOW_OVERFLOW(imm));
     EIu(opcode, func3, rd, rs1, imm);
 }
 
 static void ES(uint32_t opcode, uint32_t func3,
                uint32_t rs1, uint32_t rs2, uint32_t imm)
 {
-    assert(! ((imm + (1 << 11)) >> 12));
+    assert(! LOW_OVERFLOW(imm));
     o(opcode | (func3 << 12) | ((imm & 0x1f) << 7) | (rs1 << 15)
       | (rs2 << 20) | ((imm >> 5) << 25));
 }
@@ -158,7 +159,7 @@ ST_FUNC void gsym_addr(int t_, int a_)
         uint32_t r = a - t, imm;
         if ((r + (1 << 21)) & ~((1U << 22) - 2))
           tcc_error("out-of-range branch chain");
-        imm =   (((r >> 12) &  0xff) << 12)
+        imm = (((r >> 12) &  0xff) << 12)
             | (((r >> 11) &     1) << 20)
             | (((r >>  1) & 0x3ff) << 21)
             | (((r >> 20) &     1) << 31);
@@ -179,7 +180,7 @@ static int load_symofs(int r, SValue *sv, int forstore, int *new_fc)
                     R_RISCV_PCREL_HI20, sv->c.i);
             *new_fc = 0;
         } else {
-            if (((unsigned)fc + (1 << 11)) >> 12){
+            if (LOW_OVERFLOW(fc)){
               large_addend = 1;
             }
             greloca(cur_text_section, sv->sym, ind,
@@ -206,7 +207,7 @@ static int load_symofs(int r, SValue *sv, int forstore, int *new_fc)
         rr = 8; // s0
         if (fc != sv->c.i)
           tcc_error("unimp: store(giant local off) (0x%lx)", (long)sv->c.i);
-        if (((unsigned)fc + (1 << 11)) >> 12) {
+        if (LOW_OVERFLOW(fc)) {
             rr = is_ireg(r) ? ireg(r) : 5; // t0
             o(0x37 | (rr << 7) | UPPER(fc)); //lui RR, upper(fc)
             ER(0x33, 0, rr, rr, 8, 0); // add RR, RR, s0
@@ -251,7 +252,7 @@ ST_FUNC void load(int r, SValue *sv)
             br = load_symofs(r, sv, 0, &fc);
         } else if (v < VT_CONST) {
             br = ireg(v);
-            /*if (((unsigned)fc + (1 << 11)) >> 12)
+            /*if (LOW_OVERFLOW(fc))
               tcc_error("unimp: load(large addend) (0x%x)", fc);*/
             fc = 0; // XXX store ofs in LVAL(reg)
         } else if (v == VT_LLOCAL) {
@@ -297,7 +298,7 @@ ST_FUNC void load(int r, SValue *sv)
                 zext = 1;
             }
         }
-        if (((unsigned)fc + (1 << 11)) >> 12)
+        if (LOW_OVERFLOW(fc))
             o(0x37 | (rr << 7) | UPPER(fc)), rb = rr; //lui RR, upper(fc)
         if (fc || (rr != rb) || do32bit || (fr & VT_SYM))
           EI(0x13 | do32bit, 0, rr, rb, SIGN11(fc)); // addi[w] R, x0|R, FC
@@ -392,7 +393,7 @@ ST_FUNC void store(int r, SValue *sv)
         ptrreg = load_symofs(-1, sv, 1, &fc);
     } else if (fr < VT_CONST) {
         ptrreg = ireg(fr);
-        /*if (((unsigned)fc + (1 << 11)) >> 12)
+        /*if (LOW_OVERFLOW(fc))
           tcc_error("unimp: store(large addend) (0x%x)", fc);*/
         fc = 0; // XXX support offsets regs
     } else if (fr == VT_CONST) {
@@ -1014,7 +1015,7 @@ static void gen_opil(int op, int ll)
     ll = ll ? 0 : 8;
     if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == VT_CONST) {
         int fc = vtop->c.i;
-        if (fc == vtop->c.i && !(((unsigned)fc + (1 << 11)) >> 12)) {
+        if (fc == vtop->c.i && !LOW_OVERFLOW(fc)) {
             int cll = 0;
             int m = ll ? 31 : 63;
             vswap();
@@ -1381,7 +1382,7 @@ ST_FUNC void ggoto(void)
 
 ST_FUNC void gen_vla_sp_save(int addr)
 {
-    if (((unsigned)addr + (1 << 11)) >> 12) {
+    if (LOW_OVERFLOW(addr)) {
 	o(0x37 | (5 << 7) | UPPER(addr)); //lui t0,upper(addr)
         ER(0x33, 0, 5, 5, 8, 0); // add t0, t0, s0
         ES(0x23, 3, 5, 2, SIGN11(addr)); // sd sp, fc(t0)
@@ -1392,7 +1393,7 @@ ST_FUNC void gen_vla_sp_save(int addr)
 
 ST_FUNC void gen_vla_sp_restore(int addr)
 {
-    if (((unsigned)addr + (1 << 11)) >> 12) {
+    if (LOW_OVERFLOW(addr)) {
 	o(0x37 | (5 << 7) | UPPER(addr)); //lui t0,upper(addr)
         ER(0x33, 0, 5, 5, 8, 0); // add t0, t0, s0
         EI(0x03, 3, 2, 5, SIGN11(addr)); // ld sp, fc(t0)
