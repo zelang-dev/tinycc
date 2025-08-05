@@ -204,14 +204,15 @@ int test15(void)
 int test16()
 {
     char *demo = "This is only a test.";
-    char *p;
+    char *p, *q;
 
     p = alloca(16);
     strcpy(p,"12345678901234");
 
     /* Test alloca embedded in a larger expression */
-    printf("alloca : %s : %s\n", p, strcpy(alloca(strlen(demo)+1),demo) );
+    printf("alloca : %s : %s\n", p, strcpy(q=alloca(strlen(demo)+1),demo) );
     allocf(p);
+    allocf(q);
 
     return 0;
 }
@@ -220,14 +221,15 @@ int test16()
 int test17()
 {
     char *demo = "This is only a test.";
-    char *p;
+    char *p, *q;
 
     p = alloca(16);
     strcpy(p,"12345678901234");
 
     /* Test alloca embedded in a larger expression */
-    printf("alloca : %s : %s\n", p, strcpy(alloca(strlen(demo)),demo) );
+    printf("alloca : %s : %s\n", p, strcpy(q=alloca(strlen(demo)),demo) );
     allocf(p);
+    allocf(q);
 
     return 0;
 }
