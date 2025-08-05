@@ -79,7 +79,7 @@ endif
 
 all test :
 	@echo ------------ version ------------
-	@$(TCC_LOCAL) -v
+	@ASAN_OPTIONS=detect_leaks=0 $(TCC_LOCAL) -v
 	@$(MAKE) --no-print-directory -s clean
 	@$(MAKE) --no-print-directory -s -r _all
 

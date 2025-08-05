@@ -318,7 +318,8 @@ ST_FUNC size_t section_add(Section *sec, addr_t size, int align)
 ST_FUNC void *section_ptr_add(Section *sec, addr_t size)
 {
     size_t offset = section_add(sec, size, 1);
-    return sec->data + offset;
+    // clang -fsanitize compains about: NULL+value
+    return sec->data ? sec->data + offset : (void *)offset;
 }
 
 #ifndef ELF_OBJ_ONLY
@@ -1597,8 +1598,7 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
 
     s = data_section;
     /* Align to PTR_SIZE */
-    if (s->data_offset)
-        section_ptr_add(s, -s->data_offset & (PTR_SIZE - 1));
+    section_ptr_add(s, -s->data_offset & (PTR_SIZE - 1));
     o = s->data_offset;
     /* create a struct rt_context (see tccrun.c) */
     if (s1->dwarf) {
@@ -3260,7 +3260,7 @@ invalid:
         sm_table[i].s = s;
         /* concatenate sections */
         size = sh->sh_size;
-        if (sh->sh_type != SHT_NOBITS && size) {
+        if (sh->sh_type != SHT_NOBITS) {
             unsigned char *ptr;
             lseek(fd, file_offset + sh->sh_offset, SEEK_SET);
             ptr = section_ptr_add(s, size);

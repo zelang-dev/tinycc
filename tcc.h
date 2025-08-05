@@ -99,6 +99,11 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #define offsetof(type, field) ((size_t) &((type *)0)->field)
 #endif
 
+#ifdef __clang__ // clang -fsanitize compains about: NULL+value
+#undef offsetof
+#define offsetof(type, field) __builtin_offsetof(type, field)
+#endif
+
 #ifndef countof
 #define countof(tab) (sizeof(tab) / sizeof((tab)[0]))
 #endif

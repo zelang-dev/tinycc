@@ -2055,7 +2055,7 @@ static void parse_escape_string(CString *outstr, const uint8_t *buf, int is_long
                         expect("more hex digits in universal-character-name");
                     else
                         goto add_hex_or_ucn;
-                    n = n * 16 + c;
+                    n = (unsigned) n * 16 + c;
                     p++;
                 } while (--i);
 		if (is_long) {
