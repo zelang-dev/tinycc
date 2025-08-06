@@ -318,8 +318,7 @@ ST_FUNC size_t section_add(Section *sec, addr_t size, int align)
 ST_FUNC void *section_ptr_add(Section *sec, addr_t size)
 {
     size_t offset = section_add(sec, size, 1);
-    // clang -fsanitize compains about: NULL+value
-    return sec->data ? sec->data + offset : (void *)offset;
+    return sec->data + offset;
 }
 
 #ifndef ELF_OBJ_ONLY
@@ -1598,7 +1597,7 @@ ST_FUNC void tcc_add_btstub(TCCState *s1)
 
     s = data_section;
     /* Align to PTR_SIZE */
-    section_ptr_add(s, -s->data_offset & (PTR_SIZE - 1));
+    section_add(s, 0, PTR_SIZE);
     o = s->data_offset;
     /* create a struct rt_context (see tccrun.c) */
     if (s1->dwarf) {
@@ -2837,7 +2836,6 @@ static int elf_output_file(TCCState *s1, const char *filename)
     int textrel, got_sym, dt_flags_1;
 
     file_type = s1->output_type;
-    s1->nb_errors = 0;
     ret = -1;
     interp = dynstr = dynamic = NULL;
     sec_order = NULL;
@@ -3030,7 +3028,6 @@ static int elf_output_obj(TCCState *s1, const char *filename)
 {
     Section *s;
     int i, ret, file_offset;
-    s1->nb_errors = 0;
     /* Allocate strings for section names */
     alloc_sec_names(s1, 1);
     file_offset = (sizeof (ElfW(Ehdr)) + 3) & -4;
@@ -3049,6 +3046,7 @@ static int elf_output_obj(TCCState *s1, const char *filename)
 
 LIBTCCAPI int tcc_output_file(TCCState *s, const char *filename)
 {
+    s->nb_errors = 0;
     if (s->test_coverage)
         tcc_tcov_add_file(s, filename);
     if (s->output_type == TCC_OUTPUT_OBJ)
@@ -3254,21 +3252,19 @@ invalid:
         s->sh_entsize = sh->sh_entsize;
         sm_table[i].new_section = 1;
     found:
+        size = sh->sh_size;
         /* align start of section */
-        s->data_offset += -s->data_offset & (sh->sh_addralign - 1);
+        offset = section_add(s, size, sh->sh_addralign);
         if (sh->sh_addralign > s->sh_addralign)
             s->sh_addralign = sh->sh_addralign;
-        sm_table[i].offset = s->data_offset;
+        sm_table[i].offset = offset;
         sm_table[i].s = s;
         /* concatenate sections */
-        size = sh->sh_size;
-        if (sh->sh_type != SHT_NOBITS) {
+        if (sh->sh_type != SHT_NOBITS && size) {
             unsigned char *ptr;
             lseek(fd, file_offset + sh->sh_offset, SEEK_SET);
-            ptr = section_ptr_add(s, size);
+            ptr = s->data + offset;
             full_read(fd, ptr, size);
-        } else {
-            s->data_offset += size;
         }
 #if defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
         /* align code sections to instruction lenght */
@@ -3309,6 +3305,9 @@ invalid:
             s1->sections[s->sh_info]->reloc = s;
         }
     }
+
+    if (!symtab)
+        goto done;
 
     /* resolve symbols */
     old_to_new_syms = tcc_mallocz(nb_syms * sizeof(int));
@@ -3405,7 +3404,7 @@ invalid:
             break;
         }
     }
-
+ done:
     ret = 0;
  the_end:
     tcc_free(symtab);

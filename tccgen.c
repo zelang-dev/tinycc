@@ -2963,13 +2963,13 @@ static int combine_types(CType *dest, SValue *op1, SValue *op2, int op)
             (t2 & (VT_BTYPE | VT_UNSIGNED)) == (VT_LLONG | VT_UNSIGNED))
           type.t |= VT_UNSIGNED;
     } else {
-	int t1_bit = BIT_SIZE(t1) <= 31 ? VT_BITFIELD : 0;
-	int t2_bit = BIT_SIZE(t2) <= 31 ? VT_BITFIELD : 0;
         /* integer operations */
         type.t = VT_INT | (VT_LONG & (t1 | t2));
         /* convert to unsigned if it does not fit in an integer */
-        if ((t1 & (VT_BTYPE | VT_UNSIGNED | t1_bit)) == (VT_INT | VT_UNSIGNED) ||
-            (t2 & (VT_BTYPE | VT_UNSIGNED | t2_bit)) == (VT_INT | VT_UNSIGNED))
+        if (((t1 & (VT_BTYPE | VT_UNSIGNED)) == (VT_INT | VT_UNSIGNED)
+                && (!(t1 & VT_BITFIELD) || BIT_SIZE(t1) == 32))
+         || ((t2 & (VT_BTYPE | VT_UNSIGNED)) == (VT_INT | VT_UNSIGNED)
+                && (!(t2 & VT_BITFIELD) || BIT_SIZE(t2) == 32)))
           type.t |= VT_UNSIGNED;
     }
     if (dest)
@@ -5615,6 +5615,8 @@ ST_FUNC void unary(void)
 	       as statement expressions can't ever be entered from the
 	       outside, so any reactivation of code emission (from labels
 	       or loop heads) can be disabled again after the end of it. */
+            /* default return value is (void) */
+            vpushi(0), vtop->type.t = VT_VOID;
             block(STMT_EXPR);
             /* If the statement expr can be entered, then we retain the current
                nocode_wanted state (from e.g. a 'return 0;' in the stmt-expr).
@@ -7036,12 +7038,6 @@ static void block(int flags)
     struct scope o;
     Sym *s;
 
-    if (flags & STMT_EXPR) {
-        /* default return value is (void) */
-        vpushi(0);
-        vtop->type.t = VT_VOID;
-    }
-
 again:
     t = tok;
     /* If the token carries a value, next() might destroy it. Only with
@@ -7057,8 +7053,8 @@ again:
         new_scope_s(&o);
         skip('(');
         gexpr();
-        skip(')');
         a = gvtst(1, 0);
+        skip(')');
         block(0);
         if (tok == TOK_ELSE) {
             d = gjmp(0);
@@ -7076,8 +7072,8 @@ again:
         d = gind();
         skip('(');
         gexpr();
-        skip(')');
         a = gvtst(1, 0);
+        skip(')');
         b = 0;
         lblock(&a, &b);
         gjmp_addr(d);
@@ -7105,8 +7101,6 @@ again:
         while (tok != '}') {
 	    decl(VT_LOCAL);
             if (tok != '}') {
-                if (flags & STMT_EXPR)
-                    vpop();
                 block(flags | STMT_COMPOUND);
             }
         }
@@ -7208,9 +7202,9 @@ again:
         skip(TOK_WHILE);
         skip('(');
 	gexpr();
+        c = gvtst(0, 0);
         skip(')');
         skip(';');
-	c = gvtst(0, 0);
 	gsym_addr(c, d);
         gsym(a);
         prev_scope_s(&o);
@@ -7228,9 +7222,9 @@ again:
         new_scope_s(&o);
         skip('(');
         gexpr();
-        skip(')');
         if (!is_integer_btype(vtop->type.t & VT_BTYPE))
             tcc_error("switch value not an integer");
+        skip(')');
         sw->sv = *vtop--; /* save switch value */
         a = 0;
         b = gjmp(0); /* jump to first case */
@@ -8294,6 +8288,9 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
     if (type->t & VT_VLA) {
         int a;
 
+        if (has_init)
+            tcc_error("variable length array cannot be initialized");
+
         if (NODATA_WANTED)
             goto no_alloc;
 
@@ -8513,6 +8510,27 @@ static void do_Static_assert(void)
     skip(';');
 }
 
+#ifdef TCC_TARGET_PE
+static void pe_check_linkage(CType *type, AttributeDef *ad)
+{
+    if (!ad->a.dllimport && !ad->a.dllexport)
+        return;
+    if (type->t & VT_STATIC)
+        tcc_error("cannot have dll linkage with static");
+    if (type->t & VT_TYPEDEF) {
+        const char *m = ad->a.dllimport ? "im" : "ex";
+        tcc_warning("'dll%sport' attribute ignored for typedef", m);
+        ad->a.dllimport = 0;
+        ad->a.dllexport = 0;
+    } else if (ad->a.dllimport) {
+        if ((type->t & VT_BTYPE) == VT_FUNC)
+            ad->a.dllimport = 0;
+        else
+            type->t |= VT_EXTERN;
+    }
+}
+#endif
+
 /* 'l' is VT_LOCAL or VT_CONST to define default storage type
    or VT_CMP if parsing old style parameter list
    or VT_JMP if parsing c99 for decl: for (int i = 0, ...) */
@@ -8559,17 +8577,17 @@ static int decl(int l)
         }
 
         if (tok == ';') {
-	    if ((btype.t & VT_BTYPE) == VT_STRUCT) {
-		v = btype.ref->v;
-		if (!(v & SYM_FIELD) && (v & ~SYM_STRUCT) >= SYM_FIRST_ANOM)
-        	    tcc_warning("unnamed struct/union that defines no instances");
-                next();
-                continue;
-	    }
-            if (IS_ENUM(btype.t)) {
-                next();
-                continue;
-            }
+            if ((btype.t & VT_BTYPE) == VT_STRUCT
+                && (btype.ref->v & ~SYM_STRUCT) < SYM_FIRST_ANOM)
+                ; /* struct decl with named tag */
+            else if (IS_ENUM(btype.t))
+                ; /* enum decl */
+            else
+                tcc_warning("useless type defines no instances");
+            if (l == VT_JMP)
+                return 1;
+            next();
+            continue;
         }
 
         while (1) { /* iterate thru each declaration */
@@ -8637,20 +8655,7 @@ static int decl(int l)
             }
 
 #ifdef TCC_TARGET_PE
-            if (ad.a.dllimport || ad.a.dllexport) {
-                if (type.t & VT_STATIC)
-                    tcc_error("cannot have dll linkage with static");
-                if (type.t & VT_TYPEDEF) {
-                    tcc_warning("'%s' attribute ignored for typedef",
-                        ad.a.dllimport ? (ad.a.dllimport = 0, "dllimport") :
-                        (ad.a.dllexport = 0, "dllexport"));
-                } else if (ad.a.dllimport) {
-                    if ((type.t & VT_BTYPE) == VT_FUNC)
-                        ad.a.dllimport = 0;
-                    else
-                        type.t |= VT_EXTERN;
-                }
-            }
+            pe_check_linkage(&type, &ad);
 #endif
             if (tok == '{') {
                 if (l != VT_CONST)
@@ -8700,6 +8705,7 @@ static int decl(int l)
                 }
                 break;
             } else {
+                has_init = 0;
 		if (l == VT_CMP) {
 		    /* find parameter in function parameter list */
 		    for (sym = func_vt.ref->next; sym; sym = sym->next)
@@ -8747,9 +8753,9 @@ static int decl(int l)
                         /* not lvalue if array */
                         r |= VT_LVAL;
                     }
-                    has_init = (tok == '=');
-                    if (has_init && (type.t & VT_VLA))
-                        tcc_error("variable length array cannot be initialized");
+
+                    if (tok == '=')
+                        has_init = 1;
 
                     if (((type.t & VT_EXTERN) && (!has_init || l != VT_CONST))
 		        || (type.t & VT_BTYPE) == VT_FUNC
@@ -8789,7 +8795,7 @@ static int decl(int l)
                 }
                 if (tok != ',') {
                     if (l == VT_JMP)
-                        return 1;
+                        return has_init ? v : 1;
                     skip(';');
                     break;
                 }

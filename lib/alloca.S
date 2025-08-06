@@ -15,14 +15,14 @@ _(alloca):
 _(__alloca):
     pop     %edx
     pop     %eax
-    add     $15,%eax
-    and     $-16,%eax
+    add     $3,%eax
+    and     $-4,%eax
     jz      p3
 
 #ifdef _WIN32
 p1:
     cmp     $4096,%eax
-    jbe     p2
+    jb      p2
     test    %eax,-4096(%esp)
     sub     $4096,%esp
     sub     $4096,%eax
@@ -30,7 +30,6 @@ p1:
 p2:
 #endif
     sub     %eax,%esp
-    and     $-16,%esp
     mov     %esp,%eax
 p3:
     push    %edx
@@ -55,7 +54,7 @@ _(alloca):
 #ifdef _WIN32
 p1:
     cmp     $4096,%rax
-    jbe     p2
+    jb      p2
     test    %rax,-4096(%rsp)
     sub     $4096,%rsp
     sub     $4096,%rax

@@ -95,13 +95,12 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # define O_BINARY 0
 #endif
 
-#ifndef offsetof
-#define offsetof(type, field) ((size_t) &((type *)0)->field)
+#ifdef __clang__ // clang -fsanitize compains about: NULL+value
+#define offsetof(type, field) __builtin_offsetof(type, field)
 #endif
 
-#ifdef __clang__ // clang -fsanitize compains about: NULL+value
-#undef offsetof
-#define offsetof(type, field) __builtin_offsetof(type, field)
+#ifndef offsetof
+#define offsetof(type, field) ((size_t) &((type *)0)->field)
 #endif
 
 #ifndef countof

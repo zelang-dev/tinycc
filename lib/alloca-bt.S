@@ -17,13 +17,13 @@ _(__bound_alloca):
     mov     %eax, %ecx
     test    %eax,%eax
     jz      p6
-    add     $15+1,%eax
-    and     $-16,%eax
+    add     $3 + 1,%eax
+    and     $-4,%eax
 
 #ifdef _WIN32
 p4:
     cmp     $4096,%eax
-    jbe     p5
+    jb      p5
     test    %eax,-4096(%esp)
     sub     $4096,%esp
     sub     $4096,%eax
@@ -33,7 +33,6 @@ p5:
 #endif
 
     sub     %eax,%esp
-    and     $-16,%esp
     mov     %esp,%eax
 
     push    %edx
@@ -72,12 +71,11 @@ _(__bound_alloca_nr):
 #else
     pop     %rdx
     mov     %rdi,%rax
+    and     %eax,%eax
+    jz      p3
     mov     %rax,%rsi	# size, a second parm to the __bound_new_region
-
     add     $15 + 1,%rax  # add one extra to separate regions
     and     $-16,%rax
-    jz      p3
-
 
     sub     %rax,%rsp
     mov     %rsp,%rdi	# pointer, a first parm to the __bound_new_region

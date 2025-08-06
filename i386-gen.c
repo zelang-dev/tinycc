@@ -417,6 +417,7 @@ ST_FUNC void gfunc_call(int nb_args)
             /* allocate the necessary size on stack */
 #ifdef TCC_TARGET_PE
             if (size >= 4096) {
+                save_reg(TREG_EDX);
                 r = get_reg(RC_EAX);
                 oad(0x68, size); // push size
                 /* cannot call normal 'alloca' with bound checking */

@@ -117,16 +117,6 @@ ST_FUNC void expect(const char *msg)
 
 #define USE_TAL
 
-#ifdef _MSC_VER
-# if defined _M_AMD64 || defined _M_ARM64 || defined _M_ARM64EC || defined _M_IA64 || defined _M_X64
-#  define POINTER_SIZE 8
-# else
-#  define POINTER_SIZE 4
-# endif
-#else
-# define POINTER_SIZE sizeof(void *)
-#endif
-
 #ifndef USE_TAL
 #define tal_free(al, p) tcc_free(p)
 #define tal_realloc(al, p, size) tcc_realloc(p, size)
@@ -143,7 +133,6 @@ ST_FUNC void expect(const char *msg)
 #define tal_free(al, p) tal_free_impl(al, p, __FILE__, __LINE__)
 #define tal_realloc(al, p, size) tal_realloc_impl(&al, p, size, __FILE__, __LINE__)
 #define TAL_DEBUG_PARAMS , const char *file, int line
-#define TAL_DEBUG_FILE_LEN 40
 #endif
 
 #define TOKSYM_TAL_SIZE     (768 * 1024) /* allocator for tiny TokenSym in table_ident */
@@ -167,12 +156,15 @@ typedef struct TinyAlloc {
 } TinyAlloc;
 
 typedef struct tal_header_t {
-    ALIGNED(POINTER_SIZE) unsigned size;
+    size_t  size; /* word align */
 #ifdef TAL_DEBUG
     int     line_num; /* negative line_num used for double free check */
-    char    file_name[TAL_DEBUG_FILE_LEN + 1];
+    char    file_name[40];
 #endif
 } tal_header_t;
+
+#define TAL_ALIGN(size) \
+    (((size) + (sizeof (size_t) - 1)) & ~(sizeof (size_t) - 1))
 
 /* ------------------------------------------------------------------------- */
 
@@ -208,7 +200,7 @@ tail_call:
             tal_header_t *header = (tal_header_t *)p;
             if (header->line_num > 0) {
                 fprintf(stderr, "%s:%d: chunk of %d bytes leaked\n",
-                        header->file_name, header->line_num, header->size);
+                        header->file_name, header->line_num, (int)header->size);
             }
             p += header->size + sizeof(tal_header_t);
         }
@@ -256,7 +248,7 @@ static void *tal_realloc_impl(TinyAlloc **pal, void *p, unsigned size TAL_DEBUG_
     tal_header_t *header;
     void *ret;
     int is_own;
-    unsigned adj_size = (size + POINTER_SIZE - 1) & -POINTER_SIZE;
+    unsigned adj_size = TAL_ALIGN(size);
     TinyAlloc *al = *pal;
 
 tail_call:
@@ -266,9 +258,8 @@ tail_call:
             header = (tal_header_t *)al->p;
             header->size = adj_size;
 #ifdef TAL_DEBUG
-            { int ofs = strlen(file) - TAL_DEBUG_FILE_LEN;
-            strncpy(header->file_name, file + (ofs > 0 ? ofs : 0), TAL_DEBUG_FILE_LEN);
-            header->file_name[TAL_DEBUG_FILE_LEN] = 0;
+            { int ofs = strlen(file) + 1 - sizeof header->file_name;
+            strcpy(header->file_name, file + (ofs > 0 ? ofs : 0));
             header->line_num = line; }
 #endif
             ret = al->p + sizeof(tal_header_t);
@@ -2986,6 +2977,11 @@ maybe_newline:
         tok = c;
         p++;
         break;
+    case 0xEF: /* UTF8 BOM ? */
+        if (p[1] == 0xBB && p[2] == 0xBF && p == file->buffer) {
+            p += 3;
+            goto redo_no_start;
+        }
     default:
         if (c >= 0x80 && c <= 0xFF) /* utf8 identifiers */
 	    goto parse_ident_fast;
