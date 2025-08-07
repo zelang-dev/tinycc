@@ -7051,6 +7051,31 @@ static void lblock(int *bsym, int *csym)
     }
 }
 
+static void condition_expresion(void)
+{
+    Sym *s;
+    int decl_ret;
+
+    /* c2y if init decl? */
+    if (!(decl_ret = decl(VT_JMPI))) {
+        /* no, regular if init expr */
+        gexpr();
+    } else {
+	if (decl_ret == 1)
+	    tcc_error("declaration in the controlling expression must have an initializer");
+
+        if (tok == ';') {
+            /* finish the push */
+            next();
+            gexpr();
+        } else {
+            s = sym_find(decl_ret);
+            vset(&s->type, s->r, s->c);
+            vtop->sym = s;
+        }
+    }
+}
+
 static void block(int flags)
 {
     int a, b, c, d, e, t;
@@ -7071,7 +7096,7 @@ again:
     if (t == TOK_IF) {
         new_scope_s(&o);
         skip('(');
-        gexpr();
+        condition_expresion();
         a = gvtst(1, 0);
         skip(')');
         block(0);
@@ -7240,7 +7265,7 @@ again:
 
         new_scope_s(&o);
         skip('(');
-        gexpr();
+        condition_expresion();
         if (!is_integer_btype(vtop->type.t & VT_BTYPE))
             tcc_error("switch value not an integer");
         skip(')');
@@ -8562,7 +8587,9 @@ static void pe_check_linkage(CType *type, AttributeDef *ad)
 
 /* 'l' is VT_LOCAL or VT_CONST to define default storage type
    or VT_CMP if parsing old style parameter list
-   or VT_JMP if parsing c99 for decl: for (int i = 0, ...) */
+   or VT_JMP if parsing c99 for decl: for (int i = 0, ...)
+   or VT_JMPI if parsing c2y if decl; if (int = 0; ...)
+*/
 static int decl(int l)
 {
     int v, has_init, r, oldint;
@@ -8575,7 +8602,7 @@ static int decl(int l)
 
         oldint = 0;
         if (!parse_btype(&btype, &adbase, l == VT_LOCAL)) {
-            if (l == VT_JMP)
+            if (l == VT_JMP || l == VT_JMPI)
                 return 0;
             /* skip redundant ';' if not in old parameter decl scope */
             if (tok == ';' && l != VT_CMP) {
@@ -8815,10 +8842,12 @@ static int decl(int l)
                     }
                 }
                 if (tok != ',') {
-                    if (l == VT_JMP)
+                    if (l == VT_JMP || l == VT_JMPI)
                         return has_init ? v : 1;
                     skip(';');
                     break;
+                } else if (l == VT_JMPI) {
+                    tcc_error("declaration in condition can only declare a single object");
                 }
                 next();
             }
