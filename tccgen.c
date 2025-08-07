@@ -6706,11 +6706,16 @@ static void gfunc_return(CType *func_type)
             /* returning structure packed into registers */
             int size, addr, align, rc, n;
             size = type_size(func_type,&align);
-            if ((align & (ret_align - 1))
-                && ((vtop->r & VT_VALMASK) < VT_CONST /* pointer to struct */
-                    || (vtop->c.i & (ret_align - 1))
-                    )) {
-                loc = (loc - size) & -ret_align;
+            if (ret_nregs * regsize > size ||
+		((align & (ret_align - 1))
+                 && ((vtop->r & VT_VALMASK) < VT_CONST /* pointer to struct */
+                     || (vtop->c.i & (ret_align - 1))
+                     ))) {
+		if (ret_nregs * regsize > size)
+		    size = ret_nregs * regsize;
+		if (ret_align > align)
+		    align = ret_align;
+                loc = (loc - size) & -align;
                 addr = loc;
                 type = *func_type;
                 vset(&type, VT_LOCAL | VT_LVAL, addr);
