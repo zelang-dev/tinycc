@@ -120,6 +120,7 @@ ST_FUNC void gen_struct_copy(int size);
 
 ST_DATA const char * const target_machine_defs =
     "__x86_64__\0"
+    "__x86_64\0"
     "__amd64__\0"
     ;
 
@@ -2020,6 +2021,7 @@ void gen_opf(int op)
                 gv(RC_FLOAT);
                 vswap();
                 fc = vtop->c.i; /* bcheck may have saved previous vtop[-1] */
+                r = vtop->r;
             }
             
             if ((ft & VT_BTYPE) == VT_DOUBLE) {
