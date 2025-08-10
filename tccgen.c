@@ -8693,6 +8693,9 @@ static int decl(int l)
 		    if (sym->type.t != VT_VOID)
 		        tcc_error("redefinition of parameter '%s'",
 				  get_tok_str(v, NULL));
+		    if (func_vt.ref->f.func_type == FUNC_OLD &&
+			type.t == VT_FLOAT)
+			type.t = VT_DOUBLE;
 		    convert_parameter_type(&type);
 		    sym->type = type;
 		} else if (type.t & VT_TYPEDEF) {
