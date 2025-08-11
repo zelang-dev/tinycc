@@ -556,6 +556,7 @@ ST_FUNC void gfunc_call(int nb_args)
     int i, align, size, areg[2];
     int *info = tcc_malloc((nb_args + 1) * sizeof (int));
     int stack_adj = 0, tempspace = 0, stack_add, ofs, splitofs = 0;
+    int old = (vtop[-nb_args].type.ref->f.func_type == FUNC_OLD);
     SValue *sv;
     Sym *sa;
 
@@ -583,8 +584,8 @@ ST_FUNC void gfunc_call(int nb_args)
             size = align = 8;
             byref = 64 | (tempofs << 7);
         }
-        reg_pass(&sv->type, prc, fieldofs, sa != 0);
-        if (!sa && align == 2*XLEN && size <= 2*XLEN)
+        reg_pass(&sv->type, prc, fieldofs, old || sa != 0);
+        if (!old && !sa && align == 2*XLEN && size <= 2*XLEN)
           areg[0] = (areg[0] + 1) & ~1;
         nregs = prc[0];
         if (size == 0)
@@ -599,7 +600,7 @@ ST_FUNC void gfunc_call(int nb_args)
             if (align < XLEN)
               align = XLEN;
             stack_adj += (size + align - 1) & -align;
-            if (!sa) /* one vararg on stack forces the rest on stack */
+            if (!old && !sa) /* one vararg on stack forces the rest on stack */
               areg[0] = 8, areg[1] = 16;
         } else {
             info[i] = areg[prc[1] - 1]++;
