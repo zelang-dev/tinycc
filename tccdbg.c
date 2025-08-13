@@ -1625,7 +1625,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
 
         t = t->type.ref;
 	debug_type = tcc_debug_find(s1, t, 0);
-        if (debug_type == -1) {
+        if (debug_type == -1 && t->c >= 0) {
             debug_type = tcc_debug_add(s1, t, 0);
             cstr_new (&str);
             cstr_printf (&str, "%s:T%d=%c%d",
@@ -1664,7 +1664,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
         Sym *e = t = t->type.ref;
 
 	debug_type = tcc_debug_find(s1, t, 0);
-	if (debug_type == -1) {
+	if (debug_type == -1 && t->c >= 0) {
 	    debug_type = tcc_debug_add(s1, t, 0);
             cstr_new (&str);
             cstr_printf (&str, "%s:T%d=e",
@@ -1741,7 +1741,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
     if ((type & VT_BTYPE) == VT_STRUCT) {
         t = t->type.ref;
 	debug_type = tcc_debug_find(s1, t, 1);
-	if (debug_type == -1) {
+	if (debug_type == -1 && t->c >= 0) {
 	    int pos_sib = 0, i, *pos_type;
 
 	    debug_type = tcc_debug_add(s1, t, 1);
@@ -1819,7 +1819,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
     else if (IS_ENUM(type)) {
         t = t->type.ref;
 	debug_type = tcc_debug_find(s1, t, 1);
-	if (debug_type == -1) {
+	if (debug_type == -1 && t->c >= 0) {
 	    int pos_sib, pos_type;
 	    Sym sym = {0}; sym.type.t = VT_INT | (type & VT_UNSIGNED);
 
@@ -2090,14 +2090,16 @@ static void tcc_debug_finish (TCCState *s1, struct _debug_info *cur)
     }
 }
 
-ST_FUNC void tcc_add_debug_info(TCCState *s1, int param, Sym *s, Sym *e)
+ST_FUNC void tcc_add_debug_info(TCCState *s1, Sym *s, Sym *e)
 {
     CString debug_str;
+    int param;
 
     if (!(s1->do_debug & 2))
         return;
 
     cstr_new (&debug_str);
+    param = !e;
     for (; s != e; s = s->prev) {
         if (!s->v || (s->r & VT_VALMASK) != VT_LOCAL)
             continue;

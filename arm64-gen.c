@@ -1242,9 +1242,8 @@ ST_FUNC void gfunc_prolog(Sym *func_sym)
         int off = (a[i] < 16 ? 160 + a[i] / 2 * 8 :
                    a[i] < 32 ? 16 + (a[i] - 16) / 2 * 16 :
                    224 + ((a[i] - 32) >> 1 << 1));
-        sym_push(sym->v & ~SYM_FIELD, &sym->type,
-                 (a[i] & 1 ? VT_LLOCAL : VT_LOCAL) | VT_LVAL,
-                 off);
+
+        gfunc_set_param(sym, off, a[i] & 1);
 
         if (a[i] < 16) {
             int align, size = type_size(&sym->type, &align);

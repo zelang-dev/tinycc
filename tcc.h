@@ -1506,6 +1506,7 @@ ST_FUNC int classify_x86_64_va_arg(CType *ty);
 ST_FUNC void gbound_args(int nb_args);
 ST_DATA int func_bound_add_epilog;
 #endif
+ST_FUNC Sym *gfunc_set_param(Sym *s, int c, int byref);
 
 /* ------------ tccelf.c ------------ */
 
@@ -1856,7 +1857,7 @@ ST_FUNC void tcc_debug_eincl(TCCState *s1);
 ST_FUNC void tcc_debug_newfile(TCCState *s1);
 
 ST_FUNC void tcc_debug_line(TCCState *s1);
-ST_FUNC void tcc_add_debug_info(TCCState *s1, int param, Sym *s, Sym *e);
+ST_FUNC void tcc_add_debug_info(TCCState *s1, Sym *s, Sym *e);
 ST_FUNC void tcc_debug_funcstart(TCCState *s1, Sym *sym);
 ST_FUNC void tcc_debug_prolog_epilog(TCCState *s1, int value);
 ST_FUNC void tcc_debug_funcend(TCCState *s1, int size);
