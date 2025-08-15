@@ -8517,7 +8517,7 @@ static int decl(int l)
 {
     int v, has_init, r, oldint;
     CType type, btype;
-    Sym *sym;
+    Sym *sym, *s;
     AttributeDef ad, adbase;
     ElfSym *esym;
 
@@ -8589,6 +8589,21 @@ static int decl(int l)
                 if (sym->f.func_type == FUNC_OLD && l == VT_CONST) {
                     func_vt = type;
                     decl(VT_CMP);
+
+		    /* Allow mixing old/new prototypes
+		     *   void func(float a);
+		     *   int main(void) { func(1.0); }
+		     *   void func(a) float a; { printf("%g\n", a); }
+		     */
+		    s = sym_find(v);
+		    if (type.ref->next && // skip old func(); definitions
+		        s && s->type.ref &&
+		        s->type.ref->f.func_type == FUNC_NEW) {
+		        sym->f.func_type = FUNC_NEW;
+		        if (!is_compatible_types(&s->type, &type))
+                            tcc_error("incompatible redefinition of '%s'",
+                                      get_tok_str(v, NULL));
+		    }
                 }
 
                 if ((type.t & (VT_EXTERN|VT_INLINE)) == (VT_EXTERN|VT_INLINE)) {
@@ -8646,6 +8661,9 @@ static int decl(int l)
                 while ((sym = sym->next) != NULL) {
                     if (!(sym->v & ~SYM_FIELD))
                         expect("identifier");
+		    if (type.ref->f.func_type == FUNC_OLD &&
+			sym->type.t == VT_FLOAT)
+			sym->type.t = VT_DOUBLE;
                     if (sym->type.t == VT_VOID)
                         sym->type = int_type;
                 }
@@ -8693,9 +8711,6 @@ static int decl(int l)
 		    if (sym->type.t != VT_VOID)
 		        tcc_error("redefinition of parameter '%s'",
 				  get_tok_str(v, NULL));
-		    if (func_vt.ref->f.func_type == FUNC_OLD &&
-			type.t == VT_FLOAT)
-			type.t = VT_DOUBLE;
 		    convert_parameter_type(&type);
 		    sym->type = type;
 		} else if (type.t & VT_TYPEDEF) {
