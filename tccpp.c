@@ -117,7 +117,15 @@ ST_FUNC void expect(const char *msg)
 
 #define USE_TAL
 
-#define	POINTER_SIZE sizeof(void *)
+#ifdef _MSC_VER
+# if defined _M_AMD64 || defined _M_ARM64 || defined _M_ARM64EC || defined _M_IA64 || defined _M_X64
+#  define POINTER_SIZE 8
+# else
+#  define POINTER_SIZE 4
+# endif
+#else
+# define POINTER_SIZE sizeof(void *)
+#endif
 
 #ifndef USE_TAL
 #define tal_free(al, p) tcc_free(p)
