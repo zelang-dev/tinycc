@@ -741,6 +741,7 @@ struct TCCState {
     unsigned char static_link; /* if true, static linking is performed */
     unsigned char rdynamic; /* if true, all symbols are exported */
     unsigned char symbolic; /* if true, resolve symbols in the current module first */
+    unsigned char znodelete; /* Set DF_1_NODELETE in dynamic section */
     unsigned char filetype; /* file type for compilation (NONE,C,ASM) */
     unsigned char optimize; /* only to #define __OPTIMIZE__ */
     unsigned char option_pthread; /* -pthread option */

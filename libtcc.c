@@ -1457,6 +1457,8 @@ static int tcc_set_linker(TCCState *s, const char *optarg)
             s->filetype |= AFF_WHOLE_ARCHIVE;
         } else if (link_option(&o, "no-whole-archive")) {
             s->filetype &= ~AFF_WHOLE_ARCHIVE;
+        } else if (link_option(&o, "znodelete")) {
+            s->znodelete = 1;
 #ifdef TCC_TARGET_PE
         } else if (link_option(&o, "large-address-aware")) {
             s->pe_characteristics |= 0x20;

@@ -2939,6 +2939,8 @@ static int elf_output_file(TCCState *s1, const char *filename)
                 put_dt(dynamic, DT_TEXTREL, 0);
             if (file_type & TCC_OUTPUT_EXE)
                 dt_flags_1 = DF_1_NOW | DF_1_PIE;
+	    if (s1->znodelete)
+		dt_flags_1 |= DF_1_NODELETE;
         }
         put_dt(dynamic, DT_FLAGS, DF_BIND_NOW);
         put_dt(dynamic, DT_FLAGS_1, dt_flags_1);
