@@ -2959,15 +2959,17 @@ static int combine_types(CType *dest, SValue *op1, SValue *op2, int op)
         if (bt2 == VT_LLONG)
           type.t &= t2;
         /* convert to unsigned if it does not fit in a long long */
-        if ((t1 & (VT_BTYPE | VT_UNSIGNED | VT_BITFIELD)) == (VT_LLONG | VT_UNSIGNED) ||
-            (t2 & (VT_BTYPE | VT_UNSIGNED | VT_BITFIELD)) == (VT_LLONG | VT_UNSIGNED))
+        if ((t1 & (VT_BTYPE | VT_UNSIGNED)) == (VT_LLONG | VT_UNSIGNED) ||
+            (t2 & (VT_BTYPE | VT_UNSIGNED)) == (VT_LLONG | VT_UNSIGNED))
           type.t |= VT_UNSIGNED;
     } else {
+	int t1_bit = BIT_SIZE(t1) <= 31 ? VT_BITFIELD : 0;
+	int t2_bit = BIT_SIZE(t2) <= 31 ? VT_BITFIELD : 0;
         /* integer operations */
         type.t = VT_INT | (VT_LONG & (t1 | t2));
         /* convert to unsigned if it does not fit in an integer */
-        if ((t1 & (VT_BTYPE | VT_UNSIGNED | VT_BITFIELD)) == (VT_INT | VT_UNSIGNED) ||
-            (t2 & (VT_BTYPE | VT_UNSIGNED | VT_BITFIELD)) == (VT_INT | VT_UNSIGNED))
+        if ((t1 & (VT_BTYPE | VT_UNSIGNED | t1_bit)) == (VT_INT | VT_UNSIGNED) ||
+            (t2 & (VT_BTYPE | VT_UNSIGNED | t2_bit)) == (VT_INT | VT_UNSIGNED))
           type.t |= VT_UNSIGNED;
     }
     if (dest)
@@ -4554,6 +4556,7 @@ do_decl:
                             tcc_error("width of '%s' exceeds its type",
                                   get_tok_str(v, NULL));
                         } else if (bit_size == bsize
+				    && !*tcc_state->pack_stack_ptr
                                     && !ad.a.packed && !ad1.a.packed) {
                             /* no need for bit fields */
                             ;
