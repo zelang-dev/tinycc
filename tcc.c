@@ -324,7 +324,7 @@ redo:
             print_search_dirs(s);
         }
         if (opt < 0) err:
-            ret = 1;
+            ret = 1, opt = -1;
         if (opt) {
             tcc_delete(s);
             return ret;
