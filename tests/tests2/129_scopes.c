@@ -1,7 +1,11 @@
-#include <stdio.h>
+int printf(const char*, ...);
+
+#define myassert(x) \
+    printf("%s:%d: %s : \"%s\"\n", __FILE__,__LINE__,(x)?"ok":"error",#x)
+
 enum{ in = 0};
-#define myassert(X) do{ if(!X) printf("%d: assertion failed\n", __LINE__); }while(0)
-int main(){
+
+int main_1(){
     {
         myassert(!in);
         if(sizeof(enum{in=1})) myassert(in);
@@ -38,6 +42,45 @@ int main(){
         for(;sizeof(enum{in=1});){ myassert(in); break; }
         myassert(!in); //OK
     }
-
+    return 0;
 }
 
+/* --------------------------------------------- */
+int main_2()
+{
+  char c = 'a';
+  void func1(char c); /* param 'c' must not shadow local 'c' */
+  func1(c);
+  return 0;
+}
+
+void func1(char c)
+{
+    myassert(c == 'a');
+}
+
+struct st { int a; };
+
+/* --------------------------------------------- */
+int main_3()
+{
+  struct st func(void);
+  struct st st = func(); /* not an 'incompatible redefinition' */
+  myassert(st.a == 10);
+  return 0;
+}
+
+struct st func(void)
+{
+  struct st st = { 10 };
+  return st;
+}
+
+/* --------------------------------------------- */
+int main()
+{
+    main_1();
+    main_2();
+    main_3();
+    return 0;
+}

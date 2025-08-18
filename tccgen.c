@@ -1294,16 +1294,21 @@ static Sym *sym_copy(Sym *s0, Sym **ps)
     Sym *s;
     s = sym_malloc(), *s = *s0;
     s->prev = *ps, *ps = s;
-    if ((s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM)
+    if ((s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM && ps == &local_stack)
         sym_link(s, 1);
     return s;
 }
 
-/* copy s->type.ref to stack 'ps' for VT_FUNC and VT_PTR */
+/* Symbol 's' was locally declared 'extern' (or as function), and
+   is on global_stack.  Now must copy its 'ref' to global_stack too */
 static void sym_copy_ref(Sym *s, Sym **ps)
 {
     int bt = s->type.t & VT_BTYPE;
-    if (bt == VT_FUNC || bt == VT_PTR || (bt == VT_STRUCT && s->sym_scope)) {
+    if (bt == VT_PTR
+        || bt == VT_FUNC
+        || ((bt == VT_STRUCT || IS_ENUM(s->type.t))
+            && s->type.ref
+            && s->type.ref->sym_scope)) {
         Sym **sp = &s->type.ref;
         for (s = *sp, *sp = NULL; s; s = s->next) {
             Sym *s2 = sym_copy(s, ps);
@@ -5962,13 +5967,10 @@ ST_FUNC void unary(void)
 		    learn = 1;
 		next();
 	    } else {
-	        AttributeDef ad_tmp;
-		int itmp;
-	        CType cur_type;
-
-		parse_btype(&cur_type, &ad_tmp, 0);
-		type_decl(&cur_type, &ad_tmp, &itmp, TYPE_ABSTRACT);
-		if (compare_types(&controlling_type, &cur_type, 0)) {
+		int v;
+		parse_btype(&type, &ad, 0);
+		type_decl(&type, &ad, &v, TYPE_ABSTRACT);
+		if (compare_types(&controlling_type, &type, 0)) {
 		    if (has_match) {
 		      tcc_error("type match twice");
 		    }

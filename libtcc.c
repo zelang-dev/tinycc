@@ -326,7 +326,7 @@ struct mem_debug_header {
     struct mem_debug_header *prev;
     struct mem_debug_header *next;
     int line_num;
-    char file_name[MEM_DEBUG_FILE_LEN + 1];
+    char file_name[MEM_DEBUG_FILE_LEN];
     unsigned magic2;
     ALIGNED(16) unsigned char magic3[4];
 };
@@ -367,9 +367,8 @@ PUB_FUNC void *tcc_malloc_debug(unsigned long size, const char *file, int line)
     header->size = size;
     write32le(MEM_DEBUG_CHECK3(header), MEM_DEBUG_MAGIC3);
     header->line_num = line;
-    ofs = strlen(file) - MEM_DEBUG_FILE_LEN;
-    strncpy(header->file_name, file + (ofs > 0 ? ofs : 0), MEM_DEBUG_FILE_LEN);
-    header->file_name[MEM_DEBUG_FILE_LEN] = 0;
+    ofs = strlen(file) + 1 - MEM_DEBUG_FILE_LEN;
+    strcpy(header->file_name, file + (ofs > 0 ? ofs : 0));
     WAIT_SEM(&mem_sem);
     header->next = mem_debug_chain;
     header->prev = NULL;

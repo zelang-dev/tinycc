@@ -1675,16 +1675,20 @@ static void tcc_debug_check_forw(TCCState *s1, Sym *t, int debug_type)
     }
 }
 
+static void stabs_struct_complete(TCCState *s1, CType *t);
+
 ST_FUNC void tcc_debug_fix_forw(TCCState *s1, CType *t)
 {
     if (!(s1->do_debug & 2))
 	return;
-
+    if (0 == s1->dwarf) {
+        stabs_struct_complete(s1, t);
+        return;
+    }
     if ((t->t & VT_BTYPE) == VT_STRUCT && t->ref->c != -1) {
         int i, j, debug_type, g = check_global(t->ref);
         int *n_forw_hash;
         struct _debug_forw_hash **forw_hash;
-
         forw_hash = g ? &debug_forw_hash_global : &debug_forw_hash_local;
         n_forw_hash = g ? &n_debug_forw_hash_global : &n_debug_forw_hash_local;
 	for (i = 0; i < *n_forw_hash; i++)
@@ -1722,14 +1726,46 @@ static int tcc_debug_add(TCCState *s1, Sym *t, int dwarf)
     return offset;
 }
 
-#define	STRUCT_NODEBUG(s) 			       \
-    (s->a.nodebug ||                           \
-     ((s->v & ~SYM_FIELD) >= SYM_FIRST_ANOM && \
-      ((s->type.t & VT_BTYPE) == VT_BYTE ||    \
-       (s->type.t & VT_BTYPE) == VT_BOOL ||    \
-       (s->type.t & VT_BTYPE) == VT_SHORT ||   \
-       (s->type.t & VT_BTYPE) == VT_INT ||     \
-       (s->type.t & VT_BTYPE) == VT_LLONG)))
+static int STRUCT_NODEBUG(Sym *s)
+{
+    return
+    (s->a.nodebug ||
+     ((s->v & ~SYM_FIELD) >= SYM_FIRST_ANOM &&
+      ((s->type.t & VT_BTYPE) == VT_BYTE ||
+       (s->type.t & VT_BTYPE) == VT_BOOL ||
+       (s->type.t & VT_BTYPE) == VT_SHORT ||
+       (s->type.t & VT_BTYPE) == VT_INT ||
+       (s->type.t & VT_BTYPE) == VT_LLONG)));
+}
+
+static int stabs_struct_find(TCCState *s1, Sym *t, int *p_id)
+{
+    /* A struct/enum has a ref to its type but that type has no ref.
+       So we can (ab)use it for some info.  Here:
+         s->c : stabs type id
+         s->r : already defined in stabs */
+    Sym *s = t->type.ref;
+/*
+    if (s && s->v != (SYM_FIELD|0x00DEBBED)) {
+        tcc_error_noabort("tccdbg: internal error: %s", get_tok_str(t->v, 0));
+        if (p_id)
+            *p_id = 0;
+        return 0;
+    }
+*/
+    if (NULL == p_id)
+        return s && !s->r && t->c >= 0;
+    if (NULL == s) {
+        /* just use global_stack always */
+        s = sym_push2(&global_stack, SYM_FIELD|0x00DEBBED, 0, ++debug_next_type);
+        t->type.ref = s;
+    }
+    *p_id = s->c;
+    if (s->r || t->c < 0) /* already defined or still incomplete */
+        return 0;
+    s->r = 1;
+    return 1;
+}
 
 static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
 {
@@ -1750,9 +1786,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
     }
     if ((type & VT_BTYPE) == VT_STRUCT) {
         t = t->type.ref;
-	debug_type = tcc_debug_find(s1, t, 0);
-        if (debug_type == -1) {
-            debug_type = tcc_debug_add(s1, t, 0);
+        if (stabs_struct_find(s1, t, &debug_type)) {
             cstr_new (&str);
             cstr_printf (&str, "%s:T%d=%c%d",
                          (t->v & ~SYM_STRUCT) >= SYM_FIRST_ANOM
@@ -1760,15 +1794,16 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
                          debug_type,
                          IS_UNION (t->type.t) ? 'u' : 's',
                          t->c);
+
             while (t->next) {
                 int pos, size, align;
-
                 t = t->next;
 		if (STRUCT_NODEBUG(t))
 		    continue;
-		tcc_debug_check_forw(s1, t, -1);
                 cstr_printf (&str, "%s:",
-                             get_tok_str(t->v, NULL));
+                             (t->v & ~SYM_FIELD) >= SYM_FIRST_ANOM
+                             ? "" : get_tok_str(t->v, NULL)
+                             );
                 tcc_get_debug_info (s1, t, &str);
                 if (t->type.t & VT_BITFIELD) {
                     pos = t->c * 8 + BIT_POS(t->type.t);
@@ -1787,10 +1822,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
     }
     else if (IS_ENUM(type)) {
         Sym *e = t = t->type.ref;
-
-	debug_type = tcc_debug_find(s1, t, 0);
-	if (debug_type == -1) {
-	    debug_type = tcc_debug_add(s1, t, 0);
+        if (stabs_struct_find(s1, t, &debug_type)) {
             cstr_new (&str);
             cstr_printf (&str, "%s:T%d=e",
                          (t->v & ~SYM_STRUCT) >= SYM_FIRST_ANOM
@@ -1817,6 +1849,10 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
         if (debug_type > N_DEFAULT_DEBUG)
             return;
     }
+
+    if (NULL == result) /* from stabs_struct_complete() */
+        return;
+
     if (n > 0)
         cstr_printf (result, "%d=", ++debug_next_type);
     t = s;
@@ -1836,10 +1872,17 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
         }
         else
             break;
-        tcc_debug_check_forw(s1, t, -1);
         t = t->type.ref;
     }
     cstr_printf (result, "%d", debug_type);
+}
+
+static void stabs_struct_complete(TCCState *s1, CType *t)
+{
+    if (stabs_struct_find(s1, t->ref, NULL)) {
+        Sym s = {0}; s.type = *t;
+        tcc_get_debug_info(s1, &s, NULL);
+    }
 }
 
 static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
@@ -1993,7 +2036,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
 	    dwarf_data1(dwarf_info_section, DWARF_ABBREV_BASE_TYPE);
 	    dwarf_uleb128(dwarf_info_section, default_debug[i - 1].size);
 	    dwarf_data1(dwarf_info_section, default_debug[i - 1].encoding);
-	    strncpy(name, default_debug[i - 1].name, sizeof(name) -1);
+	    pstrcpy(name, sizeof name, default_debug[i - 1].name);
 	    *strchr(name, ':') = 0;
 	    dwarf_strp(dwarf_info_section, name);
 	    dwarf_info.base_type_used[i - 1] = debug_type;
@@ -2404,7 +2447,6 @@ ST_FUNC void tcc_debug_extern_sym(TCCState *s1, Sym *sym, int sh_num, int sym_bi
                 sym_bind == STB_GLOBAL ? 'G' : func_ind != -1 ? 'V' : 'S'
                 );
         tcc_get_debug_info(s1, sym, &str);
-	tcc_debug_check_forw(s1, sym, -1);
         if (sym_bind == STB_GLOBAL)
             tcc_debug_stabs(s1, str.data, N_GSYM, 0, NULL, 0, 0);
         else
@@ -2437,11 +2479,8 @@ ST_FUNC void tcc_debug_typedef(TCCState *s1, Sym *sym)
     {
         CString str;
         cstr_new (&str);
-        cstr_printf (&str, "%s:t",
-                     (sym->v & ~SYM_FIELD) >= SYM_FIRST_ANOM
-                     ? "" : get_tok_str(sym->v, NULL));
+        cstr_printf (&str, "%s:t", get_tok_str(sym->v, NULL));
         tcc_get_debug_info(s1, sym, &str);
-	tcc_debug_check_forw(s1, sym, -1);
         tcc_debug_stabs(s1, str.data, N_LSYM, 0, NULL, 0, 0);
         cstr_free (&str);
     }

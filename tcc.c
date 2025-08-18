@@ -323,13 +323,12 @@ redo:
             tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
             print_search_dirs(s);
         }
-        if (opt < 0) err:
-            ret = 1, opt = -1;
         if (opt) {
+            if (opt < 0) err:
+                ret = 1;
             tcc_delete(s);
             return ret;
         }
-
         if (s->nb_files == 0) {
             tcc_error_noabort("no input files");
         } else if (s->output_type == TCC_OUTPUT_PREPROCESS) {
