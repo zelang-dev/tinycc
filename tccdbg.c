@@ -554,6 +554,20 @@ static void dwarf_reloc(Section *s, int sym, int rel)
     put_elf_reloca(symtab_section, s, s->data_offset, rel, sym, 0);
 }
 
+static void free_str(struct dwarf_str_hash **str)
+{
+    int i;
+
+    for (i = 0; i < N_STR_HASH; i++) {
+       while (str[i]) {
+           struct dwarf_str_hash *next = str[i]->next;
+
+           tcc_free(str[i]);
+           str[i] = next;
+       }
+    }
+}
+
 static unsigned str_hash(const char *s)
 {
     unsigned h = 5381;
@@ -575,22 +589,36 @@ static void dwarf_string(Section *s, Section *dw, int sym, const char *str)
     len = strlen(str) + 1;
     new_hash = dw_hash[hash];
     while (new_hash) {
-       if (new_hash->len == len &&
-	   !memcmp(str, dw->data + new_hash->data_offset, len))
-           break;
-       new_hash = new_hash->next;
+	if (new_hash->len == len &&
+	    !memcmp(str, dw->data + new_hash->data_offset, len))
+	    break;
+	new_hash = new_hash->next;
     }
     if (new_hash == NULL) {
+	unsigned long offset = dw->data_offset;
+
+        new_hash = dw_hash[hash];
+        while (new_hash) {
+	    unsigned long n = new_hash->data_offset + new_hash->len - len;
+
+	    if (new_hash->len > len &&
+	        !memcmp(str, dw->data + n, len)) {
+		offset = n;
+		break;
+	    }
+	    new_hash = new_hash->next;
+        }
+	if (new_hash == NULL) {
+	    ptr = section_ptr_add(dw, len);
+	    memmove(ptr, str, len);
+	}
 	new_hash = (struct dwarf_str_hash *)
 	    tcc_malloc(sizeof(struct dwarf_str_hash));
 	new_hash->len = len;
-	new_hash->data_offset = dw->data_offset;
+	new_hash->data_offset = offset;
 	new_hash->next = dw_hash[hash];
 	dw_hash[hash] = new_hash;
-	ptr = section_ptr_add(dw, len);
-	memmove(ptr, str, len);
     }
-    else
     put_elf_reloca(symtab_section, s, s->data_offset, R_DATA_32DW, sym,
                    PTR_SIZE == 4 ? 0 : new_hash->data_offset);
     dwarf_data4(s, PTR_SIZE == 4 ? new_hash->data_offset : 0);
@@ -1249,7 +1277,6 @@ static void fix_debug_forw_hash(TCCState *s1, int global, int start);
 /* put end of translation unit info */
 ST_FUNC void tcc_debug_end(TCCState *s1)
 {
-    int i;
 
     if (!s1->do_debug || debug_next_type == 0)
         return;
@@ -1258,6 +1285,7 @@ ST_FUNC void tcc_debug_end(TCCState *s1)
         tcc_debug_funcend(s1, 0); /* free stuff in case of errors */
 
     if (s1->dwarf) {
+	int i;
 	int start_aranges;
 	unsigned char *ptr;
 	int text_size = text_section->data_offset;
@@ -1365,18 +1393,8 @@ ST_FUNC void tcc_debug_end(TCCState *s1)
         put_stabs_r(s1, NULL, N_SO, 0, 0,
                     text_section->data_offset, text_section, section_sym);
     }
-    for (i = 0; i < N_STR_HASH; i++) {
-       while (dwarf_str[i]) {
-           struct dwarf_str_hash *next = dwarf_str[i]->next;
-           tcc_free(dwarf_str[i]);
-           dwarf_str[i] = next;
-       }
-       while (dwarf_line_str[i]) {
-           struct dwarf_str_hash *next = dwarf_line_str[i]->next;
-           tcc_free(dwarf_line_str[i]);
-           dwarf_line_str[i] = next;
-       }
-    }
+    free_str (dwarf_str);
+    free_str (dwarf_line_str);
     tcc_free (debug_forw_hash_global);
     tcc_free (debug_forw_hash_local);
     tcc_free(debug_hash_global);
