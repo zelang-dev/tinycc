@@ -17,7 +17,7 @@
 60_errors_and_warnings.c:21: error: struct/union/enum already defined
 
 [test_62_enumerator_redefinition]
-60_errors_and_warnings.c:26: error: redefinition of enumerator 'RED'
+60_errors_and_warnings.c:26: error: redeclaration of 'RED'
 
 [test_63_local_enumerator_redefinition]
 [returns 1]

@@ -341,8 +341,8 @@ ST_FUNC void check_vstack(void)
                   (int)(vtop - vstack + 1));
 }
 
-/* vstack debugging aid */
 #if 0
+/* dump 'b' vstack entries starting with 'a'  */
 void pv (const char *lbl, int a, int b)
 {
     int i;
@@ -351,6 +351,27 @@ void pv (const char *lbl, int a, int b)
         printf("%s vtop[-%d] : type.t:%04x  r:%04x  r2:%04x  c.i:%d\n",
             lbl, i, p->type.t, p->r, p->r2, (int)p->c.i);
     }
+}
+
+/* dump symbols on stack from s ... last */
+static inline void psyms(const char *msg, Sym *s, Sym *last)
+{
+    printf("%-8s scope         v        c        r   type.t\n", msg);
+    while (s && s != last) {
+        printf("      %8x  %08x %08x %08x %08x %s\n",
+            s->sym_scope, s->v, s->c, s->r, s->type.t, get_tok_str(s->v, 0));
+        s = s->prev;
+    }
+}
+
+static void type_to_str(char *buf, int buf_size, CType *type, const char *varstr);
+
+/* print type */
+static void ptype(CType *type, int v)
+{
+    char buf[500];
+    type_to_str(buf, sizeof(buf), type, get_tok_str(v, NULL));
+    printf("type = '%s'\n", buf);
 }
 #endif
 
@@ -506,7 +527,7 @@ ST_FUNC void put_extern_sym2(Sym *sym, int sh_num,
             sym_type = STT_FUNC;
         } else if ((t & VT_BTYPE) == VT_VOID) {
             sym_type = STT_NOTYPE;
-            if ((t & (VT_BTYPE|VT_ASM_FUNC)) == VT_ASM_FUNC)
+            if (IS_ASM_FUNC(t))
                 sym_type = STT_FUNC;
         } else {
             sym_type = STT_OBJECT;
@@ -575,8 +596,18 @@ ST_FUNC void greloca(Section *s, Sym *sym, unsigned long offset, int type,
         return;
 
     if (sym) {
-        if (0 == sym->c)
+        if (0 == sym->c) {
             put_extern_sym(sym, NULL, 0, 0);
+            if (sym->sym_scope
+                && (sym->type.t & (VT_STATIC|VT_EXTERN)) == (VT_STATIC|VT_EXTERN)) {
+                /* when a local function declaraion redeclares a global static one
+                   then tccelf would not resolve them to the same symbol. */
+                Sym *s = sym;
+                while (s->prev_tok)
+                    s = s->prev_tok;
+                s->c = sym->c;
+            }
+        }
         c = sym->c;
     }
 
@@ -683,6 +714,13 @@ ST_INLN Sym *sym_find(int v)
     return table_ident[v]->sym_identifier;
 }
 
+static int sym_scope_e(Sym *s)
+{
+    return IS_ENUM_VAL (s->type.t)
+        ? s->type.ref->sym_scope
+        : s->sym_scope;
+}
+
 /* make sym in-/visible to the parser */
 static inline void sym_link(Sym *s, int yes)
 {
@@ -692,10 +730,14 @@ static inline void sym_link(Sym *s, int yes)
         ps = &ts->sym_struct;
     else
         ps = &ts->sym_identifier;
-    if (yes)
+    if (yes) {
+        if (*ps && sym_scope_e(*ps) == local_scope)
+            tcc_error("redeclaration of '%s'", get_tok_str(s->v, NULL));
         s->prev_tok = *ps, *ps = s;
-    else
+        s->sym_scope = local_scope;
+    } else {
         *ps = s->prev_tok;
+    }
 }
 
 /* push a given symbol on the symbol stack */
@@ -710,18 +752,9 @@ ST_FUNC Sym *sym_push(int v, CType *type, int r, int c)
     s->type.ref = type->ref;
     s->r = r;
     /* don't record fields or anonymous symbols */
-    /* XXX: simplify */
     if ((v & ~SYM_STRUCT) < SYM_FIRST_ANOM) {
         /* record symbol in token array */
         sym_link(s, 1);
-        s->sym_scope = local_scope;
-        if (s->prev_tok
-            && (IS_ENUM_VAL (s->prev_tok->type.t)
-                ? s->prev_tok->type.ref->sym_scope
-                : s->prev_tok->sym_scope)
-                == s->sym_scope)
-            tcc_error("redeclaration of '%s'",
-                get_tok_str(v & ~SYM_STRUCT, NULL));
     }
     return s;
 }
@@ -823,19 +856,6 @@ ST_FUNC void label_pop(Sym **ptop, Sym *slast, int keep)
     if (!keep)
         *ptop = slast;
 }
-
-#if 0
-/* debug: print symbols on stack from s ... last */
-static inline void psyms(const char *msg, Sym *s, Sym *last)
-{
-    printf("%-8s scope         v        c        r   type.t\n", msg);
-    while (s && s != last) {
-        printf("      %8x  %08x %08x %08x %08x %s\n",
-            s->sym_scope, s->v, s->c, s->r, s->type.t, get_tok_str(s->v, 0));
-        s = s->prev;
-    }
-}
-#endif
 
 /* ------------------------------------------------------------------------- */
 static void vcheck_cmp(void)
@@ -1294,27 +1314,47 @@ static Sym *sym_copy(Sym *s0, Sym **ps)
     Sym *s;
     s = sym_malloc(), *s = *s0;
     s->prev = *ps, *ps = s;
-    if ((s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM && ps == &local_stack)
+    if ((s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM)
         sym_link(s, 1);
     return s;
 }
 
-/* Symbol 's' was locally declared 'extern' (or as function), and
-   is on global_stack.  Now must copy its 'ref' to global_stack too */
-static void sym_copy_ref(Sym *s, Sym **ps)
+/* Symbol 's' was locally declared 'extern' (or as function), and is
+   on global_stack.  Now must copy its 'ref' to global_stack too */
+static void move_ref_to_global(Sym *s)
 {
-    int bt = s->type.t & VT_BTYPE;
-    if (bt == VT_PTR
-        || bt == VT_FUNC
-        || ((bt == VT_STRUCT || IS_ENUM(s->type.t))
-            && s->type.ref
-            && s->type.ref->sym_scope)) {
-        Sym **sp = &s->type.ref;
-        for (s = *sp, *sp = NULL; s; s = s->next) {
-            Sym *s2 = sym_copy(s, ps);
-            sp = &(*sp = s2)->next;
-            sym_copy_ref(s2, ps);
+    Sym *l, **lp;
+    int n, bt;
+
+    bt = s->type.t & VT_BTYPE;
+    if (!(bt == VT_PTR
+       || bt == VT_FUNC
+       || bt == VT_STRUCT
+       || (IS_ENUM(s->type.t)) && (bt = VT_ENUM,1)))
+        return;
+
+    for (s = s->type.ref, n = 0; s; s = s->next) {
+        for (lp = &local_stack; !!(l = *lp); lp = &l->prev) {
+            if (l == s) {
+                *lp = s->prev;
+                s->prev = global_stack, global_stack = s;
+                if (n || bt == VT_PTR) {
+                    move_ref_to_global(s);
+                } else {
+                    if ((bt == VT_STRUCT || bt == VT_ENUM)
+                        && (s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM) {
+                        /* copy struct/enum tag to local scope */
+                        s->v |= SYM_FIELD;
+                        l = sym_copy(s, lp);
+                        l->v &= ~SYM_FIELD;
+                    }
+                    n = 1;
+                }
+                break;
+            }
         }
+        if (n == 0) /* no next (VT_PTR) or ref not on local_stack */
+            break;
     }
 }
 
@@ -1335,15 +1375,15 @@ static Sym *external_sym(int v, CType *type, int r, AttributeDef *ad)
         s->a = ad->a;
         s->asm_label = ad->asm_label;
         s->type.ref = type->ref;
-        /* copy type to the global stack */
-        if (local_stack)
-            sym_copy_ref(s, &global_stack);
     } else {
         patch_storage(s, ad, type);
     }
-    /* push variables on local_stack if any */
-    if (local_stack && (s->type.t & VT_BTYPE) != VT_FUNC)
+    if (local_stack) {
+        /* make sure that type->ref is on global stack */
+        move_ref_to_global(s);
+        /* put into local scope */
         s = sym_copy(s, &local_stack);
+    }
     return s;
 }
 
@@ -3457,8 +3497,8 @@ ST_FUNC int type_size(CType *type, int *a)
             int ts;
             s = type->ref;
             ts = type_size(&s->type, a);
-            if (ts < 0 && s->c < 0)
-                ts = -ts;
+            if (s->c < 0)
+                return s->c;
             return ts * s->c;
         } else {
             *a = PTR_SIZE;
@@ -4367,6 +4407,15 @@ static void struct_layout(CType *type, AttributeDef *ad)
     }
 }
 
+/* Does 'n' fit into integer type 't' ? */
+static int in_range(long long n, int t)
+{
+    unsigned long long m = (1ULL << (btype_size(t & VT_BTYPE) * 8 - 1)) - 1;
+    if (t & VT_UNSIGNED)
+        return n <= (m << 1) + 1;
+    return n >= -(long long)m - 1 && n <= (long long)m;
+}
+
 /* enum/struct/union declaration. u is VT_ENUM/VT_STRUCT/VT_UNION */
 static void struct_decl(CType *type, int u)
 {
@@ -4431,36 +4480,26 @@ do_decl:
         /* non empty enums are not allowed */
         ps = &s->next;
         if (u == VT_ENUM) {
-            long long ll = 0, pl = 0, nl = 0, ni = 0, pi = 0;
-	    unsigned long long mu = 0;
+            long long ll = 0, pl = 0, nl = 0;
 	    CType t;
             t.ref = s;
+            s->sym_scope = local_scope; /* anonymous symbol won't have set */
             /* enum symbols have static storage */
             t.t = VT_INT|VT_STATIC|VT_ENUM_VAL;
-            if (bt) {
+            if (bt)
                 t.t = bt|VT_STATIC|VT_ENUM_VAL;
-		mu = 1llu << (type_size(&t, &align) * 8 - 1);
-		pi = mu - 1;
-		ni = -mu;
-		mu = (mu << 1) - 1u;
-	    }
             for(;;) {
                 v = tok;
                 if (v < TOK_UIDENT)
                     expect("identifier");
-                ss = sym_find(v);
-                if (ss && !local_stack)
-                    tcc_error("redefinition of enumerator '%s'",
-                              get_tok_str(v, NULL));
                 next();
                 if (tok == '=') {
                     next();
 		    ll = expr_const64();
                 }
-		if (bt && (t.t & VT_UNSIGNED ? (unsigned long long)ll > mu
-		                             : ll < ni || ll > pi))
-		    tcc_error("enumerator value outside the range of underlying type '%s'",
-			      get_tok_str(v, NULL));
+                if (bt && !in_range(ll, t.t))
+		    tcc_error("enumerator '%s' out of range of its type",
+			get_tok_str(v, NULL));
                 ss = sym_push(v, &t, VT_CONST, 0);
                 ss->enum_val = ll;
                 *ps = ss, ps = &ss->next;
@@ -4626,9 +4665,9 @@ do_decl:
 	    check_fields(type, 1);
 	    check_fields(type, 0);
             struct_layout(type, &ad);
-	    if (debug_modes)
-		tcc_debug_fix_forw(tcc_state, type);
         }
+        if (debug_modes)
+            tcc_debug_fix_forw(tcc_state, type);
     }
 }
 
@@ -4860,8 +4899,11 @@ static int parse_btype(CType *type, AttributeDef *ad, int ignore_label)
             parse_expr_type(&type1);
             /* remove all storage modifiers except typedef */
             type1.t &= ~(VT_STORAGE&~VT_TYPEDEF);
-	    if (type1.ref)
+            if (type1.ref) {
                 sym_to_attr(ad, type1.ref);
+                if (type1.t & VT_ARRAY)
+                    type1.t |= VT_BT_ARRAY;
+            }
             goto basic_type2;
         case TOK_THREAD_LOCAL:
             tcc_error("_Thread_local is not implemented");
@@ -4886,12 +4928,12 @@ static int parse_btype(CType *type, AttributeDef *ad, int ignore_label)
             if (t)
                 parse_btype_qualify(type, t);
             t = type->t;
+            if (t & VT_ARRAY)
+                t |= VT_BT_ARRAY;
             /* get attributes from typedef */
             sym_to_attr(ad, s);
             typespec_found = 1;
             st = bt = -2;
-	    if (type->ref && (t & VT_ARRAY) && type->ref->c < 0)
-	        type->ref = sym_push(SYM_FIELD, &type->ref->type, 0, type->ref->c);
             break;
         }
         type_found = 1;
@@ -4994,15 +5036,15 @@ static int post_type(CType *type, AttributeDef *ad, int storage, int td)
                     type_decl(&pt, &ad1, &n, TYPE_DIRECT | TYPE_ABSTRACT | TYPE_PARAM);
                     if ((pt.t & VT_BTYPE) == VT_VOID)
                         tcc_error("parameter declared as void");
-                    if (local_scope > 1 || n == 0)
-                        n = SYM_FIELD;
+                    if (n == 0 || (td & TYPE_PARAM))
+                        n |= SYM_FIELD;
                 } else {
                     n = tok;
                     pt.t = VT_INT | VT_EXTERN; /* default type */
                     pt.ref = NULL;
                     next();
                 }
-                if (local_scope == 1 && n < TOK_UIDENT)
+                if (n < TOK_UIDENT)
                     expect("identifier");
                 convert_parameter_type(&pt);
                 arg_size += (type_size(&pt, &align) + PTR_SIZE - 1) / PTR_SIZE;
@@ -5026,7 +5068,6 @@ static int post_type(CType *type, AttributeDef *ad, int storage, int td)
             /* if no parameters, then old type prototype */
             l = FUNC_OLD;
         skip(')');
-        --local_scope;
         /* NOTE: const is ignored in returned type as it has a special
            meaning in gcc / C++ */
         type->t &= ~VT_CONSTANT; 
@@ -5046,10 +5087,9 @@ static int post_type(CType *type, AttributeDef *ad, int storage, int td)
         s->next = first;
         type->t = VT_FUNC;
         type->ref = s;
-
-        /* unlink symbols from the token table, keep on stack */
+        /* unlink parameter symbols from the token table, keep on stack */
         sym_pop(ps, sr, 1);
-        //psyms("---", *ps, sr);
+        --local_scope;
 
     } else if (tok == '[') {
 	int saved_nocode_wanted = nocode_wanted;
@@ -6901,7 +6941,7 @@ static void try_call_scope_cleanup(Sym *stop)
     Sym *cls = cur_scope->cl.s;
     for (; cls != stop; cls = cls->next) {
 	Sym *fs = cls->cleanup_func;
-	Sym *vs = cls->prev_tok;
+	Sym *vs = cls->cleanup_sym;
 	save_lvalues();
 	vpushsym(&fs->type, fs);
 	vset(&vs->type, vs->r, vs->c);
@@ -6911,6 +6951,7 @@ static void try_call_scope_cleanup(Sym *stop)
 	gfunc_call(1);
     }
 }
+
 
 static void try_call_cleanup_goto(Sym *cleanupstate)
 {
@@ -6938,7 +6979,7 @@ static void block_cleanup(struct scope *o)
     int jmp = 0;
     Sym *g, **pg;
     for (pg = &pending_gotos; (g = *pg) && g->c > o->cl.n;) {
-        if (g->prev_tok->r & LABEL_FORWARD) {
+        if (g->cleanup_label->r & LABEL_FORWARD) {
             Sym *pcl = g->next;
             if (!jmp)
                 jmp = gjmp(0);
@@ -7360,7 +7401,7 @@ again:
 		/* start new goto chain for cleanups, linked via label->next */
 		if (cur_scope->cl.s && !nocode_wanted) {
                     sym_push2(&pending_gotos, SYM_FIELD, 0, cur_scope->cl.n);
-                    pending_gotos->prev_tok = s;
+                    pending_gotos->cleanup_label = s;
                     s = sym_push2(&s->next, SYM_FIELD, 0, 0);
                     pending_gotos->next = s;
                 }
@@ -7570,7 +7611,7 @@ static void decl_design_flex(init_params *p, Sym *ref, int index)
     if (ref == p->flex_array_ref) {
         if (index >= ref->c)
             ref->c = index + 1;
-    } else if (ref->c < 0)
+    } else if (ref->c < 0 && index >= 0)
         tcc_error("flexible array has zero size in this context");
 }
 
@@ -8029,7 +8070,7 @@ static void decl_initializer(init_params *p, CType *type, unsigned long c, int f
             /* GNU extension: if the initializer is empty for a flex array,
                it's size is zero.  We won't enter the loop, so set the size
                now.  */
-            decl_design_flex(p, s, len);
+            decl_design_flex(p, s, len - 1);
 	    while (tok != '}' || (flags & DIF_HAVE_ELEM)) {
 		len = decl_designator(p, type, c, &f, flags, len);
 		flags &= ~DIF_HAVE_ELEM;
@@ -8165,6 +8206,13 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
         // (arrays of incomplete types are handled in array parsing)
         if (!(type->t & VT_ARRAY))
             tcc_error("initialization of incomplete type");
+        /* If the base type itself was an array type of unspecified
+           size (like in 'typedef int arr[]; arr x = {1};') then
+           we will overwrite the unknown size by the real one for
+           this decl.  We need to unshare the ref symbol holding
+           that size.  */
+        if (type->t & VT_BT_ARRAY)
+            type->ref = sym_push(SYM_FIELD, &type->ref->type, 0, type->ref->c);
         p.flex_array_ref = type->ref;
 
     } else if (has_init && (type->t & VT_BTYPE) == VT_STRUCT) {
@@ -8182,8 +8230,8 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
 
     if (size < 0) {
         /* If unknown size, do a dry-run 1st pass */
-        if (!has_init) 
-            tcc_error("unknown type size");
+        if (!has_init)
+            goto err_size;
         if (has_init == 2) {
             /* only get strings */
             init_str = tok_str_alloc();
@@ -8206,7 +8254,8 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
 
         /* if still unknown size, error */
         size = type_size(type, &align);
-        if (size < 0) 
+        if (size < 0)
+    err_size:
             tcc_error("unknown type size");
 
         /* If there's a flex member and it was used in the initializer
@@ -8258,7 +8307,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
 	    if (ad->cleanup_func) {
 		Sym *cls = sym_push2(&all_cleanups,
                     SYM_FIELD | ++cur_scope->cl.n, 0, 0);
-		cls->prev_tok = sym;
+		cls->cleanup_sym = sym;
 		cls->cleanup_func = ad->cleanup_func;
 		cls->next = cur_scope->cl.s;
 		cur_scope->cl.s = cls;
@@ -8423,19 +8472,21 @@ ST_FUNC Sym *gfunc_set_param(Sym *s, int c, int byref)
         return NULL;
     s->c = c;
     if (byref)
-        s->r = VT_LLOCAL | VT_LVAL;
+        s->r = VT_LLOCAL | VT_LVAL; /* otherwise VT_LOCAL */
     return s;
 }
 
 /* push parameters (and their types), last first */
 static void sym_push_params(Sym *ref)
 {
-    Sym *s;
-    for (s = ref; s->next; s = s->next)
-        ;
-    for (; s && s != ref; s = s->prev)
+    Sym *s = ref;
+    while (s->next)
+        s = s->next;
+    while (s != ref) {
         if ((s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM)
             sym_copy(s, &local_stack);
+        s = s->prev;
+    }
 }
 
 /* parse a function defined by symbol 'sym' and generate its code in
@@ -8473,8 +8524,8 @@ static void gen_function(Sym *sym)
     /* push a dummy symbol to enable local sym storage */
     sym_push2(&local_stack, SYM_FIELD, 0, 0);
     /* push parameters */
+    local_scope = 1;
     sym_push_params(sym->type.ref);
-    //psyms(funcname, local_stack, 0);
 
     local_scope = 0;
     rsym = 0;
@@ -8608,7 +8659,7 @@ static int decl(int l)
 {
     int v, has_init, r, oldint;
     CType type, btype;
-    Sym *sym;
+    Sym *sym, *sa;
     AttributeDef ad, adbase;
     ElfSym *esym;
 
@@ -8663,22 +8714,8 @@ static int decl(int l)
         while (1) { /* iterate thru each declaration */
             type = btype;
 	    ad = adbase;
-            if ((btype.t & VT_ARRAY) && btype.ref->c < 0) {
-                /* If the base type itself was an array type of unspecified
-                   size (like in 'typedef int arr[]; arr x = {1};') then
-                   we will overwrite the unknown size by the real one for
-                   this decl.  We need to unshare the ref symbol holding
-                   that size.  */
-                type.ref = sym_push(SYM_FIELD, &type.ref->type, 0, type.ref->c);
-            }
             type_decl(&type, &ad, &v, TYPE_DIRECT);
-#if 0
-            {
-                char buf[500];
-                type_to_str(buf, sizeof(buf), &type, get_tok_str(v, NULL));
-                printf("type = '%s'\n", buf);
-            }
-#endif
+
             if ((type.t & VT_BTYPE) == VT_FUNC) {
                 if ((type.t & VT_STATIC) && (l != VT_CONST))
                     tcc_error("function without file scope cannot be static");
@@ -8722,8 +8759,6 @@ static int decl(int l)
             pe_check_linkage(&type, &ad);
 #endif
             if (tok == '{') {
-                Sym *sa;
-
                 if (l != VT_CONST)
                     tcc_error("cannot use local functions");
                 if ((type.t & VT_BTYPE) != VT_FUNC)

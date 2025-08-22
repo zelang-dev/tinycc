@@ -842,7 +842,7 @@ static void asm_parse_directive(TCCState *s1, int global)
 
             if (!strcmp(newtype, "function") || !strcmp(newtype, "STT_FUNC")) {
                 if (IS_ASM_SYM(sym))
-                    sym->type.t = (sym->type.t & ~VT_ASM) | VT_ASM_FUNC;
+                    sym->type.t |= VT_ASM_FUNC;
                 st_type = STT_FUNC;
             set_st_type:
                 if (sym->c) {

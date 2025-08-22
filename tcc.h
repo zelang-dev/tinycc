@@ -552,13 +552,17 @@ typedef struct Sym {
     CType type; /* associated type */
     union {
         struct Sym *next; /* next related symbol (for fields and anoms) */
-        int *e; /* expanded token stream */
+        int *e; /* expanded token stream with preprocessor macros */
         int asm_label; /* associated asm label */
         struct Sym *cleanupstate; /* in defined labels */
         int *vla_array_str; /* vla array code */
     };
     struct Sym *prev; /* prev symbol in stack */
-    struct Sym *prev_tok; /* previous symbol for this token */
+    union {
+        struct Sym *prev_tok; /* previous symbol for this token */
+        struct Sym *cleanup_sym; /* symbol from __attribute__((cleanup())) */
+        struct Sym *cleanup_label; /* label in 'pending_gotos' chain */
+    };
 } Sym;
 
 /* section definition */
@@ -1074,7 +1078,7 @@ struct filespec {
 
 #define VT_UNION    (1 << VT_STRUCT_SHIFT | VT_STRUCT)
 #define VT_ENUM     (2 << VT_STRUCT_SHIFT) /* integral type is an enum really */
-#define VT_ENUM_VAL (4 << VT_STRUCT_SHIFT) /* integral type is an enum constant really */
+#define VT_ENUM_VAL (3 << VT_STRUCT_SHIFT) /* integral type is an enum constant really */
 
 #define IS_ENUM(t) ((t & VT_STRUCT_MASK) == VT_ENUM)
 #define IS_ENUM_VAL(t) ((t & VT_STRUCT_MASK) == VT_ENUM_VAL)
@@ -1087,9 +1091,13 @@ struct filespec {
 #define VT_TYPE (~(VT_STORAGE|VT_STRUCT_MASK))
 
 /* symbol was created by tccasm.c first */
-#define VT_ASM (VT_VOID | 1 << VT_STRUCT_SHIFT)
-#define VT_ASM_FUNC (VT_ASM | 2 << VT_STRUCT_SHIFT)
-#define IS_ASM_SYM(sym) (((sym)->type.t & (VT_BTYPE | VT_ASM)) == VT_ASM)
+#define VT_ASM (VT_VOID | 4 << VT_STRUCT_SHIFT)
+#define VT_ASM_FUNC (VT_VOID | 5 << VT_STRUCT_SHIFT)
+#define IS_ASM_SYM(sym) (((sym)->type.t & ((VT_BTYPE|VT_STRUCT_MASK) & ~(1<<VT_STRUCT_SHIFT))) == VT_ASM)
+#define IS_ASM_FUNC(t) ((t & (VT_BTYPE|VT_STRUCT_MASK)) == VT_ASM_FUNC)
+
+/* base type is array (from typedef/typeof) */
+#define VT_BT_ARRAY (6 << VT_STRUCT_SHIFT)
 
 /* general: set/get the pseudo-bitfield value for bit-mask M */
 #define BFVAL(M,N) ((unsigned)((M) & ~((M) << 1)) * (N))

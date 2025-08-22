@@ -13,6 +13,7 @@ typedef struct FunStruct MyFunStruct;
 typedef MyFunStruct *MoreFunThanEver;
 
 typedef int t[];
+int tints[];
 
 int main()
 {
@@ -35,6 +36,14 @@ int main()
 
    printf("%d\n", (int)sizeof((t){1,2,3}));
    printf("%d\n", (int)sizeof((t){1,2,3,4}));
+
+   /* two arrays derived from same base type */
+   t t3 = { 1,2,3 }, t4 = { 4,5,6,7 };
+   for (p = t3, i = 0; i < 3 ; i++) printf("%d ", *p++);
+   for (p = t4, i = 0; i < 4 ; i++) printf("%d ", *p++); printf("\n");
+   typeof(tints) t5 = { 1,2,3 }, t6 = { 4,5,6,7 };
+   for (p = t5, i = 0; i < 3 ; i++) printf("%d ", *p++);
+   for (p = t6, i = 0; i < 4 ; i++) printf("%d ", *p++); printf("\n");
 
    return 0;
 }
