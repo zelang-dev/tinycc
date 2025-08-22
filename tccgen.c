@@ -4612,7 +4612,7 @@ do_decl:
 	    check_fields(type, 0);
             struct_layout(type, &ad);
 	    if (debug_modes)
-		tcc_debug_fix_anon(tcc_state, type);
+		tcc_debug_fix_forw(tcc_state, type);
         }
     }
 }
