@@ -290,6 +290,9 @@
      DEF(TOK___fixdfdi, "__fixdfdi")
      DEF(TOK___fixxfdi, "__fixxfdi")
 #endif
+#if defined TCC_TARGET_X86_64
+     DEF(TOK___fixxfdi, "__fixxfdi")
+#endif
 
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
      DEF(TOK_alloca, "alloca")
