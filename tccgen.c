@@ -4431,13 +4431,19 @@ do_decl:
         /* non empty enums are not allowed */
         ps = &s->next;
         if (u == VT_ENUM) {
-            long long ll = 0, pl = 0, nl = 0;
+            long long ll = 0, pl = 0, nl = 0, ni = 0, pi = 0;
+	    unsigned long long mu = 0;
 	    CType t;
             t.ref = s;
             /* enum symbols have static storage */
             t.t = VT_INT|VT_STATIC|VT_ENUM_VAL;
-            if (bt)
+            if (bt) {
                 t.t = bt|VT_STATIC|VT_ENUM_VAL;
+		mu = 1llu << (type_size(&t, &align) * 8 - 1);
+		pi = mu - 1;
+		ni = -mu;
+		mu = (mu << 1) - 1u;
+	    }
             for(;;) {
                 v = tok;
                 if (v < TOK_UIDENT)
@@ -4451,6 +4457,10 @@ do_decl:
                     next();
 		    ll = expr_const64();
                 }
+		if (bt && (t.t & VT_UNSIGNED ? (unsigned long long)ll > mu
+		                             : ll < ni || ll > pi))
+		    tcc_error("enumerator value outside the range of underlying type '%s'",
+			      get_tok_str(v, NULL));
                 ss = sym_push(v, &t, VT_CONST, 0);
                 ss->enum_val = ll;
                 *ps = ss, ps = &ss->next;
