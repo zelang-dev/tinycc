@@ -77,10 +77,47 @@ struct st func(void)
 }
 
 /* --------------------------------------------- */
+static void func2(char *(*md)(char *md))
+{
+   (*md)("test");
+}
+
+static char *a(char *a)
+{
+    printf("%s\n", a);
+    return a;
+}
+
+int main_4(void)
+{
+    func2(a);
+    return 0;
+}
+
+/* --------------------------------------------- */
+int b[3];
+int f(void);
+
+int main_5(void)
+{
+    extern int b[3];
+    b[2]=10;
+    printf("%d\n", f());
+    return 0;
+}
+
+int f(void)
+{
+    return b[2]==10 ? 1 : 0;
+}
+
+/* --------------------------------------------- */
 int main()
 {
     main_1();
     main_2();
     main_3();
+    main_4();
+    main_5();
     return 0;
 }

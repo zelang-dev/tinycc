@@ -1263,7 +1263,7 @@ static void patch_type(Sym *sym, CType *type)
     } else {
         if ((sym->type.t & VT_ARRAY) && type->ref->c >= 0) {
             /* set array size if it was omitted in extern declaration */
-            sym->type.ref = type->ref;
+            sym->type.ref->c = type->ref->c;
         }
         if ((type->t ^ sym->type.t) & VT_STATIC)
             tcc_warning("storage mismatch for redefinition of '%s'",
@@ -4890,6 +4890,8 @@ static int parse_btype(CType *type, AttributeDef *ad, int ignore_label)
             sym_to_attr(ad, s);
             typespec_found = 1;
             st = bt = -2;
+	    if (type->ref && (t & VT_ARRAY) && type->ref->c < 0)
+	        type->ref = sym_push(SYM_FIELD, &type->ref->type, 0, type->ref->c);
             break;
         }
         type_found = 1;
@@ -4992,7 +4994,7 @@ static int post_type(CType *type, AttributeDef *ad, int storage, int td)
                     type_decl(&pt, &ad1, &n, TYPE_DIRECT | TYPE_ABSTRACT | TYPE_PARAM);
                     if ((pt.t & VT_BTYPE) == VT_VOID)
                         tcc_error("parameter declared as void");
-                    if (n == 0)
+                    if (local_scope > 1 || n == 0)
                         n = SYM_FIELD;
                 } else {
                     n = tok;
@@ -5000,7 +5002,7 @@ static int post_type(CType *type, AttributeDef *ad, int storage, int td)
                     pt.ref = NULL;
                     next();
                 }
-                if (n < TOK_UIDENT)
+                if (local_scope == 1 && n < TOK_UIDENT)
                     expect("identifier");
                 convert_parameter_type(&pt);
                 arg_size += (type_size(&pt, &align) + PTR_SIZE - 1) / PTR_SIZE;
@@ -8685,7 +8687,9 @@ static int decl(int l)
                 sym = type.ref;
                 if (sym->f.func_type == FUNC_OLD && l == VT_CONST) {
                     func_vt = type;
+		    ++local_scope;
                     decl(VT_CMP);
+		    --local_scope;
                 }
                 if ((type.t & (VT_EXTERN|VT_INLINE)) == (VT_EXTERN|VT_INLINE)) {
                     /* always_inline functions must be handled as if they

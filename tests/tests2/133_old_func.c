@@ -8,6 +8,16 @@ float x;
 
 void func(float a);
 
+void func3(struct p { int a; int b; } *q) {
+}
+
+void func4(q)
+ struct p { int a; int b; int c; } *q;
+{
+}
+
+struct p { int a; int b; int c; int d; };
+
 int
 main(void)
 {

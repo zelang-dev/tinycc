@@ -21,3 +21,5 @@
 129_scopes.c:43: ok : "!in"
 129_scopes.c:59: ok : "c == 'a'"
 129_scopes.c:69: ok : "st.a == 10"
+test
+1

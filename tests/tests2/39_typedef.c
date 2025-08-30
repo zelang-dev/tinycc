@@ -12,8 +12,11 @@ typedef struct FunStruct MyFunStruct;
 
 typedef MyFunStruct *MoreFunThanEver;
 
+typedef int t[];
+
 int main()
 {
+   int i, *p;
    MyInt a = 1;
    printf("%d\n", a);
 
@@ -24,6 +27,14 @@ int main()
 
    MoreFunThanEver c = &b;
    printf("%d,%d\n", c->i, c->j);
+
+   p = (t){1,2,3};
+   for (i = 0; i < 3 ; i++) printf("%d ", *p++); printf("\n");
+   p = (t){1,2,3,4};
+   for (i = 0; i < 4 ; i++) printf("%d ", *p++); printf("\n");
+
+   printf("%d\n", (int)sizeof((t){1,2,3}));
+   printf("%d\n", (int)sizeof((t){1,2,3,4}));
 
    return 0;
 }
