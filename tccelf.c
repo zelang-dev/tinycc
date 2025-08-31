@@ -2856,6 +2856,10 @@ static int elf_output_file(TCCState *s1, const char *filename)
 #if TARGETOS_FreeBSD || TARGETOS_NetBSD
     dyninf.roinf = NULL;
 #endif
+#if TARGETOS_FreeBSD
+    dyninf.note = find_section (s1, ".note.tag");
+#endif
+
         /* if linking, also link in runtime libraries (libc, libgcc, etc.) */
         tcc_add_runtime(s1);
 	resolve_common_syms(s1);
