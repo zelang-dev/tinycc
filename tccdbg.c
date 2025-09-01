@@ -1500,6 +1500,8 @@ ST_FUNC void tcc_debug_line(TCCState *s1)
 		else {
 	            dwarf_line_op(s1, DW_LNS_advance_line);
 		    dwarf_sleb128_op(s1, len_line);
+                    /* advance by nothing */
+	            dwarf_line_op(s1, DWARF_OPCODE_BASE - DWARF_LINE_BASE);
 		}
 	    }
 	}
@@ -2209,9 +2211,9 @@ static void tcc_debug_finish (TCCState *s1, struct _debug_info *cur)
 		}
 		else {
 		    /* param/local */
-                    dwarf_data1(dwarf_info_section, dwarf_sleb128_size(s->value) + 1);
+                    dwarf_data1(dwarf_info_section, dwarf_sleb128_size((long)s->value) + 1);
                     dwarf_data1(dwarf_info_section, DW_OP_fbreg);
-                    dwarf_sleb128(dwarf_info_section, s->value);
+                    dwarf_sleb128(dwarf_info_section, (long)s->value);
 		}
 		tcc_free (s->str);
             }

@@ -1656,54 +1656,6 @@ static inline void write64le(unsigned char *p, uint64_t x) {
 static inline void add64le(unsigned char *p, int64_t x) {
     write64le(p, read64le(p) + x);
 }
-#define DWARF_MAX_128	((8 * sizeof (int64_t) + 6) / 7)
-#define	dwarf_read_1(ln,end) \
-	((ln) < (end) ? *(ln)++ : 0)
-#define	dwarf_read_2(ln,end) \
-	((ln) + 1 < (end) ? (ln) += 2, read16le((ln) - 2) : 0)
-#define	dwarf_read_4(ln,end) \
-	((ln) + 3 < (end) ? (ln) += 4, read32le((ln) - 4) : 0)
-#define	dwarf_read_8(ln,end) \
-	((ln) + 7 < (end) ? (ln) += 8, read64le((ln) - 8) : 0)
-static inline uint64_t
-dwarf_read_uleb128(unsigned char **ln, unsigned char *end)
-{
-    unsigned char *cp = *ln;
-    uint64_t retval = 0;
-    int i;
-
-    for (i = 0; i < DWARF_MAX_128; i++) {
-	uint64_t byte = dwarf_read_1(cp, end);
-
-        retval |= (byte & 0x7f) << (i * 7);
-	if ((byte & 0x80) == 0)
-	    break;
-    }
-    *ln = cp;
-    return retval;
-}
-static inline int64_t
-dwarf_read_sleb128(unsigned char **ln, unsigned char *end)
-{
-    unsigned char *cp = *ln;
-    int64_t retval = 0;
-    int i;
-
-    for (i = 0; i < DWARF_MAX_128; i++) {
-	uint64_t byte = dwarf_read_1(cp, end);
-
-        retval |= (byte & 0x7f) << (i * 7);
-	if ((byte & 0x80) == 0) {
-	    if ((byte & 0x40) && (i + 1) * 7 < 64)
-		retval |= (uint64_t)-1LL << ((i + 1) * 7);
-	    break;
-	}
-    }
-    *ln = cp;
-    return retval;
-}
-
-
 /* ------------ i386-gen.c ------------ */
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64 || defined TCC_TARGET_ARM
 ST_FUNC void g(int c);
@@ -1892,6 +1844,49 @@ ST_FUNC void tcc_tcov_reset_ind(TCCState *s1);
 #define dwarf_str_section       s1->dwarf_str_section
 #define dwarf_line_str_section  s1->dwarf_line_str_section
 
+#define DWARF_MAX_128	((8 * sizeof (int64_t) + 6) / 7)
+#define	dwarf_read_1(ln,end) \
+	((ln) < (end) ? *(ln)++ : 0)
+#define	dwarf_read_2(ln,end) \
+	((ln) + 1 < (end) ? read16le(((ln)+=2) - 2) : 0)
+#define	dwarf_read_4(ln,end) \
+	((ln) + 3 < (end) ? read32le(((ln)+=4) - 4) : 0)
+#define	dwarf_read_8(ln,end) \
+	((ln) + 7 < (end) ? read64le(((ln)+=8) - 8) : 0)
+static inline uint64_t
+dwarf_read_uleb128(unsigned char **ln, unsigned char *end)
+{
+    unsigned char *cp = *ln;
+    uint64_t retval = 0;
+    int i;
+    for (i = 0; i < DWARF_MAX_128; i++) {
+	uint64_t byte = dwarf_read_1(cp, end);
+        retval |= (byte & 0x7f) << (i * 7);
+	if ((byte & 0x80) == 0)
+	    break;
+    }
+    *ln = cp;
+    return retval;
+}
+static inline int64_t
+dwarf_read_sleb128(unsigned char **ln, unsigned char *end)
+{
+    unsigned char *cp = *ln;
+    int64_t retval = 0;
+    int i;
+    for (i = 0; i < DWARF_MAX_128; i++) {
+	uint64_t byte = dwarf_read_1(cp, end);
+        retval |= (byte & 0x7f) << (i * 7);
+	if ((byte & 0x80) == 0) {
+	    if ((byte & 0x40) && (i + 1) * 7 < 64)
+		retval |= (uint64_t)-1LL << ((i + 1) * 7);
+	    break;
+	}
+    }
+    *ln = cp;
+    return retval;
+}
+
 /* default dwarf version for "-gdwarf" */
 #ifdef TCC_TARGET_MACHO
 # define DEFAULT_DWARF_VERSION 2
@@ -1904,9 +1899,7 @@ ST_FUNC void tcc_tcov_reset_ind(TCCState *s1);
 # define CONFIG_DWARF_VERSION 0
 #endif
 
-#if defined TCC_TARGET_PE
-# define R_DATA_32DW 'Z' /* fake code to avoid DLL relocs */
-#elif defined TCC_TARGET_X86_64
+#if defined TCC_TARGET_X86_64
 # define R_DATA_32DW R_X86_64_32
 #else
 # define R_DATA_32DW R_DATA_32

@@ -234,8 +234,8 @@ Advanced options (experts only):
 Cross build options (experimental):
   --cpu=CPU                target CPU [$cpu]
   --targetos=...           target OS (Darwin,WIN32,Android/Termux) [$targetos]
+  --os-release=x.y.z       target os release x.y.z [$os_release] (with BSD systems)
   --cross-prefix=PREFIX    use PREFIX for compile tools [$cross_prefix]
-  --os-release=x.y.z       use os release x.y.z [$os_release]
 EOF
 exit 1
 }
@@ -260,6 +260,7 @@ fi
 # OS specific
 buildos=$(uname)
 cpu_sys=$(uname -m)
+default os_release "$(uname -r)"
 
 case $buildos in
   Windows_NT|MINGW*|MSYS*|CYGWIN*)
@@ -292,11 +293,6 @@ then
   build_cross="yes"
   cc="${cross_prefix}${cc}"
   ar="${cross_prefix}${ar}"
-fi
-
-if test -z "$os_release"
-then
-   os_release=$(uname -r)
 fi
 
 case "$cpu" in
