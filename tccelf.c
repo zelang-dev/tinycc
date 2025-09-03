@@ -2803,23 +2803,62 @@ static void create_arm_attribute_section(TCCState *s1)
 }
 #endif
 
-#if TARGETOS_OpenBSD || TARGETOS_NetBSD
+#if TARGETOS_OpenBSD || TARGETOS_NetBSD || TARGETOS_FreeBSD
+#include <sys/utsname.h>
+
+static void fill_bsd_note(Section *s, int type,
+			  const char *value, uint32_t data)
+{
+    unsigned long offset = 0;
+    char *ptr;
+    ElfW(Nhdr) *note;
+    int align = s->sh_addralign;
+
+    /* check if type present */
+    while (offset + sizeof(ElfW(Nhdr)) < s->data_offset) {
+        note = (ElfW(Nhdr) *) (s->data + offset);
+	if (note->n_type == type)
+	    return;
+	offset += (sizeof(ElfW(Nhdr)) + note->n_namesz + note->n_descsz +
+		  align - 1) & -align;
+    }
+    ptr = section_ptr_add(s, sizeof(ElfW(Nhdr)) + 8 + 4);
+    note = (ElfW(Nhdr) *) ptr;
+    note->n_namesz = 8;
+    note->n_descsz = 4;
+    note->n_type = type;
+    strcpy (ptr + sizeof(ElfW(Nhdr)), value);
+    memcpy (ptr + sizeof(ElfW(Nhdr)) + 8, &data, 4);
+}
+
 static Section *create_bsd_note_section(TCCState *s1,
 					const char *name,
 					const char *value)
 {
-    Section *s = find_section (s1, name);
+    Section *s;
+    unsigned int major = 0, minor = 0, patch = 0;
+    struct utsname uts;
 
-    if (s->data_offset == 0) {
-        char *ptr = section_ptr_add(s, sizeof(ElfW(Nhdr)) + 8 + 4);
-        ElfW(Nhdr) *note = (ElfW(Nhdr) *) ptr;
-
-        s->sh_type = SHT_NOTE;
-        note->n_namesz = 8;
-        note->n_descsz = 4;
-        note->n_type = ELF_NOTE_OS_GNU;
-	strcpy (ptr + sizeof(ElfW(Nhdr)), value);
-    }
+    if (!uname(&uts))
+	sscanf(uts.release, "%u.%u.%u", &major, &minor, &patch);
+#if TARGETOS_FreeBSD
+    if (major < 14)
+	return NULL;
+#endif
+    s = find_section (s1, name);
+    s->sh_type = SHT_NOTE;
+#if TARGETOS_OpenBSD
+    fill_bsd_note(s, ELF_NOTE_OS_GNU, value, 0);
+#elif TARGETOS_NetBSD
+    fill_bsd_note(s, 1 /* NT_NETBSD_IDENT_TAG */, value,
+		  major * 100000000u + (minor % 100u) * 1000000u +
+		  (patch % 10000u) * 100u);
+#elif TARGETOS_FreeBSD
+    fill_bsd_note(s, 1 /* NT_FREEBSD_ABI_TAG */, value,
+		  major * 100000u + (minor % 100u) * 1000u);
+    fill_bsd_note(s, 4 /* NT_FREEBSD_FEATURE_CTL */, value, 0);
+    fill_bsd_note(s, 2 /* NT_FREEBSD_NOINIT_TAG */, value, 0);
+#endif
     return s;
 }
 #endif
@@ -2853,11 +2892,12 @@ static int elf_output_file(TCCState *s1, const char *filename)
     dyninf.note = create_bsd_note_section (s1, ".note.netbsd.ident", "NetBSD");
 #endif
 
+#if TARGETOS_FreeBSD
+    dyninf.note = create_bsd_note_section (s1, ".note.tag", "FreeBSD");
+#endif
+
 #if TARGETOS_FreeBSD || TARGETOS_NetBSD
     dyninf.roinf = NULL;
-#endif
-#if TARGETOS_FreeBSD
-    dyninf.note = find_section (s1, ".note.tag");
 #endif
 
         /* if linking, also link in runtime libraries (libc, libgcc, etc.) */
