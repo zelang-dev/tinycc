@@ -2804,7 +2804,9 @@ static void create_arm_attribute_section(TCCState *s1)
 #endif
 
 #if TARGETOS_OpenBSD || TARGETOS_NetBSD || TARGETOS_FreeBSD
+#ifndef _WIN32
 #include <sys/utsname.h>
+#endif
 
 static void fill_bsd_note(Section *s, int type,
 			  const char *value, uint32_t data)
@@ -2837,10 +2839,13 @@ static Section *create_bsd_note_section(TCCState *s1,
 {
     Section *s;
     unsigned int major = 0, minor = 0, patch = 0;
+#ifndef _WIN32
     struct utsname uts;
 
+/* Maybe move this to configure option for cross compiling */
     if (!uname(&uts))
 	sscanf(uts.release, "%u.%u.%u", &major, &minor, &patch);
+#endif
 #if TARGETOS_FreeBSD
     if (major < 14)
 	return NULL;
