@@ -87,6 +87,7 @@ static const char help[] =
 #ifdef TCC_TARGET_PE
     "  create def file : tcc -impdef lib.dll [-v] [-o lib.def]\n"
 #endif
+    "  report bugs to the mailing list http://lists.nongnu.org/mailman/listinfo/tinycc-devel\n"
     ;
 
 static const char help2[] =
