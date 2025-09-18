@@ -1330,7 +1330,7 @@ static void move_ref_to_global(Sym *s)
     if (!(bt == VT_PTR
        || bt == VT_FUNC
        || bt == VT_STRUCT
-       || (IS_ENUM(s->type.t)) && (bt = VT_ENUM,1)))
+       || ((IS_ENUM(s->type.t)) && (bt = VT_ENUM,1))))
         return;
 
     for (s = s->type.ref, n = 0; s; s = s->next) {
