@@ -367,11 +367,12 @@ static inline void psyms(const char *msg, Sym *s, Sym *last)
 static void type_to_str(char *buf, int buf_size, CType *type, const char *varstr);
 
 /* print type */
-static void ptype(CType *type, int v)
+static void ptype(const char *msg, CType *type, int v)
 {
     char buf[500];
-    type_to_str(buf, sizeof(buf), type, get_tok_str(v, NULL));
-    printf("type = '%s'\n", buf);
+    type_to_str(buf, sizeof(buf), type,
+        (v & ~SYM_FIELD) ? get_tok_str(v, NULL) : NULL);
+    printf("%s : %s;\n", msg, buf);
 }
 #endif
 
@@ -714,13 +715,6 @@ ST_INLN Sym *sym_find(int v)
     return table_ident[v]->sym_identifier;
 }
 
-static int sym_scope_e(Sym *s)
-{
-    return IS_ENUM_VAL (s->type.t)
-        ? s->type.ref->sym_scope
-        : s->sym_scope;
-}
-
 /* make sym in-/visible to the parser */
 static inline void sym_link(Sym *s, int yes)
 {
@@ -731,13 +725,19 @@ static inline void sym_link(Sym *s, int yes)
     else
         ps = &ts->sym_identifier;
     if (yes) {
-        if (*ps && sym_scope_e(*ps) == local_scope)
-            tcc_error("redeclaration of '%s'", get_tok_str(s->v, NULL));
         s->prev_tok = *ps, *ps = s;
         s->sym_scope = local_scope;
     } else {
         *ps = s->prev_tok;
     }
+}
+
+static inline int sym_scope_ex(Sym *s)
+{
+    /* enums have 'sym_scope' overwritten by 'enum_val' */
+    return IS_ENUM_VAL (s->type.t)
+        ? s->type.ref->sym_scope
+        : s->sym_scope;
 }
 
 /* push a given symbol on the symbol stack */
@@ -755,6 +755,8 @@ ST_FUNC Sym *sym_push(int v, CType *type, int r, int c)
     if ((v & ~SYM_STRUCT) < SYM_FIRST_ANOM) {
         /* record symbol in token array */
         sym_link(s, 1);
+        if (s->prev_tok && sym_scope_ex(s->prev_tok) == local_scope)
+            tcc_error("redeclaration of '%s'", get_tok_str(s->v, NULL));
     }
     return s;
 }
@@ -1330,7 +1332,7 @@ static void move_ref_to_global(Sym *s)
     if (!(bt == VT_PTR
        || bt == VT_FUNC
        || bt == VT_STRUCT
-       || ((IS_ENUM(s->type.t)) && (bt = VT_ENUM,1))))
+       || IS_ENUM(s->type.t)))
         return;
 
     for (s = s->type.ref, n = 0; s; s = s->next) {
@@ -1338,18 +1340,18 @@ static void move_ref_to_global(Sym *s)
             if (l == s) {
                 *lp = s->prev;
                 s->prev = global_stack, global_stack = s;
-                if (n || bt == VT_PTR) {
+                if (n || bt == VT_PTR || bt == VT_FUNC) {
                     move_ref_to_global(s);
                 } else {
-                    if ((bt == VT_STRUCT || bt == VT_ENUM)
-                        && (s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM) {
+                    if ((s->v & ~SYM_STRUCT) < SYM_FIRST_ANOM) {
                         /* copy struct/enum tag to local scope */
                         s->v |= SYM_FIELD;
                         l = sym_copy(s, lp);
                         l->v &= ~SYM_FIELD;
                     }
-                    n = 1;
                 }
+                if (bt != VT_PTR)
+                    n = 1;
                 break;
             }
         }
@@ -8715,6 +8717,7 @@ static int decl(int l)
             type = btype;
 	    ad = adbase;
             type_decl(&type, &ad, &v, TYPE_DIRECT);
+            /*ptype("decl", &type, v);*/
 
             if ((type.t & VT_BTYPE) == VT_FUNC) {
                 if ((type.t & VT_STATIC) && (l != VT_CONST))
