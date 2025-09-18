@@ -17,10 +17,6 @@
 /* __VA_ARGS__ and __func__ support */
 #define C99_MACROS
 
-#ifndef __TINYC__
-typedef __SIZE_TYPE__ uintptr_t;
-#endif
-
 #if defined(_WIN32) \
     || (defined(__arm__) \
         && (defined(__FreeBSD__) \
@@ -65,6 +61,10 @@ typedef __SIZE_TYPE__ uintptr_t;
 #include "tcclib.h"
 
 #include "tcctest.h"
+
+#ifndef _TINYC_STDDEF
+#include <stdint.h>
+#endif
 
 /* Test two more ways to include a file named like a pp-number */
 #define INC(name) <tests/name.h>
