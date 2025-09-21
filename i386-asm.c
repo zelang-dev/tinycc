@@ -1416,7 +1416,7 @@ ST_FUNC void asm_compute_constraints(ASMOperand *operands,
             /* any general register */
             if ((reg = op->reg) >= 0)
                 goto reg_found;
-            else for(reg = 0; reg < 8; reg++) {
+            else for(reg = 0; reg < NB_ASM_REGS; reg++) {
                 if (!is_reg_allocated(reg))
                     goto reg_found;
             }
@@ -1451,7 +1451,7 @@ ST_FUNC void asm_compute_constraints(ASMOperand *operands,
             if (j < nb_outputs || c == 'm') {
                 if ((op->vt->r & VT_VALMASK) == VT_LLOCAL) {
                     /* any general register */
-                    for(reg = 0; reg < 8; reg++) {
+                    for(reg = 0; reg < NB_ASM_REGS; reg++) {
                         if (!(regs_allocated[reg] & REG_IN_MASK))
                             goto reg_found1;
                     }
@@ -1484,7 +1484,7 @@ ST_FUNC void asm_compute_constraints(ASMOperand *operands,
         if (op->reg >= 0 &&
             (op->vt->r & VT_VALMASK) == VT_LLOCAL  &&
             !op->is_memory) {
-            for(reg = 0; reg < 8; reg++) {
+            for(reg = 0; reg < NB_ASM_REGS; reg++) {
                 if (!(regs_allocated[reg] & REG_OUT_MASK))
                     goto reg_found2;
             }
