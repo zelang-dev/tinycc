@@ -1233,8 +1233,8 @@ static const char *skip_constraint_modifiers(const char *p)
     return p;
 }
 
-/* If T (a token) is of the form "%reg" returns the register
-   number and type, otherwise return -1.  */
+/* If t (a token) is of the form "%reg" or "reg" return the register number and
+   type, otherwise return -1. With GCC the % is optional, too. */
 ST_FUNC int asm_parse_regvar (int t)
 {
     const char *s;
@@ -1242,13 +1242,14 @@ ST_FUNC int asm_parse_regvar (int t)
     if (t < TOK_IDENT || (t & SYM_FIELD))
         return -1;
     s = table_ident[t - TOK_IDENT]->str;
-    if (s[0] != '%')
-        return -1;
-    t = tok_alloc_const(s + 1);
+    if (s[0] == '%')
+        ++s;
+    t = tok_alloc_const(s);
     unget_tok(t);
+    /* Internally the % prefix is required. */
     unget_tok('%');
     parse_operand(tcc_state, &op);
-    /* Accept only integer regs for now.  */
+    /* Accept only integer regs for now. */
     if (op.type & OP_REG)
         return op.reg;
     else
