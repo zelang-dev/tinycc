@@ -257,9 +257,6 @@ ST_FUNC void libc_free(void *ptr)
     free(ptr);
 }
 
-#define free(p) use_tcc_free(p)
-#define realloc(p, s) use_tcc_realloc(p, s)
-
 /* global so that every tcc_alloc()/tcc_free() call doesn't need to be changed */
 static void *(*reallocator)(void*, unsigned long) = default_reallocator;
 
