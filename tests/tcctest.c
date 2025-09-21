@@ -41,6 +41,8 @@
 #define LONG_DOUBLE_LITERAL(x) x ## L
 #endif
 
+typedef __SIZE_TYPE__ uintptr_t;
+
 /* test various include syntaxes */
 
 #define TCCLIB_INC <tcclib.h>
@@ -61,10 +63,6 @@
 #include "tcclib.h"
 
 #include "tcctest.h"
-
-#ifndef _TINYC_STDDEF
-#include <stdint.h>
-#endif
 
 /* Test two more ways to include a file named like a pp-number */
 #define INC(name) <tests/name.h>

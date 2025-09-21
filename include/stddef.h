@@ -1,6 +1,5 @@
 #ifndef _STDDEF_H
 #define _STDDEF_H
-#define _TINYC_STDDEF
 
 typedef __SIZE_TYPE__ size_t;
 typedef __PTRDIFF_TYPE__ ssize_t;

@@ -56,7 +56,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # include <io.h> /* open, close etc. */
 # include <direct.h> /* getcwd */
 # include <malloc.h> /* alloca */
-# ifdef __GNUC__
+# ifndef _MSC_VER
 #  include <stdint.h>
 # endif
 # define inline __inline
@@ -1235,6 +1235,7 @@ PUB_FUNC char *tcc_strdup_debug(const char *str, const char *file, int line);
 #endif
 
 ST_FUNC void libc_free(void *ptr);
+/* defined to be not used */
 #define free(p) use_tcc_free(p)
 #define malloc(s) use_tcc_malloc(s)
 #define realloc(p, s) use_tcc_realloc(p, s)

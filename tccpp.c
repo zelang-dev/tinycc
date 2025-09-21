@@ -1418,6 +1418,9 @@ static int parse_include(TCCState *s1, int do_next, int test)
 #ifdef INC_DEBUG
             printf("%s: skipping cached %s\n", file->filename, buf);
 #endif
+            if ((s1->verbose | 1) == 3) /* -vv[v] */
+                printf("=> %*s%s\n",
+                   (int)(s1->include_stack_ptr - s1->include_stack), "", buf);
             return 1;
         }
         if (tcc_open(s1, buf) >= 0)
@@ -2740,7 +2743,6 @@ maybe_newline:
             cstr_cat(&tokcstr, (char *) p1, len);
             p--;
             PEEKC(c, p);
-        parse_ident_slow:
             while (isidnum_table[c - CH_EOF] & (IS_ID|IS_NUM))
             {
                 cstr_ccat(&tokcstr, c);
@@ -2752,21 +2754,15 @@ maybe_newline:
         break;
     case 'L':
         t = p[1];
-        if (t != '\\' && t != '\'' && t != '\"') {
-            /* fast case */
-            goto parse_ident_fast;
-        } else {
+        if (t == '\'' || t == '\"' || t == '\\') {
             PEEKC(c, p);
             if (c == '\'' || c == '\"') {
                 is_long = 1;
                 goto str_const;
-            } else {
-                cstr_reset(&tokcstr);
-                cstr_ccat(&tokcstr, 'L');
-                goto parse_ident_slow;
             }
+            *--p = c = 'L';
         }
-        break;
+        goto parse_ident_fast;
 
     case '0': case '1': case '2': case '3':
     case '4': case '5': case '6': case '7':
