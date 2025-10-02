@@ -17,10 +17,6 @@
 /* __VA_ARGS__ and __func__ support */
 #define C99_MACROS
 
-#ifndef __TINYC__
-typedef __SIZE_TYPE__ uintptr_t;
-#endif
-
 #if defined(_WIN32) \
     || (defined(__arm__) \
         && (defined(__FreeBSD__) \
@@ -65,6 +61,10 @@ typedef __SIZE_TYPE__ uintptr_t;
 #include "tcclib.h"
 
 #include "tcctest.h"
+
+#ifndef _TINYC_STDDEF
+#include <stdint.h>
+#endif
 
 /* Test two more ways to include a file named like a pp-number */
 #define INC(name) <tests/name.h>
@@ -1767,9 +1767,13 @@ struct complexinit2 cix22 = {
 };
 
 typedef int arrtype1[];
+arrtype1 sinit19;
+arrtype1 sinit20;
 arrtype1 sinit19 = {1};
 arrtype1 sinit20 = {2,3};
 typedef int arrtype2[3];
+arrtype2 sinit21;
+arrtype2 sinit22;
 arrtype2 sinit21 = {4};
 arrtype2 sinit22 = {5,6,7};
 

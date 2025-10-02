@@ -120,6 +120,7 @@ ST_FUNC void gen_struct_copy(int size);
 
 ST_DATA const char * const target_machine_defs =
     "__x86_64__\0"
+    "__x86_64\0"
     "__amd64__\0"
     ;
 
@@ -396,6 +397,7 @@ void load(int r, SValue *sv)
             v1.type.t = VT_PTR;
             v1.r = VT_LOCAL | VT_LVAL;
             v1.c.i = fc;
+	    v1.sym = NULL;
             fr = r;
             if (!(reg_classes[fr] & (RC_INT|RC_R11)))
                 fr = get_reg(RC_INT);
@@ -408,6 +410,7 @@ void load(int r, SValue *sv)
 	    v1.type.t = VT_LLONG;
 	    v1.r = VT_CONST;
 	    v1.c.i = sv->c.i;
+	    v1.sym = NULL;
 	    fr = r;
 	    if (!(reg_classes[fr] & (RC_INT|RC_R11)))
 	        fr = get_reg(RC_INT);
@@ -972,8 +975,7 @@ void gfunc_prolog(Sym *func_sym)
             if (reg_param_index < REGN) {
                 gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
             }
-            sym_push(sym->v & ~SYM_FIELD, type,
-                     VT_LLOCAL | VT_LVAL, addr);
+            gfunc_set_param(sym, addr, 1);
         } else {
             if (reg_param_index < REGN) {
                 /* save arguments passed by register */
@@ -986,8 +988,7 @@ void gfunc_prolog(Sym *func_sym)
                     gen_modrm64(0x89, arg_regs[reg_param_index], VT_LOCAL, NULL, addr);
                 }
             }
-            sym_push(sym->v & ~SYM_FIELD, type,
-		     VT_LOCAL | VT_LVAL, addr);
+            gfunc_set_param(sym, addr, 0);
         }
         addr += 8;
         reg_param_index++;
@@ -1501,7 +1502,7 @@ void gfunc_prolog(Sym *func_sym)
 	gen_le32(seen_stack_size);
 	/* movq %r11, -0x10(%rbp) */
 	o(0xf05d894c);
-	/* leaq $-192(%rbp), %r11 */
+	/* leaq $-200(%rbp), %r11 */
 	o(0x9d8d4c);
 	gen_le32(-176 - 24);
 	/* movq %r11, -0x8(%rbp) */
@@ -1584,8 +1585,7 @@ void gfunc_prolog(Sym *func_sym)
         }
 	default: break; /* nothing to be done for x86_64_mode_none */
         }
-        sym_push(sym->v & ~SYM_FIELD, type,
-                 VT_LOCAL | VT_LVAL, param_addr);
+        gfunc_set_param(sym, param_addr, 0);
     }
 
 #ifdef CONFIG_TCC_BCHECK
@@ -1937,6 +1937,7 @@ void gen_opf(int op)
                 v1.type.t = VT_PTR;
                 v1.r = VT_LOCAL | VT_LVAL;
                 v1.c.i = fc;
+                v1.sym = NULL;
                 load(r, &v1);
                 fc = 0;
                 vtop->r = r = r | VT_LVAL;
@@ -2005,6 +2006,7 @@ void gen_opf(int op)
                 v1.type.t = VT_PTR;
                 v1.r = VT_LOCAL | VT_LVAL;
                 v1.c.i = fc;
+	        v1.sym = NULL;
                 load(r, &v1);
                 fc = 0;
                 vtop->r = r = r | VT_LVAL;
@@ -2016,6 +2018,7 @@ void gen_opf(int op)
                 gv(RC_FLOAT);
                 vswap();
                 fc = vtop->c.i; /* bcheck may have saved previous vtop[-1] */
+                r = vtop->r;
             }
             
             if ((ft & VT_BTYPE) == VT_DOUBLE) {
@@ -2150,6 +2153,15 @@ void gen_cvt_ftoi(int t)
     ft = vtop->type.t;
     bt = ft & VT_BTYPE;
     if (bt == VT_LDOUBLE) {
+	if (t != VT_INT) {
+	    vpush_helper_func(TOK___fixxfdi);
+	    vswap();
+	    gfunc_call(1);
+	    vpushi(0);
+	    vtop->r = REG_IRET;
+	    vtop->r2 = REG_IRE2;
+	    return;
+	}
         gen_cvt_ftof(VT_DOUBLE);
         bt = VT_DOUBLE;
     }
