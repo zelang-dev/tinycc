@@ -353,8 +353,8 @@ doc : $(TCCDOCS)
 # --------------------------------------------------------------------------
 # install
 
-INSTALL = install -m644
-INSTALLBIN = install -m755 $(STRIP_$(CONFIG_strip))
+INSTALL = install -m 644
+INSTALLBIN = install -m 755 $(STRIP_$(CONFIG_strip))
 STRIP_yes = -s
 
 LIBTCC1_W = $(filter %-win32-libtcc1.a %-wince-libtcc1.a,$(LIBTCC1_CROSS))
