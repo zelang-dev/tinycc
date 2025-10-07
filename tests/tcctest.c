@@ -1686,7 +1686,7 @@ struct structinit1 {
 
 int sinit1 = 2;
 int sinit2 = { 3 };
-int sinit3[3] = { 1, 2, {{3}}, };
+int sinit3[3] = { 1, 2, {3}, };
 int sinit4[3][2] = { {1, 2}, {3, 4}, {5, 6} };
 int sinit5[3][2] = { 1, 2, 3, 4, 5, 6 };
 int sinit6[] = { 1, 2, 3 };
