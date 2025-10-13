@@ -115,13 +115,52 @@ ST_FUNC void expect(const char *msg)
 /* ------------------------------------------------------------------------- */
 /* Custom allocator for tiny objects */
 
+#define PP_ALLOC_INSERT(a) (a)->next = &pp_allocs; \
+		           (a)->prev = pp_allocs.prev; \
+		           pp_allocs.prev->next = (a); \
+		           pp_allocs.prev = (a);
+#define PP_ALLOC_REMOVE(a) (a)->next->prev = (a)->prev; \
+		           (a)->prev->next = (a)->next;
+
+typedef struct pp_alloc_t {
+    struct pp_alloc_t *next, *prev;
+} pp_alloc_t;
+
+static pp_alloc_t pp_allocs;
+
 #define USE_TAL
 
 #ifndef USE_TAL
-#define tal_free(al, p) tcc_free(p)
-#define tal_realloc(al, p, size) tcc_realloc(p, size)
+#define tal_free(al, p) tcc_free_impl(p)
+#define tal_realloc(al, p, size) tcc_realloc_impl(p, size)
 #define tal_new(a,b,c)
 #define tal_delete(a)
+
+static void tcc_free_impl(void *p)
+{
+    if (p) {
+        pp_alloc_t *alloc = ((pp_alloc_t *)p) - 1;
+
+        PP_ALLOC_REMOVE(alloc);
+        tcc_free(alloc);
+    }
+}
+
+static void *tcc_realloc_impl(void *p, unsigned size)
+{
+    pp_alloc_t *alloc = NULL;
+
+    if (p) {
+        alloc = ((pp_alloc_t *)p) - 1;
+        PP_ALLOC_REMOVE(alloc);
+    }
+    if (size) {
+        alloc = tcc_realloc(alloc, size + sizeof(pp_alloc_t));
+        PP_ALLOC_INSERT(alloc);
+        return alloc + 1;
+    }
+    return NULL;
+}
 #else
 #if !defined(MEM_DEBUG)
 #define tal_free(al, p) tal_free_impl(al, p)
@@ -239,8 +278,12 @@ tail_call:
         al = al->next;
         goto tail_call;
     }
-    else
-        tcc_free(p);
+    else {
+	pp_alloc_t *alloc = ((pp_alloc_t *)p) - 1;
+
+        PP_ALLOC_REMOVE(alloc);
+        tcc_free(alloc);
+    }
 }
 
 static void *tal_realloc_impl(TinyAlloc **pal, void *p, unsigned size TAL_DEBUG_PARAMS)
@@ -303,8 +346,12 @@ tail_call:
         goto tail_call;
     }
     if (is_own) {
+	pp_alloc_t *alloc;
+
         al->nb_allocs--;
-        ret = tcc_malloc(size);
+        alloc = tcc_malloc(size + sizeof(pp_alloc_t));
+	PP_ALLOC_INSERT(alloc);
+	ret = alloc + 1;
         header = (((tal_header_t *)p) - 1);
         if (p) memcpy(ret, p, header->size);
 #ifdef TAL_DEBUG
@@ -313,8 +360,21 @@ tail_call:
     } else if (al->next) {
         al = al->next;
         goto tail_call;
-    } else
-        ret = tcc_realloc(p, size);
+    } else {
+	pp_alloc_t *alloc = NULL;
+
+	if (p) {
+	    alloc = ((pp_alloc_t *)p) - 1;
+	    PP_ALLOC_REMOVE(alloc);
+	}
+	if (size) {
+            alloc = tcc_realloc(alloc, size + sizeof(pp_alloc_t));
+	    PP_ALLOC_INSERT(alloc);
+	    ret = alloc + 1;
+	}
+	else
+	    ret = NULL;
+    }
 #ifdef TAL_INFO
     al->nb_missed++;
 #endif
@@ -322,6 +382,17 @@ tail_call:
 }
 
 #endif /* USE_TAL */
+
+static void tal_alloc_init(void)
+{
+    pp_allocs.next = pp_allocs.prev = &pp_allocs;
+}
+
+static void tal_alloc_free(void)
+{
+    while (pp_allocs.next != &pp_allocs)
+	tal_free(toksym_alloc /* dummy */, pp_allocs.next + 1);
+}
 
 /* ------------------------------------------------------------------------- */
 /* CString handling */
@@ -3748,6 +3819,7 @@ ST_FUNC void tccpp_new(TCCState *s)
     /* init allocators */
     tal_new(&toksym_alloc, TOKSYM_TAL_LIMIT, TOKSYM_TAL_SIZE);
     tal_new(&tokstr_alloc, TOKSTR_TAL_LIMIT, TOKSTR_TAL_SIZE);
+    tal_alloc_init();
 
     memset(hash_ident, 0, TOK_HASH_SIZE * sizeof(TokenSym *));
     memset(s->cached_includes_hash, 0, sizeof s->cached_includes_hash);
@@ -3803,6 +3875,7 @@ ST_FUNC void tccpp_delete(TCCState *s)
     tok_str_free_str(unget_buf.str);
 
     /* free allocators */
+    tal_alloc_free();
     tal_delete(toksym_alloc);
     toksym_alloc = NULL;
     tal_delete(tokstr_alloc);
