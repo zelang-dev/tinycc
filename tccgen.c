@@ -409,6 +409,7 @@ ST_FUNC int tccgen_compile(TCCState *s1)
     anon_sym = SYM_FIRST_ANOM;
     nocode_wanted = DATA_ONLY_WANTED; /* no code outside of functions */
     debug_modes = (s1->do_debug ? 1 : 0) | s1->test_coverage << 1;
+    global_expr = 0;
 
     tcc_debug_start(s1);
     tcc_tcov_start (s1);
