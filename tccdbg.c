@@ -1781,6 +1781,8 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
         type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
         if ((type & VT_BTYPE) != VT_BYTE)
             type &= ~VT_DEFSIGN;
+        if (!(type & VT_BITFIELD) && (type & VT_STRUCT_MASK) > VT_ENUM)
+	    type &= ~VT_STRUCT_MASK;
         if (type == VT_PTR || type == (VT_PTR | VT_ARRAY))
             n++, t = t->type.ref;
         else
@@ -1902,6 +1904,8 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
         type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
         if ((type & VT_BTYPE) != VT_BYTE)
             type &= ~VT_DEFSIGN;
+        if (!(type & VT_BITFIELD) && (type & VT_STRUCT_MASK) > VT_ENUM)
+	    type &= ~VT_STRUCT_MASK;
         if (type == VT_PTR || type == (VT_PTR | VT_ARRAY))
             t = t->type.ref;
         else
