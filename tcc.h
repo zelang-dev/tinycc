@@ -1098,6 +1098,7 @@ struct filespec {
 
 /* base type is array (from typedef/typeof) */
 #define VT_BT_ARRAY (6 << VT_STRUCT_SHIFT)
+#define IS_BT_ARRAY(t) ((t & VT_STRUCT_MASK) == VT_BT_ARRAY)
 
 /* general: set/get the pseudo-bitfield value for bit-mask M */
 #define BFVAL(M,N) ((unsigned)((M) & ~((M) << 1)) * (N))

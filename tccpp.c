@@ -159,6 +159,7 @@ static void *tcc_realloc_impl(void *p, unsigned size)
         PP_ALLOC_INSERT(alloc);
         return alloc + 1;
     }
+    tcc_free(alloc);
     return NULL;
 }
 #else
@@ -372,8 +373,10 @@ tail_call:
 	    PP_ALLOC_INSERT(alloc);
 	    ret = alloc + 1;
 	}
-	else
+	else {
+	    tcc_free(alloc);
 	    ret = NULL;
+	}
     }
 #ifdef TAL_INFO
     al->nb_missed++;

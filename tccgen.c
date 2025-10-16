@@ -8204,7 +8204,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
            we will overwrite the unknown size by the real one for
            this decl.  We need to unshare the ref symbol holding
            that size.  */
-        if (type->t & VT_BT_ARRAY)
+        if (IS_BT_ARRAY(type->t))
             type->ref = sym_push(SYM_FIELD, &type->ref->type, 0, type->ref->c);
         p.flex_array_ref = type->ref;
 

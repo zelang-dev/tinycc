@@ -1769,6 +1769,16 @@ static int stabs_struct_find(TCCState *s1, Sym *t, int *p_id)
     return 1;
 }
 
+static int remove_type_info(int type)
+{
+        type &= ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
+        if ((type & VT_BTYPE) != VT_BYTE)
+            type &= ~VT_DEFSIGN;
+        if (!(type & VT_BITFIELD) && (type & VT_STRUCT_MASK) > VT_ENUM)
+	    type &= ~VT_STRUCT_MASK;
+	return type;
+}
+
 static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
 {
     int type;
@@ -1778,11 +1788,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
     CString str;
 
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
-        if (!(type & VT_BITFIELD) && (type & VT_STRUCT_MASK) > VT_ENUM)
-	    type &= ~VT_STRUCT_MASK;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR || type == (VT_PTR | VT_ARRAY))
             n++, t = t->type.ref;
         else
@@ -1861,9 +1867,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
         cstr_printf (result, "%d=", ++debug_next_type);
     t = s;
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR)
             cstr_printf (result, "%d=*", ++debug_next_type);
         else if (type == (VT_PTR | VT_ARRAY))
@@ -1901,11 +1905,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
     if (new_file)
         put_new_file(s1);
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
-        if (!(type & VT_BITFIELD) && (type & VT_STRUCT_MASK) > VT_ENUM)
-	    type &= ~VT_STRUCT_MASK;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR || type == (VT_PTR | VT_ARRAY))
             t = t->type.ref;
         else
@@ -2052,9 +2052,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
     e = NULL;
     t = s;
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR) {
 	    i = dwarf_info_section->data_offset;
 	    if (retval == debug_type)
