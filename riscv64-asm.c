@@ -806,6 +806,9 @@ static void asm_mem_access_opcode(TCCState *s1, int token)
     case TOK_ASM_lwu:
          asm_emit_i(token, (0x0 << 2) | 3 | (6 << 12), &ops[0], &ops[1], &ops[2]);
          return;
+    case TOK_ASM_fld:
+         asm_emit_i(token, (0x1 << 2) | 3 | (3 << 12), &ops[0], &ops[1], &ops[2]);
+         return;
 
     // s{b|h|w|d} rs2, imm(rs1); S-format (with rsX swapped)
     case TOK_ASM_sb:
@@ -819,6 +822,9 @@ static void asm_mem_access_opcode(TCCState *s1, int token)
          return;
     case TOK_ASM_sd:
          asm_emit_s(token, (0x8 << 2) | 3 | (3 << 12), &ops[1], &ops[0], &ops[2]);
+         return;
+    case TOK_ASM_fsd:
+         asm_emit_s(token, (0x9 << 2) | 3 | (3 << 12), &ops[1], &ops[0], &ops[2]);
          return;
     }
 }
@@ -1272,6 +1278,7 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_lh:
     case TOK_ASM_lw:
     case TOK_ASM_ld:
+    case TOK_ASM_fld:
     case TOK_ASM_lbu:
     case TOK_ASM_lhu:
     case TOK_ASM_lwu:
@@ -1279,6 +1286,7 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_sh:
     case TOK_ASM_sw:
     case TOK_ASM_sd:
+    case TOK_ASM_fsd:
         asm_mem_access_opcode(s1, token);
         break;
 
