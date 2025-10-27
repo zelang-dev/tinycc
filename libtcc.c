@@ -1547,6 +1547,7 @@ enum {
     TCC_OPTION_rdynamic,
     TCC_OPTION_pthread,
     TCC_OPTION_run,
+    TCC_OPTION_rstdin,
     TCC_OPTION_w,
     TCC_OPTION_E,
     TCC_OPTION_M,
@@ -1637,6 +1638,7 @@ static const TCCOption tcc_options[] = {
     { "o", TCC_OPTION_o, TCC_OPTION_HAS_ARG },
     { "pthread", TCC_OPTION_pthread, 0},
     { "run", TCC_OPTION_run, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
+    { "rstdin", TCC_OPTION_rstdin, TCC_OPTION_HAS_ARG },
     { "rdynamic", TCC_OPTION_rdynamic, 0 },
     { "r", TCC_OPTION_r, 0 },
     { "Wl,", TCC_OPTION_Wl, TCC_OPTION_HAS_ARG | TCC_OPTION_NOSEP },
@@ -2041,6 +2043,12 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
             goto set_output_type;
 #else
             return tcc_error_noabort("-run is not available in a cross compiler");
+#endif
+#ifdef TCC_IS_NATIVE
+        case TCC_OPTION_rstdin:
+            /* custom stdin for run_main */
+            s->run_stdin = optarg;
+            break;
 #endif
         case TCC_OPTION_v:
             do ++s->verbose; while (*optarg++ == 'v');

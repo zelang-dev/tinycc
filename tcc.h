@@ -976,6 +976,7 @@ struct TCCState {
     const char *run_main; /* entry for tcc_run() */
     void *run_ptr; /* runtime_memory */
     unsigned run_size; /* size of runtime_memory  */
+    const char *run_stdin; /* custom stdin file for run_main */
 #ifdef _WIN64
     void *run_function_table; /* unwind data */
 #endif

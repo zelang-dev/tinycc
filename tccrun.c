@@ -233,6 +233,17 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     prog_main = (void*)get_sym_addr(s1, s1->run_main, 1, 1);
     if ((addr_t)-1 == (addr_t)prog_main)
         return -1;
+
+    /* custom stdin for run_main, mainly if stdin is/was an input file.
+     * fileno(stdin) should remain 0, as posix mandates to use the smallest
+     * free fd, which is 0 after the initial fclose in freopen. windows too.
+     * to set stdin to the tty, use /dev/tty (posix) or con (windows).
+     */
+    if (s1->run_stdin && !freopen(s1->run_stdin, "r", stdin)) {
+        tcc_error_noabort("failed to reopen stdin from '%s'", s1->run_stdin);
+        return -1;
+    }
+
     errno = 0; /* clean errno value */
     fflush(stdout);
     fflush(stderr);
