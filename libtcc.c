@@ -1571,6 +1571,30 @@ enum {
 #define TCC_OPTION_HAS_ARG 0x0001
 #define TCC_OPTION_NOSEP   0x0002 /* cannot have space before option and arg */
 
+/*
+ * in tcc_options, if opt-string A is a prefix of opt-string B,
+ * it's un-ambiguous if and only if option A is without TCC_OPTION_HAS_ARG.
+ * otherwise (A with HAS_ARG), if, for instance, A is FOO and B is FOOBAR,
+ * then "-FOOBAR" is either A with arg BAR, or B (-FOOBARX too, if B HAS_ARG).
+ *
+ * tcc_parse_args searches tcc_options in order, so if ambiguous:
+ * - if the shorter (A) is earlier: the longer (B) is completely unreachable.
+ * - else B wins, and A can't be used with adjacent arg if it also matches B.
+ *
+ * there are few clashes currently, and the longer is always earlier/reachable.
+ * when it's ambiguous, shorter-concat-arg is not useful currently.
+ * the sh(1) script 'optclash' can identifiy clashes (tcc root dir, try "-h").
+ * at the time of writing, running './optclash' prints this:
+
+    -Wl,... (1642) overrides -W... (1644)
+    -Wp,... (1643) overrides -W... (1644)
+    -dumpmachine (1630) overrides -d... (1632)
+    -dumpversion (1631) overrides -d... (1632)
+    -dynamiclib (1623) overrides -d... (1632)
+    -flat_namespace (1624) overrides -f... (1650)
+    -mfloat-abi... (1647) overrides -m... (1649)
+
+ */
 static const TCCOption tcc_options[] = {
     { "h", TCC_OPTION_HELP, 0 },
     { "-help", TCC_OPTION_HELP, 0 },
@@ -1808,6 +1832,27 @@ static void args_parser_add_file(TCCState *s, const char* filename, int filetype
         ++s->nb_libraries;
 }
 
+/*  parsing is between getopt(3) and getopt_long(3), and permuting-like:
+ *  - an option is 1 or more chars.
+ *  - at most 1 option per arg in argv.
+ *  - an option in argv is "-OPT[...]" (few are --OPT, if OPT is "-...").
+ *  - optarg is next arg, or adjacent non-empty (no '='. -std=.. is arg "=..").
+ *  - supports also adjacent-only optarg (typically optional).
+ *  - supports mixed options and operands ("--" is ignored, except with -run).
+ *  - -OPT[...] can be ambiguous, which is resolved using tcc_options's order.
+ *    (see tcc_options for details)
+ *
+ *  specifically, per arg of argv, in order:
+ *  - if arg begins with '@' and is not exactly "@": process as @listfile.
+ *  - elif arg is exactly "-" or doesn't begin with '-': process as input file.
+ *    - if -run... is already set: also stop, arg... become argv of run_main.
+ *  - elif arg is "--":
+ *    - if -run... is already set: stop, arg... become argv of run_main.
+ *    - else ignore it.
+ *  - else ("-STRING") try to apply it as option, maybe with next (opt)arg.
+ *
+ *  after all args, if -run... but no "stop": run_main gets our argv (tcc ...)
+ */
 /* using * to argc/argv to let "tcc -ar" benefit from @listfile expansion */
 PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
 {
