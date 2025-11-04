@@ -23,6 +23,8 @@
      DEF(TOK_CONST1, "const")
      DEF(TOK_CONST2, "__const") /* gcc keyword */
      DEF(TOK_CONST3, "__const__") /* gcc keyword */
+     DEF(TOK_PURE1, "pure")
+     DEF(TOK_PURE2, "__pure__")
      DEF(TOK_VOLATILE1, "volatile")
      DEF(TOK_VOLATILE2, "__volatile") /* gcc keyword */
      DEF(TOK_VOLATILE3, "__volatile__") /* gcc keyword */
@@ -114,8 +116,12 @@
      DEF(TOK_WEAK2, "__weak__")
      DEF(TOK_ALIAS1, "alias")
      DEF(TOK_ALIAS2, "__alias__")
+     DEF(TOK_USED1, "used")
+     DEF(TOK_USED2, "__used__")
      DEF(TOK_UNUSED1, "unused")
      DEF(TOK_UNUSED2, "__unused__")
+     DEF(TOK_FORMAT1, "format")
+     DEF(TOK_FORMAT2, "__format__")
      DEF(TOK_NODEBUG1, "nodebug")
      DEF(TOK_NODEBUG2, "__nodebug__")
      DEF(TOK_CDECL1, "cdecl")
@@ -140,6 +146,7 @@
      DEF(TOK_DESTRUCTOR2, "__destructor__")
      DEF(TOK_ALWAYS_INLINE1, "always_inline")
      DEF(TOK_ALWAYS_INLINE2, "__always_inline__")
+     DEF(TOK_NOINLINE, "__noinline__")
 
      DEF(TOK_MODE, "__mode__")
      DEF(TOK_MODE_QI, "__QI__")

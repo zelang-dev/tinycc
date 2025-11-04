@@ -4013,11 +4013,27 @@ redo:
         case TOK_NODEBUG2:
             ad->a.nodebug = 1;
             break;
+        case TOK_USED1:
+        case TOK_USED2:
         case TOK_UNUSED1:
         case TOK_UNUSED2:
             /* currently, no need to handle it because tcc does not
-               track unused objects */
+               track used/unused objects */
             break;
+        case TOK_CONST1:
+        case TOK_CONST2:
+        case TOK_CONST3:
+        case TOK_PURE1:
+        case TOK_PURE2:
+	    /* ignored */
+            break;
+        case TOK_NOINLINE:
+	    /* ignored */
+	    break;
+        case TOK_FORMAT1:
+        case TOK_FORMAT2:
+	    /* ignored */
+            goto skip_param;
         case TOK_NORETURN1:
         case TOK_NORETURN2:
             ad->f.func_noreturn = 1;
@@ -4091,6 +4107,7 @@ redo:
         default:
             tcc_warning_c(warn_unsupported)("'%s' attribute ignored", get_tok_str(t, NULL));
             /* skip parameters */
+skip_param:
             if (tok == '(') {
                 int parenthesis = 0;
                 do {
