@@ -249,8 +249,30 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     fflush(stderr);
 
     ret = tcc_setjmp(s1, main_jb, tcc_get_symbol(s1, top_sym));
-    if (0 == ret)
-        ret = prog_main(argc, argv, envp);
+    if (0 == ret) {
+        if (s1->nostdlib) {
+	    int n = 1;
+	    char **p, **e = envp;
+
+	    /* create sysv memory layout: argc, argv[], NULL, envp[], NULL */
+	    if (envp)
+	        while (*e++)
+		    n++;
+	    p = tcc_malloc((argc + n + 2) * sizeof(char **));
+	    p[0] = (char *) (size_t) argc;
+	    memcpy(p + 1, argv, argc * sizeof(char *));
+	    p[argc + 1] = NULL;
+	    if (envp)
+	        memcpy(p + argc + 2, envp, n * sizeof(char *));
+	    else
+	        p[argc + 2] = NULL;
+	    /* Probably never returns */
+	    tcc_run_start(prog_main, argc + n + 2, p);
+	    tcc_free(p);
+	}
+	else
+            ret = prog_main(argc, argv, envp);
+    }
     else if (RT_EXIT_ZERO == ret)
         ret = 0;
 

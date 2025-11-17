@@ -1167,6 +1167,25 @@ ST_FUNC void gfunc_call(int nb_args)
     tcc_free(t);
 }
 
+void tcc_run_start(int (*prog_main)(int, char **, char **), int cnt, char **var)
+{
+#if defined(__aarch64__)
+#if defined(__TINYC__)
+    // FIXME: immplement arm64 assembler
+    fprintf(stderr, "tcc -nostdlib -run not implement for arm64\n");
+#else
+    void *sp;
+
+    asm("sub sp, sp, %1\n"
+        "\tmov %0, sp"
+        : "=r" (sp)
+        : "r" ((((size_t) cnt + 1) & -2) * sizeof(char *)));
+    memcpy(sp, var, cnt * sizeof(char *));
+    asm("br %0" : : "r" (prog_main));
+#endif
+#endif
+}
+
 static unsigned long arm64_func_va_list_stack;
 static int arm64_func_va_list_gr_offs;
 static int arm64_func_va_list_vr_offs;

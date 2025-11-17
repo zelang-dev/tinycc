@@ -933,6 +933,10 @@ void gfunc_call(int nb_args)
     vtop--;
 }
 
+void tcc_run_start(int (*prog_main)(int, char **, char **), int cnt, char **var)
+{
+    fprintf(stderr, "tcc -nostdlib -run not implement for TCC_TARGET_PE\n");
+}
 
 #define FUNC_PROLOG_SIZE 11
 
@@ -1432,6 +1436,20 @@ void gfunc_call(int nb_args)
     if (args_size)
         gadd_sp(args_size);
     vtop--;
+}
+
+void tcc_run_start(int (*prog_main)(int, char **, char **), int cnt, char **var)
+{
+#ifdef __x86_64__
+    void *sp;
+
+    asm("subq %1, %%rsp\n"
+	"\tmovq %%rsp, %0"
+	: "=r" (sp)
+	: "r" ((((size_t) cnt + 1) & -2) * sizeof(char *)));
+    memcpy(sp, var, cnt * sizeof(char *));
+    asm("jmp *%0" : : "r" (prog_main));
+#endif
 }
 
 #define FUNC_PROLOG_SIZE 11
