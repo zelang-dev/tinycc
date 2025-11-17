@@ -512,12 +512,12 @@ void tcc_run_start(int (*prog_main)(int, char **, char **), int cnt, char **var)
 #else
     void *sp;
 
-    asm("sub %1, %%esp\n"
-        "\tmov %%esp, %0"
-        : "=r" (sp)
-        : "r" ((((size_t) cnt + 1) & -2) * sizeof(char *)));
+    __asm("sub %1, %%esp\n"
+           "\tmov %%esp, %0"
+           : "=r" (sp)
+           : "r" ((((size_t) cnt + 1) & -2) * sizeof(char *)));
     memcpy(sp, var, cnt * sizeof(char *));
-    asm("jmp *%0" : : "r" (prog_main));
+    __asm__("jmp *%0" : : "r" (prog_main));
 #endif
 #endif
 }

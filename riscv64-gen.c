@@ -774,12 +774,12 @@ void tcc_run_start(int (*prog_main)(int, char **, char **), int cnt, char **var)
 #ifdef __riscv
     void *sp;
 
-    asm("sub sp, sp, %1\n"
-        "\tmv %0, sp"
-        : "=r" (sp)
-        : "r" ((((size_t) cnt + 1) & -2) * sizeof(char *)));
+    __asm__("sub sp, sp, %1\n"
+            "\tmv %0, sp"
+            : "=r" (sp)
+            : "r" ((((size_t) cnt + 1) & -2) * sizeof(char *)));
     memcpy(sp, var, cnt * sizeof(char *));
-    asm("jalr %0" : : "r" (prog_main));
+    __asm__("jalr %0" : : "r" (prog_main));
 #endif
 }
 

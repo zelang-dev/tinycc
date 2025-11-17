@@ -258,7 +258,7 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
 	    if (envp)
 	        while (*e++)
 		    n++;
-	    p = tcc_malloc((argc + n + 2) * sizeof(char **));
+	    p = tcc_malloc((argc + n + 2) * sizeof(char *));
 	    p[0] = (char *) (size_t) argc;
 	    memcpy(p + 1, argv, argc * sizeof(char *));
 	    p[argc + 1] = NULL;
