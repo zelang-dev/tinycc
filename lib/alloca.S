@@ -71,7 +71,7 @@ p3:
 #elif defined __arm__
 
     .text
-    .align
+    .align  2
     .global alloca
     .type   alloca, %function
 alloca:
