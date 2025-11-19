@@ -59,8 +59,8 @@ $(Cbc)COMMON_O += bcheck.o
 EXTRA_O = runmain.o bt-exe.o bt-dll.o bt-log.o bcheck.o
 
 OBJ-i386 = $(I386_O) $(LIN_O)
-OBJ-x86_64 = $(X86_64_O) va_list.o $(LIN_O)
-OBJ-x86_64-osx = $(X86_64_O) va_list.o $(OSX_O)
+OBJ-x86_64 = $(X86_64_O) $(LIN_O)
+OBJ-x86_64-osx = $(X86_64_O) $(OSX_O)
 OBJ-i386-win32 = $(I386_O) chkstk.o $(WIN_O)
 OBJ-x86_64-win32 = $(X86_64_O) chkstk.o $(WIN_O)
 OBJ-arm64 = $(ARM64_O) $(LIN_O)
