@@ -142,4 +142,18 @@ p100:
 #endif
     .size   alloca, .-alloca
 /* ---------------------------------------------- */
+#elif defined __riscv
+
+	.text
+	.align	2
+	.global	alloca
+	.type	alloca, %function
+alloca:
+	sub	sp, sp, a0
+	addi	sp, sp, -15
+	andi	sp, sp, -16
+	add	a0, sp, zero
+	ret
+	.size	alloca, .-alloca
+/* ---------------------------------------------- */
 #endif
