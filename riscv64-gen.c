@@ -911,18 +911,14 @@ ST_FUNC void gfunc_epilog(void)
     loc = (loc - num_va_regs * 8);
     d = v = (-loc + 15) & -16;
 
-    if (v >= (1 << 11)) {
-        d = 16;
-        o(0x37 | (5 << 7) | UPPER(v-16)); //lui t0, upper(v)
-        EI(0x13, 0, 5, 5, SIGN11(v-16)); // addi t0, t0, lo(v)
-        ER(0x33, 0, 2, 2, 5, 0); // add sp, sp, t0
-    }
-    EI(0x03, 3, 1, 2, d - 8 - num_va_regs * 8);  // ld ra, v-8(sp)
-    EI(0x03, 3, 8, 2, d - 16 - num_va_regs * 8); // ld s0, v-16(sp)
-    EI(0x13, 0, 2, 2, d);      // addi sp, sp, v
-    EI(0x67, 0, 0, 1, 0);      // jalr x0, 0(x1), aka ret
+    EI(0x13, 0, 2, 8, num_va_regs * 8); // addi sp, s0, num_va_regs*8
+    EI(0x03, 3, 1, 8, -8); // ld ra, -8(s0)
+    EI(0x03, 3, 8, 8, -16); // ld s0, -16(s0)
+    EI(0x67, 0, 0, 1, 0); // jalr x0, 0(x1), aka ret
+
     large_ofs_ind = ind;
     if (v >= (1 << 11)) {
+        d = 16;
         EI(0x13, 0, 8, 2, d - num_va_regs * 8);      // addi s0, sp, d
         o(0x37 | (5 << 7) | UPPER(v-16)); //lui t0, upper(v)
         EI(0x13, 0, 5, 5, SIGN11(v-16)); // addi t0, t0, lo(v)
