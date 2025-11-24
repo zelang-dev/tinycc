@@ -63,6 +63,9 @@ static void asm_emit_opcode(uint32_t opcode);
 static void asm_emit_r(int token, uint32_t opcode, const Operand *rd, const Operand *rs1, const Operand *rs2);
 static void asm_emit_s(int token, uint32_t opcode, const Operand *rs1, const Operand *rs2, const Operand *imm);
 static void asm_emit_u(int token, uint32_t opcode, const Operand *rd, const Operand *rs2);
+static void asm_emit_f(int token, uint32_t opcode, const Operand *rd, const Operand *rs1, const Operand *rs2);
+static void asm_emit_fb(int token, uint32_t opcode, const Operand *rd, const Operand *rs);
+static void asm_emit_fq(int token, uint32_t opcode, const Operand *rd, const Operand *rs1, const Operand *rs2, const Operand *rs3);
 ST_FUNC void asm_gen_code(ASMOperand *operands, int nb_operands, int nb_outputs, int is_output, uint8_t *clobber_regs, int out_reg);
 static void asm_nullary_opcode(TCCState *s1, int token);
 ST_FUNC void asm_opcode(TCCState *s1, int token);
@@ -587,6 +590,14 @@ static void asm_binary_opcode(TCCState* s1, int token)
         asm_emit_css(token, 2 | (5 << 13), ops, ops + 1);
         return;
 
+    /* F/D extension */
+    case TOK_ASM_fsqrt_d:
+        asm_emit_fb(token, 0x53 | (11 << 27) | (1 << 25) | (7 << 12), ops, ops + 1);
+        return;
+    case TOK_ASM_fsqrt_s:
+        asm_emit_fb(token, 0x53 | (11 << 27) | (0 << 25) | (7 << 12), ops, ops + 1);
+        return;
+
     /* pseudoinstructions */
     /* rd, sym */
     case TOK_ASM_la:
@@ -682,6 +693,15 @@ static void asm_binary_opcode(TCCState* s1, int token)
         asm_emit_r(token, (0xC << 2) | 3 | (2 << 12), &ops[0], &zero, &ops[1]);
         return;
 
+    case TOK_ASM_fabs_d:
+        /* fsgnjx.d rd, rs, rs */
+        asm_emit_f(token, 0x53 | (4 << 27) | (1 << 25) | (2 << 12), &ops[0], &ops[1], &ops[1]);
+        return;
+    case TOK_ASM_fabs_s:
+        /* fsgnjx.s rd, rs, rs */
+        asm_emit_f(token, 0x53 | (4 << 27) | (0 << 25) | (2 << 12), &ops[0], &ops[1], &ops[1]);
+        return;
+
     default:
         expect("binary instruction");
     }
@@ -707,6 +727,73 @@ static void asm_emit_r(int token, uint32_t opcode, const Operand* rd, const Oper
 	     11...7 rd
 	     6...0 opcode */
     gen_le32(opcode | ENCODE_RD(rd->reg) | ENCODE_RS1(rs1->reg) | ENCODE_RS2(rs2->reg));
+}
+
+/* caller: Add rounding mode, fmt, funct5 to opcode */
+static void asm_emit_f(int token, uint32_t opcode, const Operand* rd, const Operand* rs1, const Operand* rs2)
+{
+    if (rd->type != OP_REG || !REG_IS_FLOAT(rd->reg)) {
+        tcc_error("'%s': Expected destination operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    if (rs1->type != OP_REG || !REG_IS_FLOAT(rs1->reg)) {
+        tcc_error("'%s': Expected first source operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    if (rs2->type != OP_REG || !REG_IS_FLOAT(rs2->reg)) {
+        tcc_error("'%s': Expected second source operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    /* F-type instruction:
+	     31...27 funct5
+	     26...25 fmt
+	     24...20 rs2
+	     19...15 rs1
+	     14...12 rm
+	     11...7 rd
+	     6...0 opcode = OP-FP */
+    gen_le32(opcode | ENCODE_RD(rd->reg) | ENCODE_RS1(rs1->reg) | ENCODE_RS2(rs2->reg));
+}
+/* caller: Add rounding mode, fmt, funct5 to opcode */
+static void asm_emit_fb(int token, uint32_t opcode, const Operand* rd, const Operand* rs)
+{
+    if (rd->type != OP_REG || !REG_IS_FLOAT(rd->reg)) {
+        tcc_error("'%s': Expected destination operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    if (rs->type != OP_REG || !REG_IS_FLOAT(rs->reg)) {
+        tcc_error("'%s': Expected source operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    /* F-type instruction:
+	     31...27 funct5
+	     26...25 fmt
+	     24...20 rs2 = 0
+	     19...15 rs1 = rs
+	     14...12 rm
+	     11...7 rd
+	     6...0 opcode = OP-FP */
+    gen_le32(opcode | ENCODE_RD(rd->reg) | ENCODE_RS1(rs->reg) | ENCODE_RS2(0));
+}
+/* caller: Add rounding mode, fmt to opcode */
+static void asm_emit_fq(int token, uint32_t opcode, const Operand* rd, const Operand* rs1, const Operand* rs2, const Operand* rs3)
+{
+    if (rd->type != OP_REG || !REG_IS_FLOAT(rd->reg)) {
+        tcc_error("'%s': Expected destination operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    if (rs1->type != OP_REG || !REG_IS_FLOAT(rs1->reg)) {
+        tcc_error("'%s': Expected first source operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    if (rs2->type != OP_REG || !REG_IS_FLOAT(rs2->reg)) {
+        tcc_error("'%s': Expected second source operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    if (rs3->type != OP_REG || !REG_IS_FLOAT(rs3->reg)) {
+        tcc_error("'%s': Expected third source operand that is a floating-point register", get_tok_str(token, NULL));
+    }
+    /* F-type instruction:
+	     31...27 rs3
+	     26...25 fmt
+	     24...20 rs2
+	     19...15 rs1
+	     14...12 rm
+	     11...7 rd
+	     6...0 opcode */
+    gen_le32(opcode | ENCODE_RD(rd->reg) | ENCODE_RS1(rs1->reg) | ENCODE_RS2(rs2->reg) | (REG_VALUE(rs3->reg) << 27));
 }
 
 /* caller: Add funct3 into opcode */
@@ -1089,8 +1176,46 @@ static void asm_ternary_opcode(TCCState *s1, int token)
         asm_emit_cs(token, 6 << 13, ops, ops + 1, ops + 2);
         return;
 
+    /* F/D extension */
+    case TOK_ASM_fsgnj_d:
+        asm_emit_f(token, 0x53 | (4 << 27) | (1 << 25) | (0 << 12), ops, ops + 1, ops + 2);
+        return;
+    case TOK_ASM_fsgnj_s:
+        asm_emit_f(token, 0x53 | (4 << 27) | (0 << 25) | (0 << 12), ops, ops + 1, ops + 2);
+        return;
+    case TOK_ASM_fmax_d:
+        asm_emit_f(token, 0x53 | (5 << 27) | (1 << 25) | (1 << 12), ops, ops + 1, ops + 2);
+        return;
+    case TOK_ASM_fmax_s:
+        asm_emit_f(token, 0x53 | (5 << 27) | (0 << 25) | (1 << 12), ops, ops + 1, ops + 2);
+        return;
+    case TOK_ASM_fmin_d:
+        asm_emit_f(token, 0x53 | (5 << 27) | (1 << 25) | (0 << 12), ops, ops + 1, ops + 2);
+        return;
+    case TOK_ASM_fmin_s:
+        asm_emit_f(token, 0x53 | (5 << 27) | (0 << 25) | (0 << 12), ops, ops + 1, ops + 2);
+        return;
+
     default:
         expect("ternary instruction");
+    }
+}
+
+static void asm_quaternary_opcode(TCCState *s1, int token)
+{
+    Operand ops[4];
+    parse_operands(s1, &ops[0], 4);
+
+    switch (token) {
+    case TOK_ASM_fmadd_d:
+        asm_emit_fq(token, 0x43 | (1 << 25) | (7 << 12), ops, ops + 1, ops + 2, ops + 3);
+        return;
+    case TOK_ASM_fmadd_s:
+        asm_emit_fq(token, 0x43 | (0 << 25) | (7 << 12), ops, ops + 1, ops + 2, ops + 3);
+        return;
+
+    default:
+        expect("quaternary instruction");
     }
 }
 
@@ -1271,6 +1396,8 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
 
     case TOK_ASM_lui:
     case TOK_ASM_auipc:
+    case TOK_ASM_fsqrt_s:
+    case TOK_ASM_fsqrt_d:
         asm_binary_opcode(s1, token);
         return;
 
@@ -1349,7 +1476,18 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_csrrsi:
     case TOK_ASM_csrrw:
     case TOK_ASM_csrrwi:
+    /* F/D extension */
+    case TOK_ASM_fsgnj_d:
+    case TOK_ASM_fsgnj_s:
+    case TOK_ASM_fmax_s:
+    case TOK_ASM_fmax_d:
+    case TOK_ASM_fmin_s:
+    case TOK_ASM_fmin_d:
         asm_ternary_opcode(s1, token);
+        return;
+    case TOK_ASM_fmadd_d:
+    case TOK_ASM_fmadd_s:
+        asm_quaternary_opcode(s1, token);
         return;
 
     /* Branches */
@@ -1441,6 +1579,8 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_not:
     case TOK_ASM_neg:
     case TOK_ASM_negw:
+    case TOK_ASM_fabs_s:
+    case TOK_ASM_fabs_d:
         asm_binary_opcode(s1, token);
         return;
 
@@ -1556,7 +1696,7 @@ ST_FUNC void subst_asm_operand(CString *add_str, SValue *sv, int modifier)
         if ((sv->type.t & VT_BTYPE) == VT_FLOAT ||
             (sv->type.t & VT_BTYPE) == VT_DOUBLE) {
             /* floating point register */
-            reg = TOK_ASM_f0 + reg;
+            reg = TOK_ASM_f0 + REG_VALUE(reg);
         } else {
             /* general purpose register */
             reg = TOK_ASM_x0 + reg;
@@ -1570,7 +1710,7 @@ ST_FUNC void subst_asm_operand(CString *add_str, SValue *sv, int modifier)
         if ((sv->type.t & VT_BTYPE) == VT_FLOAT ||
             (sv->type.t & VT_BTYPE) == VT_DOUBLE) {
             /* floating point register */
-            reg = TOK_ASM_f0 + reg;
+            reg = TOK_ASM_f0 + REG_VALUE(reg);
         } else {
             /* general purpose register */
             reg = TOK_ASM_x0 + reg;
