@@ -385,7 +385,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #elif defined TCC_TARGET_ARM64
 # include "arm64-gen.c"
 # include "arm64-link.c"
-# include "arm-asm.c"
+# include "arm64-asm.c"
 #elif defined TCC_TARGET_C67
 # define TCC_TARGET_COFF
 # include "coff.h"

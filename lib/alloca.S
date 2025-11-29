@@ -70,25 +70,18 @@ p3:
 /* ---------------------------------------------- */
 #elif defined __arm__
 
-    .text
-    .align  2
-    .global alloca
-    .type   alloca, %function
-alloca:
+.globl _(alloca)
+_(alloca):
     rsb sp, r0, sp
     bic sp, sp, #7
     mov r0, sp
     mov pc, lr
-    .size   alloca, .-alloca
 
 /* ---------------------------------------------- */
 #elif defined __aarch64__ || defined __arm64__
 
-    .text
-    .align  2
-    .global alloca
-    .type   alloca, %function
-alloca:
+.globl _(alloca)
+_(alloca):
 #ifdef __TINYC__
     .int 0x91003c00
     .int 0x927cec00
@@ -102,16 +95,16 @@ alloca:
     .int 0xcb2163ff
     .int 0xcb010000
     .int 0x17fffffa
-#endif
     .int 0xb4000040
+#endif
     .int 0xcb2063ff
     .int 0x910003e0
     .int 0xd65f03c0
 #else
     add x0, x0, #15     // Round up to 16-byte boundary
     and x0, x0, #-16    // Ensure 16-byte alignment
-    cbz x0, p100        // If size is 0, skip to return
 #ifdef _WIN32
+    cbz x0, p100        // If size is 0, skip to return
     // Windows requires page-wise allocation with stack probing
     mov x1, #4096       // Page size = 4096 bytes
 
@@ -140,20 +133,16 @@ p100:
     mov x0, sp          // Return allocated address
     ret                 // Return to caller
 #endif
-    .size   alloca, .-alloca
+
 /* ---------------------------------------------- */
 #elif defined __riscv
 
-	.text
-	.align	2
-	.global	alloca
-	.type	alloca, %function
-alloca:
-	sub	sp, sp, a0
-	addi	sp, sp, -15
-	andi	sp, sp, -16
-	add	a0, sp, zero
-	ret
-	.size	alloca, .-alloca
-/* ---------------------------------------------- */
+.globl _(alloca)
+_(alloca):
+    sub    sp, sp, a0
+    addi   sp, sp, -15
+    andi   sp, sp, -16
+    add    a0, sp, zero
+    ret
+
 #endif

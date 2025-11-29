@@ -1701,10 +1701,8 @@ ST_FUNC void gbound_args(int nb_args)
             gfunc_call(1);
             func_bound_add_epilog = 1;
         }
-#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
         if (v == TOK_alloca)
             func_bound_add_epilog = 1;
-#endif
 #if TARGETOS_NetBSD
         if (v == TOK_longjmp) /* undo rename to __longjmp14 */
             sv->sym->asm_label = TOK___bound_longjmp;

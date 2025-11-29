@@ -347,12 +347,8 @@
     __MAYBE_REDIR(void*, calloc, (__SIZE_TYPE__, __SIZE_TYPE__))
     __MAYBE_REDIR(void*, memalign, (__SIZE_TYPE__, __SIZE_TYPE__))
     __MAYBE_REDIR(void, free, (void*))
-#if defined __i386__ || defined __x86_64__
     __BOTH(void*, alloca, (__SIZE_TYPE__))
     void *alloca(__SIZE_TYPE__);
-#else
-    __BUILTIN(void*, alloca, (__SIZE_TYPE__))
-#endif
     __BUILTIN(void, abort, (void))
     __BOUND(void, longjmp, ())
 #if !defined _WIN32
