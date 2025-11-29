@@ -398,6 +398,15 @@ static void asm_unary_opcode(TCCState *s1, int token)
     case TOK_ASM_rdinstreth:
         asm_emit_opcode(opcode | (0xC82 << 20) | ENCODE_RD(op.reg));
         return;
+    case TOK_ASM_frflags:
+        asm_emit_opcode(opcode | (0x001 << 20) | ENCODE_RD(op.reg));
+        return;
+    case TOK_ASM_frrm:
+        asm_emit_opcode(opcode | (0x002 << 20) | ENCODE_RD(op.reg));
+        return;
+    case TOK_ASM_frcsr:
+        asm_emit_opcode(opcode | (0x003 << 20) | ENCODE_RD(op.reg));
+        return;
 
     case TOK_ASM_jr:
         /* jalr zero, 0(rs)*/
@@ -431,6 +440,7 @@ static void asm_unary_opcode(TCCState *s1, int token)
     case TOK_ASM_c_jr:
         asm_emit_cr(token, 2 | (8 << 12), &op, &zero);
         return;
+
     default:
         expect("unary instruction");
     }
@@ -702,6 +712,22 @@ static void asm_binary_opcode(TCCState* s1, int token)
         asm_emit_f(token, 0x53 | (4 << 27) | (0 << 25) | (2 << 12), &ops[0], &ops[1], &ops[1]);
         return;
 
+    case TOK_ASM_csrs:
+        /* csrrs x0, csr, rs */
+        asm_emit_opcode(0x73 | (2 << 12) | (ops[0].e.v << 20) | ENCODE_RS1(ops[1].reg));
+        return;
+    case TOK_ASM_csrc:
+        /* csrrc x0, csr, rs */
+        asm_emit_opcode(0x73 | (3 << 12) | (ops[0].e.v << 20) | ENCODE_RS1(ops[1].reg));
+        return;
+    case TOK_ASM_fsrm:
+        /* csrrw rd, frm, rs */
+        asm_emit_opcode(0x73 | (1 << 12) | (2 << 20) | ENCODE_RD(ops[0].reg) | ENCODE_RS1(ops[1].reg));
+        return;
+    case TOK_ASM_fscsr:
+        /* csrrw rd, fcsr, rs */
+        asm_emit_opcode(0x73 | (1 << 12) | (3 << 20) | ENCODE_RD(ops[0].reg) | ENCODE_RS1(ops[1].reg));
+        return;
     default:
         expect("binary instruction");
     }
@@ -1564,6 +1590,9 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_jr:
     case TOK_ASM_call:
     case TOK_ASM_tail:
+    case TOK_ASM_frflags:
+    case TOK_ASM_frrm:
+    case TOK_ASM_frcsr:
         asm_unary_opcode(s1, token);
         return;
 
@@ -1581,6 +1610,10 @@ ST_FUNC void asm_opcode(TCCState *s1, int token)
     case TOK_ASM_negw:
     case TOK_ASM_fabs_s:
     case TOK_ASM_fabs_d:
+    case TOK_ASM_csrc:
+    case TOK_ASM_csrs:
+    case TOK_ASM_fsrm:
+    case TOK_ASM_fscsr:
         asm_binary_opcode(s1, token);
         return;
 
