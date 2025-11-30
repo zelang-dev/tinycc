@@ -8742,7 +8742,11 @@ static int decl(int l)
         while (1) { /* iterate thru each declaration */
             type = btype;
 	    ad = adbase;
-            type_decl(&type, &ad, &v, TYPE_DIRECT);
+            if (l == VT_CMP) {
+                type_decl(&type, &ad, &v, TYPE_DIRECT | TYPE_PARAM);
+            } else {
+                type_decl(&type, &ad, &v, TYPE_DIRECT);
+            }
             /*ptype("decl", &type, v);*/
 
             if ((type.t & VT_BTYPE) == VT_FUNC) {
