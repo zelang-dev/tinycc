@@ -1229,6 +1229,10 @@ ST_FUNC void gen_opf(int op)
         ER(0x53, op, rd, rs1, rs2, dbl | 0x50); // fcmp.[sd] RD, RS1, RS2 (op == eq/lt/le)
         if (invert)
           EI(0x13, 4, rd, rd, 1); // xori RD, 1
+
+        /* generate VT_CMP output */
+        vset_VT_CMP(TOK_NE);
+        vtop->cmp_r = rd | (0 << 8);
         break;
     case TOK_NE:
         invert = 1;
