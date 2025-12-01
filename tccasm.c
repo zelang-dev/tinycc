@@ -991,7 +991,7 @@ static void asm_parse_directive(TCCState *s1, int global)
 	    next();
 	    asm_expr(s1, &e);
 	    skip(',');
-#ifdef __aarch64__
+#if defined(TCC_TARGET_ARM64)
 	    if (strcmp(get_tok_str(tok, NULL), "R_AARCH64_CALL26"))
 #endif
 	        tcc_error("unimp: reloc '%s' unknown", get_tok_str(tok, NULL));
