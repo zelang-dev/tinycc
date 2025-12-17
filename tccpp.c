@@ -2575,12 +2575,13 @@ static void parse_number(const char *p)
             if (t >= b)
                 tcc_error("invalid digit");
             n = n * b + t;
-            if (!ov)
+            if (!ov) {
                 /* detect overflow */
                 if (n1 >= 0x1000000000000000ULL && n / b != n1)
                     ov = 1;
                 else
                     n1 = n;
+	    }
         }
 #ifdef TCC_CUT_ON_INTEGER_LITERAL_OVERFLOW
         /* On integer literal overflow use the most significant digits before
