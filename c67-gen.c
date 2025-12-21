@@ -195,11 +195,8 @@ void C67_g(int c)
     fprintf(f, " %08X", c);
 #endif
     ind1 = ind + 4;
-    if ((unsigned)ind1 > (int) cur_text_section->data_allocated) {
-        if (ind1 < 0)
-	    tcc_error("program too big");
+    if (ind1 > (int) cur_text_section->data_allocated)
 	section_realloc(cur_text_section, ind1);
-    }
     cur_text_section->data[ind] = c & 0xff;
     cur_text_section->data[ind + 1] = (c >> 8) & 0xff;
     cur_text_section->data[ind + 2] = (c >> 16) & 0xff;

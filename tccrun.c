@@ -120,10 +120,7 @@ static int rt_mem(TCCState *s1, int size)
     unlink(tmpfname);
     ftruncate(fd, size);
 
-    ptr = mmap(NULL, size * 2, PROT_READ|PROT_EXEC|(s1->do_debug ? PROT_WRITE : 0), MAP_SHARED, fd, 0);
-    if (ptr == MAP_FAILED)
-	/* Some targets do not support PROT_EXEC + PROT_WRITE */
-        ptr = mmap(NULL, size * 2, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
+    ptr = mmap(NULL, size * 2, PROT_READ|PROT_EXEC, MAP_SHARED, fd, 0);
     /* mmap RW memory at fixed distance */
     prw = mmap((char*)ptr + size, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, fd, 0);
     close(fd);
@@ -224,14 +221,11 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
         return 0;
 
     tcc_add_symbol(s1, "__rt_exit", rt_exit);
-    if (s1->nostdlib) {
-        tcc_add_support(s1, "run_nostdlib.o");
-        s1->run_main = top_sym = s1->elf_entryname ? s1->elf_entryname : "_start";
-    } else {
-        tcc_add_support(s1, "runmain.o");
-        s1->run_main = "_runmain";
-        top_sym = "main";
-    }
+    s1->run_main = "_runmain", top_sym = "main";
+    if (s1->elf_entryname)
+        s1->run_main = top_sym = s1->elf_entryname;
+    tcc_add_support(s1, "runmain.o");
+
     if (tcc_relocate(s1) < 0)
         return -1;
 
@@ -255,19 +249,10 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
 
     ret = tcc_setjmp(s1, main_jb, tcc_get_symbol(s1, top_sym));
     if (0 == ret) {
-        if (s1->nostdlib) {
-            void (*run_nostdlib)(void *start, int argc, char **argv, char **envp);
-
-	    run_nostdlib = (void *)get_sym_addr(s1, "_run_nostdlib", 1, 1);
-            if ((addr_t)-1 == (addr_t)run_nostdlib)
-                return -1;
-	    run_nostdlib(prog_main, argc, argv, envp);    /* never returns */
-	}
-	else
-            ret = prog_main(argc, argv, envp);
-    }
-    else if (RT_EXIT_ZERO == ret)
+        ret = prog_main(argc, argv, envp);
+    } else if (RT_EXIT_ZERO == ret) {
         ret = 0;
+    }
 
     if (s1->dflag & 16 && ret) /* tcc -dt -run ... */
         fprintf(s1->ppfp, "[returns %d]\n", ret), fflush(s1->ppfp);

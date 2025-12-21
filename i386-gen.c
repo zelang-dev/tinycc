@@ -48,7 +48,6 @@ enum {
     TREG_EBX,
     TREG_ST0,
     TREG_ESP = 4,
-
     TREG_MEM = 0x20
 };
 
@@ -90,22 +89,17 @@ ST_DATA const char * const target_machine_defs =
     "__i386\0"
     ;
 
-/* define to 1/0 to [not] have EBX as 4th register */
-#define USE_EBX 0
 #if defined CONFIG_TCC_PIC
-#if USE_EBX > 0
-#error only USE_EBX or GOT_EBX can be set
-#endif
-#define	GOT_EBX 1
+# define USE_EBX 2
 #else
-#define	GOT_EBX 0
+# define USE_EBX 0 /* define to 1 to have EBX as 4th register */
 #endif
 
 ST_DATA const int reg_classes[NB_REGS] = {
     /* eax */ RC_INT | RC_EAX,
     /* ecx */ RC_INT | RC_ECX,
     /* edx */ RC_INT | RC_EDX,
-    /* ebx */ (RC_INT | RC_EBX) * USE_EBX,
+    /* ebx */ (RC_INT | RC_EBX) * (USE_EBX == 1),
     /* st0 */ RC_FLOAT | RC_ST0,
 };
 
@@ -126,11 +120,8 @@ ST_FUNC void g(int c)
     if (nocode_wanted)
         return;
     ind1 = ind + 1;
-    if ((unsigned)ind1 > cur_text_section->data_allocated) {
-        if (ind1 < 0)
-	    tcc_error("program too big");
+    if (ind1 > cur_text_section->data_allocated)
         section_realloc(cur_text_section, ind1);
-    }
     cur_text_section->data[ind] = c;
     ind = ind1;
 }
@@ -187,33 +178,23 @@ ST_FUNC void gen_fill_nops(int bytes)
 }
 
 #if defined CONFIG_TCC_PIC
+static void gen_static_call(int v);
 static void get_pc_thunk(int r, int add)
 {
-    static const char *pc_thunk_name[] = {
+    static const char * const pc_thunk_name[] = {
 	"__x86.get_pc_thunk.ax",
 	"__x86.get_pc_thunk.cx",
 	"__x86.get_pc_thunk.dx",
 	"__x86.get_pc_thunk.bx"
     };
-    int pc_thunk;
-
     if (nocode_wanted)
         return;
-
-    r = REG_VALUE(r);
-    pc_thunk = set_elf_sym(tcc_state->symtab, 0, 0,
-                           ELFW(ST_INFO)(STB_GLOBAL, STT_FUNC),
-			   ELFW(ST_VISIBILITY)(STV_HIDDEN),
-			   SHN_UNDEF, pc_thunk_name[r]);
-    oad(0xe8, -4); /* call __x86.get_pc_thunk.rx */
-    put_elf_reloc(symtab_section, cur_text_section, ind - 4,
-		  R_386_PC32, pc_thunk);
-
+    gen_static_call(tok_alloc_const(pc_thunk_name[r]));
     if (add) {
         Sym label = {0};
-
-        label.type.t = VT_VOID | VT_STATIC;
+        label.type.t = VT_VOID|VT_STATIC;
         put_extern_sym(&label, cur_text_section, ind, 0);
+        r = REG_VALUE(r);
 	if (r == 0)
 	    oad(0x05, 1); /* add _GLOBAL_OFFSET_TABLE_, %eax */
 	else
@@ -256,38 +237,37 @@ ST_FUNC void gen_addrpc32(int r, Sym *sym, int c)
 
 /* generate a modrm reference. 'op_reg' contains the additional 3
    opcode bits */
-static void gen_modrm(int opc, int op_reg, int r, Sym *sym, int c)
+static void gen_modrm(int opc, int op_r2, int r, Sym *sym, int c)
 {
-#if defined CONFIG_TCC_PIC
-    int is_got = (op_reg & TREG_MEM) && !(sym->type.t & VT_STATIC);
-#endif
+    int op_reg = REG_VALUE(op_r2) << 3;
 
-    op_reg = REG_VALUE(op_reg) << 3;
+#if defined CONFIG_TCC_PIC
+    if ((r & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
+        int is_got = (op_r2 & TREG_MEM) && !(sym->type.t & VT_STATIC);
+        int here = ind;
+        get_pc_thunk(TREG_EBX, is_got);
+        o(opc);
+        o(0x83 | op_reg);
+        if (is_got) {
+            gen_gotpcrel(r, sym, c);
+        } else {
+            gen_addrpc32(r, sym, c + (ind - here - 1));
+        }
+    } else if ((r & VT_VALMASK) < VT_CONST && (r & TREG_MEM)) {
+        o(opc);
+        if (c) {
+            g(0x80 | op_reg | REG_VALUE(r));
+            gen_le32(c);
+        } else {
+            g(0x00 | op_reg | REG_VALUE(r));
+        }
+    } else
+#endif
     if ((r & VT_VALMASK) == VT_CONST) {
         /* constant memory reference */
-#if defined CONFIG_TCC_PIC
-	if (r & VT_SYM) {
-	    get_pc_thunk(TREG_EBX, is_got);
-	    o(opc);
-            o(0x83 | op_reg);
-	    if (is_got)
-                gen_gotpcrel(r, sym, c);
-	    else {
-		int off = 6;
-
-		off += opc & 0xff00 ? 1 : 0;
-		off += opc & 0xff0000 ? 1 : 0;
-		off += opc & 0xff000000 ? 1 : 0;
-                gen_addrpc32(r, sym, c + off);
-	    }
-	}
-	else
-#endif
-	{
-	    o(opc);
-            o(0x05 | op_reg);
-            gen_addr32(r, sym, c);
-	}
+        o(opc);
+        o(0x05 | op_reg);
+        gen_addr32(r, sym, c);
     } else if ((r & VT_VALMASK) == VT_LOCAL) {
 	o(opc);
         /* currently, we use only ebp as base */
@@ -297,14 +277,6 @@ static void gen_modrm(int opc, int op_reg, int r, Sym *sym, int c)
             g(c);
         } else {
             oad(0x85 | op_reg, c);
-        }
-    } else if ((r & VT_VALMASK) >= TREG_MEM) {
-	o(opc);
-        if (c) {
-            g(0x80 | op_reg | REG_VALUE(r));
-            gen_le32(c);
-        } else {
-            g(0x00 | op_reg | REG_VALUE(r));
         }
     } else {
 	o(opc);
@@ -321,14 +293,13 @@ ST_FUNC void load(int r, SValue *sv)
     fr = sv->r;
     ft = sv->type.t & ~VT_DEFSIGN;
     fc = sv->c.i;
-
     ft &= ~(VT_VOLATILE | VT_CONSTANT);
+    v = fr & VT_VALMASK;
 
-#ifndef TCC_TARGET_PE
 #if defined CONFIG_TCC_PIC
     /* we use indirect access via got */
-    if ((fr & VT_VALMASK) == VT_CONST && (fr & VT_SYM) &&
-        (fr & VT_LVAL) && !(sv->sym->type.t & VT_STATIC)) {
+    if ((fr & (VT_VALMASK|VT_SYM|VT_LVAL)) == (VT_CONST|VT_SYM|VT_LVAL)
+        && !(sv->sym->type.t & VT_STATIC)) {
         /* use the result register as a temporal register */
         int tr = r | TREG_MEM;
         if (is_float(ft)) {
@@ -336,14 +307,11 @@ ST_FUNC void load(int r, SValue *sv)
             tr = get_reg(RC_INT) | TREG_MEM;
         }
         gen_modrm(0x8b, tr, fr, sv->sym, 0);
-
         /* load from the temporal register */
         fr = tr | VT_LVAL;
     }
 #endif
-#endif
 
-    v = fr & VT_VALMASK;
     if (fr & VT_LVAL) {
         if (v == VT_LLOCAL) {
             v1.type.t = VT_INT;
@@ -378,26 +346,23 @@ ST_FUNC void load(int r, SValue *sv)
         }
         gen_modrm(opc, r, fr, sv->sym, fc);
     } else {
-        if (v == VT_CONST) {
 #if defined CONFIG_TCC_PIC
-	    if (fr & VT_SYM) {
-		if (sv->sym->type.t & VT_STATIC) {
-		    get_pc_thunk(r, 0);
-                    o(0x808d | REG_VALUE(r) * 0x900); /* lea $xx(r), r */
-                    gen_addrpc32(fr, sv->sym, fc + 6);
-	        }
-	        else {
-		    get_pc_thunk(r, 1);
-                    o(0x808b | REG_VALUE(r) * 0x900); /* mov $xx(r), r */
-                    gen_gotpcrel(r, sv->sym, fc);
-	        }
-	    }
-	    else
+        if ((fr & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
+            if (sv->sym->type.t & VT_STATIC) {
+                get_pc_thunk(r, 0);
+                o(0x808d | REG_VALUE(r) * 0x900); /* lea $xx(r), r */
+                gen_addrpc32(fr, sv->sym, fc + 6);
+            } else {
+                get_pc_thunk(r, 1);
+                o(0x808b | REG_VALUE(r) * 0x900); /* mov $xx(r), r */
+                gen_gotpcrel(r, sv->sym, fc);
+            }
+        } else
+
 #endif
-	    {
-                o(0xb8 + r); /* mov $xx, r */
-                gen_addr32(fr, sv->sym, fc);
-	    }
+        if (v == VT_CONST) {
+            o(0xb8 + r); /* mov $xx, r */
+            gen_addr32(fr, sv->sym, fc);
         } else if (v == VT_LOCAL) {
             if (fc) {
                 /* lea xxx(%ebp), r */
@@ -427,27 +392,9 @@ ST_FUNC void load(int r, SValue *sv)
 /* store register 'r' in lvalue 'v' */
 ST_FUNC void store(int r, SValue *v)
 {
-    int fr, bt, ft, fc, opc, pic = 0;
+    int fr, bt, fc, opc;
 
-    ft = v->type.t;
-    fc = v->c.i;
-    fr = v->r & VT_VALMASK;
-    ft &= ~(VT_VOLATILE | VT_CONSTANT);
-    bt = ft & VT_BTYPE;
-
-#ifndef TCC_TARGET_PE
-#if defined CONFIG_TCC_PIC
-    /* we need to access the variable via got */
-    if (fr == VT_CONST
-        && (v->r & VT_SYM)
-        && !(v->sym->type.t & VT_STATIC)) {
-	get_pc_thunk(TREG_EBX, 1);
-	o(0x9b8b); /* mov xx(%ebx),%ebx */
-	gen_gotpcrel(TREG_EBX, v->sym, v->c.i);
-        pic = 1;
-    }
-#endif
-#endif
+    bt = v->type.t & VT_BTYPE;
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
@@ -459,26 +406,35 @@ ST_FUNC void store(int r, SValue *v)
     } else if (bt == VT_LDOUBLE) {
         opc = 0xdbc0d9; /* fld %st(0), fstpt */
         r = 7;
-    } else if (bt == VT_SHORT)
+    } else if (bt == VT_SHORT) {
         opc = 0x8966;
-    else if (bt == VT_BYTE || bt == VT_BOOL)
+    } else if (bt == VT_BYTE || bt == VT_BOOL) {
         opc = 0x88;
-    else
+    } else {
         opc = 0x89;
-    if (pic) {
+    }
+
+    fc = v->c.i;
+    fr = v->r & VT_VALMASK;
+
+#if defined CONFIG_TCC_PIC
+    /* we need to access the variable via got */
+    if ((v->r & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)
+        && !(v->sym->type.t & VT_STATIC)) {
+	get_pc_thunk(TREG_EBX, 1);
+	o(0x9b8b); /* mov xx(%ebx),%ebx */
+	gen_gotpcrel(TREG_EBX, v->sym, v->c.i);
 	o(opc);
 	o(3 + (r << 3));
-    }
-    else if (fr == VT_CONST ||
-             fr == VT_LOCAL ||
-             (v->r & VT_LVAL)) {
-             gen_modrm(opc, r, v->r, v->sym, fc);
+    } else
+#endif
+
+    if (fr == VT_CONST || fr == VT_LOCAL || (v->r & VT_LVAL)) {
+        gen_modrm(opc, r, v->r, v->sym, fc);
     } else if (fr != r) {
 	o(opc);
         o(0xc0 + fr + r * 8); /* mov r, fr */
     }
-    else
-	tcc_error("store problem");
 }
 
 static void gadd_sp(int val)
@@ -491,20 +447,14 @@ static void gadd_sp(int val)
     }
 }
 
-#if defined CONFIG_TCC_BCHECK || defined TCC_TARGET_PE
+#if defined CONFIG_TCC_BCHECK || defined TCC_TARGET_PE || defined CONFIG_TCC_PIC
 static void gen_static_call(int v)
 {
     Sym *sym;
 
     sym = external_helper_sym(v);
-#if defined CONFIG_TCC_PIC
-    get_pc_thunk(TREG_EBX, 1);
-    oad(0xe8, -4);
-    greloc(cur_text_section, sym, ind - 4, R_386_PLT32);
-#else
     oad(0xe8, -4);
     greloc(cur_text_section, sym, ind - 4, R_386_PC32);
-#endif
 }
 #endif
 
@@ -512,22 +462,18 @@ static void gen_static_call(int v)
 static void gcall_or_jmp(int is_jmp)
 {
     int r;
-    if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST && (vtop->r & VT_SYM)) {
+    if ((vtop->r & (VT_VALMASK|VT_LVAL|VT_SYM)) == (VT_CONST|VT_SYM)) {
         /* constant and relocation case */
 #if defined CONFIG_TCC_PIC
-	if (vtop->sym->type.t & VT_STATIC) {
-            oad(0xe8 + is_jmp, vtop->c.i - 4); /* call/jmp im */
-            greloc(cur_text_section, vtop->sym, ind - 4, R_386_PC32);
-	}
-        else {
+	if (!(vtop->sym->type.t & VT_STATIC)) {
 	    get_pc_thunk(TREG_EBX, 1);
             oad(0xe8 + is_jmp, vtop->c.i - 4); /* call/jmp im */
             greloc(cur_text_section, vtop->sym, ind - 4, R_386_PLT32);
+            return;
 	}
-#else
-        greloc(cur_text_section, vtop->sym, ind + 1, R_386_PC32);
-        oad(0xe8 + is_jmp, vtop->c.i - 4); /* call/jmp im */
 #endif
+        oad(0xe8 + is_jmp, vtop->c.i - 4); /* call/jmp im */
+        greloc(cur_text_section, vtop->sym, ind - 4, R_386_PC32);
     } else {
         /* otherwise, indirect call */
         r = gv(RC_INT);
@@ -679,9 +625,9 @@ ST_FUNC void gfunc_call(int nb_args)
 }
 
 #ifdef TCC_TARGET_PE
-#define FUNC_PROLOG_SIZE (10 + USE_EBX)
+#define FUNC_PROLOG_SIZE (10 + !!USE_EBX)
 #else
-#define FUNC_PROLOG_SIZE (9 + (USE_EBX || GOT_EBX))
+#define FUNC_PROLOG_SIZE (9 + !!USE_EBX)
 #endif
 
 /* generate function prolog of type 't' */
@@ -786,7 +732,6 @@ ST_FUNC void gfunc_epilog(void)
 #if USE_EBX
     gen_modrm(0x8b, TREG_EBX, VT_LOCAL, NULL, -(v+4));
 #endif
-    o(0x5b * GOT_EBX); /* pop ebx */
 
     o(0xc9); /* leave */
     if (func_ret_sub == 0) {
@@ -812,7 +757,9 @@ ST_FUNC void gfunc_epilog(void)
         o(0x90);  /* adjust to FUNC_PROLOG_SIZE */
 #endif
     }
-    o(0x53 * (USE_EBX || GOT_EBX)); /* push ebx */
+#if USE_EBX
+    o(0x53); /* push ebx */
+#endif
     ind = saved_ind;
 }
 

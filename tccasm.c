@@ -684,17 +684,14 @@ static void asm_parse_directive(TCCState *s1, int global)
             next();
 	    asm_expr(s1, &e);
 	    n = e.v;
-	    if (n != e.v || n < 0)
-	range:
-		tcc_error(".org out of range");
 	    esym = elfsym(e.sym);
 	    if (esym) {
 		if (esym->st_shndx != cur_text_section->sh_num)
 		  expect("constant or same-section symbol");
 		n += esym->st_value;
-		if (n < esym->st_value)
-		    goto range;
 	    }
+	    if (n < 0 || n > 0x100000)
+		tcc_error(".org out of range");
             if (n < ind)
                 tcc_error("attempt to .org backwards");
             v = 0;
@@ -719,8 +716,8 @@ static void asm_parse_directive(TCCState *s1, int global)
 	do { 
             Sym *sym;
             next();
-	    if (tok < TOK_IDENT || tok >= SYM_FIRST_ANOM)
-		tcc_error("Illegal symbol %s", get_tok_str(tok1, NULL));
+	    if (tok < TOK_IDENT)
+		expect("identifier");
             sym = get_asm_sym(tok, NULL);
 	    if (tok1 != TOK_ASMDIR_hidden)
                 sym->type.t &= ~VT_STATIC;
@@ -816,15 +813,12 @@ static void asm_parse_directive(TCCState *s1, int global)
         { 
             Sym *sym;
 
-	    tok1 = tok;
             next();
-	    if (tok < TOK_IDENT || tok >= SYM_FIRST_ANOM)
-		goto nolab;
+	    if (tok < TOK_IDENT)
+		expect("identifier");
             sym = asm_label_find(tok);
-            if (!sym) {
-	nolab:
-                tcc_error("label not found: %s", get_tok_str(tok1, NULL));
-            }
+            if (!sym)
+                tcc_error("label not found: %s", get_tok_str(tok, NULL));
             /* XXX .size name,label2-label1 */
             tcc_warning_c(warn_unsupported)("ignoring .size %s,*", get_tok_str(tok, NULL));
             next();
@@ -840,10 +834,9 @@ static void asm_parse_directive(TCCState *s1, int global)
             const char *newtype;
             int st_type;
 
-	    tok1 = tok;
             next();
-	    if (tok < TOK_IDENT || tok >= SYM_FIRST_ANOM)
-		tcc_error("Illegal symbol %s", get_tok_str(tok1, NULL));
+	    if (tok < TOK_IDENT)
+		expect("identifier");
             sym = get_asm_sym(tok, NULL);
             next();
             skip(',');
@@ -1192,7 +1185,7 @@ static void subst_asm_operands(ASMOperand *operands, int nb_operands,
                 modifier = *str++;
             index = find_constraint(operands, nb_operands, str, &str);
             if (index < 0)
-		error:
+        error:
                 tcc_error("invalid operand reference after %%");
             op = &operands[index];
             if (modifier == 'l') {

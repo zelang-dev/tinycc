@@ -1840,9 +1840,6 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
                 tcc_add_dll(s1, TCC_LIBGCC, AFF_PRINT_ERROR);
         }
 #endif
-#if defined CONFIG_TCC_PIC && defined TCC_TARGET_I386
-        tcc_add_support(s1, "get_pc_thunk.o");
-#endif
 #if defined TCC_TARGET_ARM && TARGETOS_FreeBSD
         tcc_add_library(s1, "gcc_s"); // unwind code
 #endif
@@ -3103,9 +3100,6 @@ LIBTCCAPI int elf_output_obj(TCCState *s1, const char *filename)
 {
     Section *s;
     int i, ret, file_offset;
-    for(i = 1; i < s1->nb_sections; i++)
-	if (s1->sections[i] == NULL)
-	    return -2; /* debugging and TCC_OUTPUT_MEMORY and do_debug = 0 */
     /* Allocate strings for section names */
     alloc_sec_names(s1, 1);
     file_offset = (sizeof (ElfW(Ehdr)) + 3) & -4;

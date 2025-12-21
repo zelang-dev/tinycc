@@ -1899,13 +1899,8 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
             args_parser_add_file(s, r, s->filetype);
             empty = 0;
         dorun:
-            if (run) {
-                /* tcc -run <file> <args...> */
-                if (tcc_set_options(s, run) < 0)
-                    return -1;
-                x = 0;
-                goto extra_action;
-            }
+            if (run)
+                break;
             continue;
         }
         /* Also allow "tcc <files...> -run -- <args...>" */
@@ -2219,6 +2214,12 @@ unsupported_option:
     }
     if (s->link_optind < s->link_argc)
         return tcc_error_noabort("argument to '-Wl,%s' is missing", s->link_argv[s->link_optind]);
+    if (run) {
+        if (*run && tcc_set_options(s, run) < 0)
+            return -1;
+        x = 0;
+        goto extra_action;
+    }
     if (!empty)
         return 0;
     if (s->verbose == 2)
