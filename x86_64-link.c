@@ -221,10 +221,6 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
                 qrel->r_addend = (int)read32le(ptr) + val;
                 qrel++;
             }
-            if ((type == R_X86_64_32 && (unsigned long long)val > 4294967295ULL) ||
-                (type == R_X86_64_32S &&
-	         ((long long)val < -2147483648LL || (long long)val > 2147483647LL)))
-                tcc_error_noabort("internal error: relocation %d failed", type);
             add32le(ptr, val);
             break;
 
