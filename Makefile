@@ -24,6 +24,11 @@ CFLAGS += $(CPPFLAGS)
 VPATH = $(TOPSRC)
 -LTCC = $(TOP)/$(LIBTCC)
 
+ifeq ($(CONFIG_pie),yes)
+CFLAGS += -fPIE
+LDFLAGS += -pie
+endif
+
 ifdef CONFIG_WIN32
  CFG = -win
  ifneq ($(CONFIG_static),yes)
