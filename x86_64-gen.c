@@ -933,7 +933,6 @@ void gfunc_call(int nb_args)
     vtop--;
 }
 
-
 #define FUNC_PROLOG_SIZE 11
 
 /* generate function prolog of type 't' */

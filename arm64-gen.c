@@ -503,17 +503,19 @@ ST_FUNC void load(int r, SValue *sv)
     }
 
     if (svr == (VT_CONST | VT_LVAL)) {
+	uint64_t i = sv->c.i;
+
 	if (sv->sym)
             arm64_sym(30, sv->sym, // use x30 for address
-	              arm64_check_offset(0, arm64_type_size(svtt), sv->c.i));
+	              arm64_check_offset(0, arm64_type_size(svtt), i));
 	else
-	    arm64_movimm (30, sv->c.i);
+	    arm64_movimm (30, i), i = 0;
         if (IS_FREG(r))
             arm64_ldrv(arm64_type_size(svtt), fltr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), sv->c.i));
+		       arm64_check_offset(1, arm64_type_size(svtt), i));
         else
             arm64_ldrx(!(svtt&VT_UNSIGNED), arm64_type_size(svtt), intr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), sv->c.i));
+		       arm64_check_offset(1, arm64_type_size(svtt), i));
         return;
     }
 
@@ -621,17 +623,19 @@ ST_FUNC void store(int r, SValue *sv)
     }
 
     if (svr == (VT_CONST | VT_LVAL)) {
+	uint64_t i = sv->c.i;
+
 	if (sv->sym)
             arm64_sym(30, sv->sym, // use x30 for address
-		      arm64_check_offset(0, arm64_type_size(svtt), sv->c.i));
+		      arm64_check_offset(0, arm64_type_size(svtt), i));
 	else
-	    arm64_movimm (30, sv->c.i);
+	    arm64_movimm (30, i), i = 0;
         if (IS_FREG(r))
             arm64_strv(arm64_type_size(svtt), fltr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), sv->c.i));
+		       arm64_check_offset(1, arm64_type_size(svtt), i));
         else
             arm64_strx(arm64_type_size(svtt), intr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), sv->c.i));
+		       arm64_check_offset(1, arm64_type_size(svtt), i));
         return;
     }
 
@@ -1752,6 +1756,7 @@ static void arm64_gen_opil(int op, uint32_t l)
         o(0x4b000000 | l << 31 | x | a << 5 | b << 16); // sub
         break;
     case '/':
+    case TOK_PDIV:
         o(0x1ac00c00 | l << 31 | x | a << 5 | b << 16); // sdiv
         break;
     case '^':
@@ -1794,7 +1799,6 @@ static void arm64_gen_opil(int op, uint32_t l)
         o(0x1ac02400 | l << 31 | x | a << 5 | b << 16); // lsr
         break;
     case TOK_UDIV:
-    case TOK_PDIV:
         o(0x1ac00800 | l << 31 | x | a << 5 | b << 16); // udiv
         break;
     case TOK_UGE:

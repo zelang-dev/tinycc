@@ -56,7 +56,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 # include <io.h> /* open, close etc. */
 # include <direct.h> /* getcwd */
 # include <malloc.h> /* alloca */
-# ifdef __GNUC__
+# ifndef _MSC_VER
 #  include <stdint.h>
 # endif
 # define inline __inline
@@ -385,7 +385,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #elif defined TCC_TARGET_ARM64
 # include "arm64-gen.c"
 # include "arm64-link.c"
-# include "arm-asm.c"
+# include "arm64-asm.c"
 #elif defined TCC_TARGET_C67
 # define TCC_TARGET_COFF
 # include "coff.h"
@@ -976,6 +976,7 @@ struct TCCState {
     const char *run_main; /* entry for tcc_run() */
     void *run_ptr; /* runtime_memory */
     unsigned run_size; /* size of runtime_memory  */
+    const char *run_stdin; /* custom stdin file for run_main */
 #ifdef _WIN64
     void *run_function_table; /* unwind data */
 #endif
@@ -1098,6 +1099,7 @@ struct filespec {
 
 /* base type is array (from typedef/typeof) */
 #define VT_BT_ARRAY (6 << VT_STRUCT_SHIFT)
+#define IS_BT_ARRAY(t) ((t & VT_STRUCT_MASK) == VT_BT_ARRAY)
 
 /* general: set/get the pseudo-bitfield value for bit-mask M */
 #define BFVAL(M,N) ((unsigned)((M) & ~((M) << 1)) * (N))
@@ -1235,6 +1237,7 @@ PUB_FUNC char *tcc_strdup_debug(const char *str, const char *file, int line);
 #endif
 
 ST_FUNC void libc_free(void *ptr);
+/* defined to be not used */
 #define free(p) use_tcc_free(p)
 #define malloc(s) use_tcc_malloc(s)
 #define realloc(p, s) use_tcc_realloc(p, s)

@@ -984,6 +984,23 @@ static void asm_parse_directive(TCCState *s1, int global)
         skip('@');
 	next();
 	break;
+    case TOK_ASMDIR_reloc:
+	{
+	    ExprValue e;
+
+	    next();
+	    asm_expr(s1, &e);
+	    skip(',');
+#if defined(TCC_TARGET_ARM64)
+	    if (strcmp(get_tok_str(tok, NULL), "R_AARCH64_CALL26"))
+#endif
+	        tcc_error("unimp: reloc '%s' unknown", get_tok_str(tok, NULL));
+	    next();
+	    skip(',');
+	    greloca(cur_text_section, get_asm_sym(tok, NULL), e.v, R_AARCH64_CALL26, 0);
+	    next();
+	}
+	break;
     default:
         tcc_error("unknown assembler directive '.%s'", get_tok_str(tok, NULL));
         break;

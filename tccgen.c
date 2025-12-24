@@ -409,6 +409,7 @@ ST_FUNC int tccgen_compile(TCCState *s1)
     anon_sym = SYM_FIRST_ANOM;
     nocode_wanted = DATA_ONLY_WANTED; /* no code outside of functions */
     debug_modes = (s1->do_debug ? 1 : 0) | s1->test_coverage << 1;
+    global_expr = 0;
 
     tcc_debug_start(s1);
     tcc_tcov_start (s1);
@@ -1700,10 +1701,8 @@ ST_FUNC void gbound_args(int nb_args)
             gfunc_call(1);
             func_bound_add_epilog = 1;
         }
-#if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
         if (v == TOK_alloca)
             func_bound_add_epilog = 1;
-#endif
 #if TARGETOS_NetBSD
         if (v == TOK_longjmp) /* undo rename to __longjmp14 */
             sv->sym->asm_label = TOK___bound_longjmp;
@@ -3590,7 +3589,8 @@ static void cast_error(CType *st, CType *dt)
 static void verify_assign_cast(CType *dt)
 {
     CType *st, *type1, *type2;
-    int dbt, sbt, qualwarn, lvl;
+    Sym *sym;
+    int dbt, sbt, qualwarn, lvl, compat;
 
     st = &vtop->type; /* source type */
     dbt = dt->t & VT_BTYPE;
@@ -3644,8 +3644,29 @@ static void verify_assign_cast(CType *dt)
 		   base types, though, in particular for unsigned enums
 		   and signed int targets.  */
             } else {
-                tcc_warning("assignment from incompatible pointer type");
-                break;
+                compat = 0;
+                /* Don't warn if the source struct (recursively) contains
+                   destination struct as the first member. */
+                if (dbt == VT_STRUCT && sbt == VT_STRUCT
+                    && !IS_UNION(type2->t)
+                    ) {
+                    sym = type2->ref->next;
+                    while (sym != NULL && (sym->type.t & VT_BTYPE) == VT_STRUCT
+                        ) {
+                        if (is_compatible_unqualified_types(type1, &sym->type)
+                            ) {
+                            compat = 1;
+                            break;
+                        }
+                        if (IS_UNION(sym->type.t))
+                            break;
+                        sym = sym->type.ref->next;
+                    }
+                }
+                if( !compat ) {
+                    tcc_warning("assignment from incompatible pointer type");
+                    break;
+                }
             }
         }
         if (qualwarn)
@@ -4012,11 +4033,27 @@ redo:
         case TOK_NODEBUG2:
             ad->a.nodebug = 1;
             break;
+        case TOK_USED1:
+        case TOK_USED2:
         case TOK_UNUSED1:
         case TOK_UNUSED2:
             /* currently, no need to handle it because tcc does not
-               track unused objects */
+               track used/unused objects */
             break;
+        case TOK_CONST1:
+        case TOK_CONST2:
+        case TOK_CONST3:
+        case TOK_PURE1:
+        case TOK_PURE2:
+	    /* ignored */
+            break;
+        case TOK_NOINLINE:
+	    /* ignored */
+	    break;
+        case TOK_FORMAT1:
+        case TOK_FORMAT2:
+	    /* ignored */
+            goto skip_param;
         case TOK_NORETURN1:
         case TOK_NORETURN2:
             ad->f.func_noreturn = 1;
@@ -4090,6 +4127,7 @@ redo:
         default:
             tcc_warning_c(warn_unsupported)("'%s' attribute ignored", get_tok_str(t, NULL));
             /* skip parameters */
+skip_param:
             if (tok == '(') {
                 int parenthesis = 0;
                 do {
@@ -7108,28 +7146,18 @@ static void lblock(int *bsym, int *csym)
     }
 }
 
-static void condition_expresion(void)
+/* c2y if/switch declaration */
+static void gexpr_decl(void)
 {
-    Sym *s;
-    int decl_ret;
-
-    /* c2y if init decl? */
-    if (!(decl_ret = decl(VT_JMPI))) {
-        /* no, regular if init expr */
-        gexpr();
+    int v = decl(VT_JMP);
+    if (v > 1 && tok != ';') {
+        Sym *s = sym_find(v);
+        vset(&s->type, s->r, (s->r & VT_SYM) ? 0 : s->c);
+        vtop->sym = s;
     } else {
-	if (decl_ret == 1)
-	    tcc_error("declaration in the controlling expression must have an initializer");
-
-        if (tok == ';') {
-            /* finish the push */
-            next();
-            gexpr();
-        } else {
-            s = sym_find(decl_ret);
-            vset(&s->type, s->r, s->c);
-            vtop->sym = s;
-        }
+        if (v)
+            skip(';');
+        gexpr();
     }
 }
 
@@ -7153,7 +7181,7 @@ again:
     if (t == TOK_IF) {
         new_scope_s(&o);
         skip('(');
-        condition_expresion();
+        gexpr_decl();
         a = gvtst(1, 0);
         skip(')');
         block(0);
@@ -7322,7 +7350,7 @@ again:
 
         new_scope_s(&o);
         skip('(');
-        condition_expresion();
+        gexpr_decl();
         if (!is_integer_btype(vtop->type.t & VT_BTYPE))
             tcc_error("switch value not an integer");
         skip(')');
@@ -8213,7 +8241,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
            we will overwrite the unknown size by the real one for
            this decl.  We need to unshare the ref symbol holding
            that size.  */
-        if (type->t & VT_BT_ARRAY)
+        if (IS_BT_ARRAY(type->t))
             type->ref = sym_push(SYM_FIELD, &type->ref->type, 0, type->ref->c);
         p.flex_array_ref = type->ref;
 
@@ -8654,9 +8682,7 @@ static void pe_check_linkage(CType *type, AttributeDef *ad)
 
 /* 'l' is VT_LOCAL or VT_CONST to define default storage type
    or VT_CMP if parsing old style parameter list
-   or VT_JMP if parsing c99 for decl: for (int i = 0, ...)
-   or VT_JMPI if parsing c2y if decl; if (int = 0; ...)
-*/
+   or VT_JMP if parsing c99 for decl: for (int i = 0, ...) */
 static int decl(int l)
 {
     int v, has_init, r, oldint;
@@ -8669,7 +8695,7 @@ static int decl(int l)
 
         oldint = 0;
         if (!parse_btype(&btype, &adbase, l == VT_LOCAL)) {
-            if (l == VT_JMP || l == VT_JMPI)
+            if (l == VT_JMP)
                 return 0;
             /* skip redundant ';' if not in old parameter decl scope */
             if (tok == ';' && l != VT_CMP) {
@@ -8716,7 +8742,11 @@ static int decl(int l)
         while (1) { /* iterate thru each declaration */
             type = btype;
 	    ad = adbase;
-            type_decl(&type, &ad, &v, TYPE_DIRECT);
+            if (l == VT_CMP) {
+                type_decl(&type, &ad, &v, TYPE_DIRECT | TYPE_PARAM);
+            } else {
+                type_decl(&type, &ad, &v, TYPE_DIRECT);
+            }
             /*ptype("decl", &type, v);*/
 
             if ((type.t & VT_BTYPE) == VT_FUNC) {
@@ -8896,12 +8926,10 @@ static int decl(int l)
                     }
                 }
                 if (tok != ',') {
-                    if (l == VT_JMP || l == VT_JMPI)
+                    if (l == VT_JMP)
                         return has_init ? v : 1;
                     skip(';');
                     break;
-                } else if (l == VT_JMPI) {
-                    tcc_error("declaration in condition can only declare a single object");
                 }
                 next();
             }

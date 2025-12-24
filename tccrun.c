@@ -206,9 +206,10 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     const char *top_sym;
     jmp_buf main_jb;
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
-    char **envp = NULL;
-#elif defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__APPLE__)
+    extern char ***_NSGetEnviron(void);
+    char **envp = *_NSGetEnviron();
+#elif defined(__OpenBSD__) || defined(__NetBSD__)  || defined(__FreeBSD__)
     extern char **environ;
     char **envp = environ;
 #else
@@ -221,6 +222,7 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
 
     tcc_add_symbol(s1, "__rt_exit", rt_exit);
     if (s1->nostdlib) {
+        tcc_add_support(s1, "run_nostdlib.o");
         s1->run_main = top_sym = s1->elf_entryname ? s1->elf_entryname : "_start";
     } else {
         tcc_add_support(s1, "runmain.o");
@@ -233,13 +235,34 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     prog_main = (void*)get_sym_addr(s1, s1->run_main, 1, 1);
     if ((addr_t)-1 == (addr_t)prog_main)
         return -1;
+
+    /* custom stdin for run_main, mainly if stdin is/was an input file.
+     * fileno(stdin) should remain 0, as posix mandates to use the smallest
+     * free fd, which is 0 after the initial fclose in freopen. windows too.
+     * to set stdin to the tty, use /dev/tty (posix) or con (windows).
+     */
+    if (s1->run_stdin && !freopen(s1->run_stdin, "r", stdin)) {
+        tcc_error_noabort("failed to reopen stdin from '%s'", s1->run_stdin);
+        return -1;
+    }
+
     errno = 0; /* clean errno value */
     fflush(stdout);
     fflush(stderr);
 
     ret = tcc_setjmp(s1, main_jb, tcc_get_symbol(s1, top_sym));
-    if (0 == ret)
-        ret = prog_main(argc, argv, envp);
+    if (0 == ret) {
+        if (s1->nostdlib) {
+            void (*run_nostdlib)(void *start, int argc, char **argv, char **envp);
+
+	    run_nostdlib = (void *)get_sym_addr(s1, "_run_nostdlib", 1, 1);
+            if ((addr_t)-1 == (addr_t)run_nostdlib)
+                return -1;
+	    run_nostdlib(prog_main, argc, argv, envp);    /* never returns */
+	}
+	else
+            ret = prog_main(argc, argv, envp);
+    }
     else if (RT_EXIT_ZERO == ret)
         ret = 0;
 

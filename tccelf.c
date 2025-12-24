@@ -2419,8 +2419,10 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         if (s->sh_type != SHT_NOBITS)
             file_offset += s->sh_size;
 
-        ph->p_filesz = file_offset - ph->p_offset;
-        ph->p_memsz = addr - ph->p_vaddr;
+        if (ph) {
+            ph->p_filesz = file_offset - ph->p_offset;
+            ph->p_memsz = addr - ph->p_vaddr;
+        }
     }
 
     /* Fill other headers */

@@ -431,7 +431,7 @@ struct _tccdbg {
 #define	FDE_ENCODING        (DW_EH_PE_udata4 | DW_EH_PE_signed | DW_EH_PE_pcrel)
 
 /* ------------------------------------------------------------------------- */
-static void put_stabs(TCCState *s1, const char *str, int type, int other,
+static int put_stabs(TCCState *s1, const char *str, int type, int other,
     int desc, unsigned long value);
 
 ST_FUNC void tcc_debug_new(TCCState *s1)
@@ -449,6 +449,19 @@ ST_FUNC void tcc_debug_new(TCCState *s1)
 #endif
 
     if (s1->dwarf) {
+	int i;
+	/* The sections below are just to make reloctions with
+	   R_DATA_32DW work correctly. See tccelf.c */
+	static const char *const debug[] = {
+	    ".debug_macro",
+	    ".debug_loc",
+	    ".debug_ranges",
+	    ".debug_loclists",
+	    ".debug_rnglists",
+	    ".debug_str_offsets",
+	    ".debug_addr"
+	};
+
         s1->dwlo = s1->nb_sections;
         dwarf_info_section =
 	    new_section(s1, ".debug_info", SHT_PROGBITS, shf);
@@ -458,6 +471,8 @@ ST_FUNC void tcc_debug_new(TCCState *s1)
 	    new_section(s1, ".debug_line", SHT_PROGBITS, shf);
         dwarf_aranges_section =
 	    new_section(s1, ".debug_aranges", SHT_PROGBITS, shf);
+	for (i = 0; i < sizeof(debug)/sizeof(debug[0]); i++)
+	    new_section(s1, debug[i], SHT_PROGBITS, 0)->sh_addralign = 1;
 	shf |= SHF_MERGE | SHF_STRINGS;
         dwarf_str_section =
 	    new_section(s1, ".debug_str", SHT_PROGBITS, shf);
@@ -487,7 +502,7 @@ ST_FUNC void tcc_debug_new(TCCState *s1)
 }
 
 /* put stab debug information */
-static void put_stabs(TCCState *s1, const char *str, int type, int other, int desc,
+static int put_stabs(TCCState *s1, const char *str, int type, int other, int desc,
                       unsigned long value)
 {
     Stab_Sym *sym;
@@ -500,7 +515,7 @@ static void put_stabs(TCCState *s1, const char *str, int type, int other, int de
         && sym->n_value == value) {
         /* just update line_number in previous entry */
         sym->n_desc = desc;
-        return;
+        return 0;
     }
 
     sym = section_ptr_add(stab_section, sizeof(Stab_Sym));
@@ -513,16 +528,17 @@ static void put_stabs(TCCState *s1, const char *str, int type, int other, int de
     sym->n_other = other;
     sym->n_desc = desc;
     sym->n_value = value;
+    return 1;
 }
 
 static void put_stabs_r(TCCState *s1, const char *str, int type, int other, int desc,
                         unsigned long value, Section *sec, int sym_index)
 {
-    put_elf_reloc(symtab_section, stab_section,
-                  stab_section->data_offset + 8,
-                  sizeof ((Stab_Sym*)0)->n_value == PTR_SIZE ? R_DATA_PTR : R_DATA_32,
-                  sym_index);
-    put_stabs(s1, str, type, other, desc, value);
+    if (put_stabs(s1, str, type, other, desc, value))
+        put_elf_reloc(symtab_section, stab_section,
+                      stab_section->data_offset - 4,
+                      sizeof ((Stab_Sym*)0)->n_value == PTR_SIZE ? R_DATA_PTR : R_DATA_32,
+                      sym_index);
 }
 
 static void put_stabn(TCCState *s1, int type, int other, int desc, int value)
@@ -1769,6 +1785,16 @@ static int stabs_struct_find(TCCState *s1, Sym *t, int *p_id)
     return 1;
 }
 
+static int remove_type_info(int type)
+{
+        type &= ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
+        if ((type & VT_BTYPE) != VT_BYTE)
+            type &= ~VT_DEFSIGN;
+        if (!(type & VT_BITFIELD) && (type & VT_STRUCT_MASK) > VT_ENUM)
+	    type &= ~VT_STRUCT_MASK;
+	return type;
+}
+
 static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
 {
     int type;
@@ -1778,9 +1804,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
     CString str;
 
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR || type == (VT_PTR | VT_ARRAY))
             n++, t = t->type.ref;
         else
@@ -1859,9 +1883,7 @@ static void tcc_get_debug_info(TCCState *s1, Sym *s, CString *result)
         cstr_printf (result, "%d=", ++debug_next_type);
     t = s;
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR)
             cstr_printf (result, "%d=*", ++debug_next_type);
         else if (type == (VT_PTR | VT_ARRAY))
@@ -1899,9 +1921,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
     if (new_file)
         put_new_file(s1);
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR || type == (VT_PTR | VT_ARRAY))
             t = t->type.ref;
         else
@@ -2048,9 +2068,7 @@ static int tcc_get_dwarf_info(TCCState *s1, Sym *s)
     e = NULL;
     t = s;
     for (;;) {
-        type = t->type.t & ~(VT_STORAGE | VT_CONSTANT | VT_VOLATILE | VT_VLA);
-        if ((type & VT_BTYPE) != VT_BYTE)
-            type &= ~VT_DEFSIGN;
+        type = remove_type_info (t->type.t);
         if (type == VT_PTR) {
 	    i = dwarf_info_section->data_offset;
 	    if (retval == debug_type)
