@@ -1355,6 +1355,10 @@ ST_FUNC void gen_va_arg(CType *t)
         o(0x540000ad); // b.le .+20
 #endif
         o(0xf9400000 | r1 | r0 << 5); // ldr x(r1),[x(r0)] // __stack
+        if (align == 16) {
+            o(0x91003c00 | r1 | r1 << 5); // add x(r1),x(r1),#15
+            o(0x927cec00 | r1 | r1 << 5); // and x(r1),x(r1),#-16
+        }
         o(0x9100001e | r1 << 5 | n << 10); // add x30,x(r1),#(n)
         o(0xf900001e | r0 << 5); // str x30,[x(r0)] // __stack
 #if !defined(TCC_TARGET_MACHO)
