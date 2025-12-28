@@ -476,7 +476,7 @@ static void arm64_sym(int r, Sym *sym, unsigned long addend)
 		int t = r ? 0 : 1;
 		o(0xf81f0fe0 | t);            /* str xt, [sp, #-16]! */
 		arm64_movimm(t, addend & ~0xfffffful); // use xt for addent
-		o(0x91000000 | r | (t << 5)); /* add xr, xt, #0 */
+		o(0x8B000000 | (t << 16) | (r << 5) | r); /* add xr, xr, xt */
 		o(0xf84107e0 | t);            /* ldr xt, [sp], #16 */
 	    }
         }
