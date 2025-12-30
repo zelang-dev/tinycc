@@ -35,7 +35,7 @@ endif
 
 XFLAGS += -I$(TOP)
 
-I386_O = libtcc1.o $(COMMON_O)
+I386_O = libtcc1.o get_pc_thunk.o $(COMMON_O)
 X86_64_O = libtcc1.o $(COMMON_O)
 ARM_O = libtcc1.o armeabi.o armflush.o $(COMMON_O)
 ARM64_O = lib-arm64.o $(COMMON_O)
@@ -56,7 +56,7 @@ $(Cbt)WIN_O += bt-dll.o
 $(Cbc)COMMON_O += bcheck.o
 
 # not in libtcc1.a
-EXTRA_O = runmain.o run_nostdlib.o bt-exe.o bt-dll.o bt-log.o bcheck.o
+EXTRA_O = runmain.o run_nostdlib.o bt-exe.o bt-dll.o bt-log.o bcheck.o get_pc_thunk.o
 
 OBJ-i386 = $(I386_O) $(LIN_O)
 OBJ-x86_64 = $(X86_64_O) $(LIN_O)
@@ -88,6 +88,9 @@ $(X)%.o : %.c $(TCC)
 	$S$(XCC) -c $< -o $@ $(XFLAGS)
 
 $(X)%.o : %.S $(TCC)
+	$S$(XCC) -c $< -o $@ $(XFLAGS)
+
+$(TOP)/%.o : %.S $(TCC)
 	$S$(XCC) -c $< -o $@ $(XFLAGS)
 
 $(TOP)/%.o : %.c $(TCC)

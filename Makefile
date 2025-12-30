@@ -372,7 +372,7 @@ IR = $(IM) mkdir -p $2 && cp -r $1/. $2
 IM = @echo "-> $2 : $1" ;
 BINCHECK = $(if $(wildcard $(PROGS) *-tcc$(EXESUF)),,@echo "Makefile: nothing found to install" && exit 1)
 
-EXTRA_O = runmain.o run_nostdlib.o bt-exe.o bt-dll.o bt-log.o bcheck.o
+EXTRA_O = runmain.o run_nostdlib.o bt-exe.o bt-dll.o bt-log.o bcheck.o get_pc_thunk.o
 
 # install progs & libs
 install-unx:
