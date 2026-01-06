@@ -818,8 +818,11 @@ static void asm_parse_directive(TCCState *s1, int global)
 
 	    tok1 = tok;
             next();
+	    if (tok < TOK_IDENT || tok >= SYM_FIRST_ANOM)
+		goto nolab;
             sym = asm_label_find(tok);
             if (!sym) {
+	nolab:
                 tcc_error("label not found: %s", get_tok_str(tok1, NULL));
             }
             /* XXX .size name,label2-label1 */

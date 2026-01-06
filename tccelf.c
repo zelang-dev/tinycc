@@ -2615,6 +2615,10 @@ static int tcc_output_elf(TCCState *s1, FILE *f, int phnum, ElfW(Phdr) *phdr)
 
 #if TARGETOS_FreeBSD || TARGETOS_FreeBSD_kernel
     ehdr.e_ident[EI_OSABI] = ELFOSABI_FREEBSD;
+#elif TARGETOS_OpenBSD
+    ehdr.e_ident[EI_OSABI] = ELFOSABI_OPENBSD;
+#elif TARGETOS_NetBSD
+    ehdr.e_ident[EI_OSABI] = ELFOSABI_NETBSD;
 #elif defined TCC_TARGET_ARM && defined TCC_ARM_EABI
     ehdr.e_flags = EF_ARM_EABI_VER5;
     ehdr.e_flags |= s1->float_abi == ARM_HARD_FLOAT
