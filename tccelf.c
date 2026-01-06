@@ -3095,10 +3095,13 @@ static void alloc_sec_names(TCCState *s1, int is_obj)
 }
 
 /* Output an elf .o file */
-static int elf_output_obj(TCCState *s1, const char *filename)
+LIBTCCAPI int elf_output_obj(TCCState *s1, const char *filename)
 {
     Section *s;
     int i, ret, file_offset;
+    for(i = 1; i < s1->nb_sections; i++)
+	if (s1->sections[i] == NULL)
+	    return -2; /* debugging and TCC_OUTPUT_MEMORY and do_debug = 0 */
     /* Allocate strings for section names */
     alloc_sec_names(s1, 1);
     file_offset = (sizeof (ElfW(Ehdr)) + 3) & -4;
