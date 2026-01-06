@@ -7837,6 +7837,9 @@ static void init_putv(init_params *p, CType *type, unsigned long c)
 	    ElfW_Rel *rel;
 	    esym = elfsym(vtop->sym);
 	    ssec = tcc_state->sections[esym->st_shndx];
+	    if (esym->st_value + (int)vtop->c.i + size > ssec->data_offset)
+	        section_add(ssec, esym->st_value + (int)vtop->c.i +
+				  size - ssec->data_offset, 1);
 	    memmove (ptr, ssec->data + esym->st_value + (int)vtop->c.i, size);
 	    if (ssec->reloc) {
 		/* We need to copy over all memory contents, and that

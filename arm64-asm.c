@@ -31,8 +31,11 @@ ST_FUNC void g(int c)
     if (nocode_wanted)
         return;
     ind1 = ind + 1;
-    if (ind1 > cur_text_section->data_allocated)
+    if ((unsigned)ind1 > cur_text_section->data_allocated) {
+        if (ind1 < 0)
+	    tcc_error("program too big");
         section_realloc(cur_text_section, ind1);
+    }
     cur_text_section->data[ind] = c;
     ind = ind1;
 }

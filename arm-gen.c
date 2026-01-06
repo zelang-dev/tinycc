@@ -257,8 +257,11 @@ void o(uint32_t i)
   if (!cur_text_section)
     tcc_error("compiler error! This happens f.ex. if the compiler\n"
          "can't evaluate constant expressions outside of a function.");
-  if (ind1 > cur_text_section->data_allocated)
+  if ((unsigned)ind1 > cur_text_section->data_allocated) {
+    if (ind1 < 0)
+      tcc_error("program too big");
     section_realloc(cur_text_section, ind1);
+  }
   cur_text_section->data[ind++] = i&255;
   i>>=8;
   cur_text_section->data[ind++] = i&255;

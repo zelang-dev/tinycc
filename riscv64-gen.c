@@ -115,8 +115,11 @@ ST_FUNC void o(unsigned int c)
     int ind1 = ind + 4;
     if (nocode_wanted)
         return;
-    if (ind1 > cur_text_section->data_allocated)
+    if ((unsigned)ind1 > cur_text_section->data_allocated) {
+        if (ind1 < 0)
+	    tcc_error("program too big");
         section_realloc(cur_text_section, ind1);
+    }
     write32le(cur_text_section->data + ind, c);
     ind = ind1;
 }

@@ -551,4 +551,84 @@ int main(int argc, char **argv)
 
 }
 
+#elif defined test_jmp_label
+
+int main(void) {
+    asm goto("jmp %[label]" : : : : label);
+}
+
+#elif defined test_void_ternary
+
+int main() {
+    unsigned long b = 0;
+    if ((b ? (void)0 : (long long)b))
+}
+
+#elif defined test_init_int_string
+
+int fsB = "";
+
+//#elif defined test_constant1
+// results differs on 32/64 bits targets
+// reports 64: constant expression expected
+// reports 32: constant exceeds 32 bit
+//e[1.0 < r()
+//
+//#elif defined test_constant2
+// results differs on 32/64 bits targets
+// reports 64: constant expression expected
+// reports 32: constant exceeds 32 bit
+//e[1 < r()-1.
+
+#elif defined test_asm1
+
+asm  (".align 8589934592");
+
+#elif defined test_asm2
+
+asm  (".balign 8589934592");
+
+#elif defined test_asm3
+
+asm  (".global ");
+
+#elif defined test_asm4
+
+asm  (".type (a,cr0,digit)");
+
+#elif defined test_asm5
+
+asm  (".type $6");
+
+#elif defined test_asm6
+
+asm  (".global $-3");
+
+#elif defined test_asm7
+
+asm  (".global (dx,0X2D,digit)");
+
+#elif defined test_asm8
+
+asm  (".size 0XA");
+
+#elif defined test_asm9
+
+asm  (".weak (fs:0)");
+
+#elif defined test_asm10
+
+asm  (".align 0");
+
+#elif defined test_asm11
+
+asm  (".org 33824993159184");
+
+//#elif defined test_big
+// results differs on 32/64 bits targets
+// reports 64: error: program too big
+// reports 32: memory full
+//asm (".org 0x7fffffff");
+//asm (".byte 1, 2, 3, 4");
+
 #endif

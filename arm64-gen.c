@@ -117,8 +117,11 @@ ST_FUNC void o(unsigned int c)
     int ind1 = ind + 4;
     if (nocode_wanted)
         return;
-    if (ind1 > cur_text_section->data_allocated)
+    if ((unsigned)ind1 > cur_text_section->data_allocated) {
+        if (ind1 < 0)
+	    tcc_error("program too big");
         section_realloc(cur_text_section, ind1);
+    }
     write32le(cur_text_section->data + ind, c);
     ind = ind1;
 }
@@ -274,6 +277,7 @@ static int arm64_type_size(int t)
     case VT_DOUBLE: return 3;
     case VT_LDOUBLE: return 4;
     case VT_BOOL: return 0;
+    case VT_VOID: return 0;
     }
     assert(0);
     return 0;

@@ -175,8 +175,11 @@ ST_FUNC void g(int c)
     if (nocode_wanted)
         return;
     ind1 = ind + 1;
-    if (ind1 > cur_text_section->data_allocated)
+    if ((unsigned)ind1 > cur_text_section->data_allocated) {
+        if (ind1 < 0)
+	    tcc_error("program too big");
         section_realloc(cur_text_section, ind1);
+    }
     cur_text_section->data[ind] = c;
     ind = ind1;
 }
@@ -444,7 +447,8 @@ void load(int r, SValue *sv)
             b = 0xdb, r = 5; /* fldt */
         } else if ((ft & VT_TYPE) == VT_BYTE || (ft & VT_TYPE) == VT_BOOL) {
             b = 0xbe0f;   /* movsbl */
-        } else if ((ft & VT_TYPE) == (VT_BYTE | VT_UNSIGNED)) {
+        } else if ((ft & VT_TYPE) == (VT_BYTE | VT_UNSIGNED) ||
+		   (ft & VT_TYPE) == (VT_BOOL | VT_UNSIGNED)) {
             b = 0xb60f;   /* movzbl */
         } else if ((ft & VT_TYPE) == VT_SHORT) {
             b = 0xbf0f;   /* movswl */
@@ -538,7 +542,8 @@ void load(int r, SValue *sv)
                     o(0x44 + REG_VALUE(r)*8); /* %xmmN */
                     o(0xf024);
                 } else {
-                    assert((v >= TREG_XMM0) && (v <= TREG_XMM7));
+		    if (!nocode_wanted)
+                        assert((v >= TREG_XMM0) && (v <= TREG_XMM7));
                     if ((ft & VT_BTYPE) == VT_FLOAT) {
                         o(0x100ff3);
                     } else {
@@ -548,7 +553,8 @@ void load(int r, SValue *sv)
                     o(0xc0 + REG_VALUE(v) + REG_VALUE(r)*8);
                 }
             } else if (r == TREG_ST0) {
-                assert((v >= TREG_XMM0) && (v <= TREG_XMM7));
+		if (!nocode_wanted)
+                    assert((v >= TREG_XMM0) && (v <= TREG_XMM7));
                 /* gen_cvt_ftof(VT_LDOUBLE); */
                 /* movsd %xmmN,-0x10(%rsp) */
                 o(0x110ff2);

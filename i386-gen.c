@@ -126,8 +126,11 @@ ST_FUNC void g(int c)
     if (nocode_wanted)
         return;
     ind1 = ind + 1;
-    if (ind1 > cur_text_section->data_allocated)
+    if ((unsigned)ind1 > cur_text_section->data_allocated) {
+        if (ind1 < 0)
+	    tcc_error("program too big");
         section_realloc(cur_text_section, ind1);
+    }
     cur_text_section->data[ind] = c;
     ind = ind1;
 }
@@ -363,7 +366,8 @@ ST_FUNC void load(int r, SValue *sv)
             r = 5;
         } else if ((ft & VT_TYPE) == VT_BYTE || (ft & VT_TYPE) == VT_BOOL) {
             opc = 0xbe0f;   /* movsbl */
-        } else if ((ft & VT_TYPE) == (VT_BYTE | VT_UNSIGNED)) {
+        } else if ((ft & VT_TYPE) == (VT_BYTE | VT_UNSIGNED) ||
+		   (ft & VT_TYPE) == (VT_BOOL | VT_UNSIGNED)) {
             opc = 0xb60f;   /* movzbl */
         } else if ((ft & VT_TYPE) == VT_SHORT) {
             opc = 0xbf0f;   /* movswl */

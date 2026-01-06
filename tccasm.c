@@ -398,6 +398,8 @@ ST_FUNC int asm_int_expr(TCCState *s1)
     asm_expr(s1, &e);
     if (e.sym)
         expect("constant");
+    if ((int)e.v != e.v)
+	tcc_error("integer out of range %lld", (long long)e.v);
     return e.v;
 }
 
@@ -515,7 +517,7 @@ static void asm_parse_directive(TCCState *s1, int global)
             tok1 = TOK_ASMDIR_align;
         }
         if (tok1 == TOK_ASMDIR_align || tok1 == TOK_ASMDIR_balign) {
-            if (n < 0 || (n & (n-1)) != 0)
+            if (n <= 0 || (n & (n-1)) != 0)
                 tcc_error("alignment must be a positive power of two");
             offset = (ind + n - 1) & -n;
             size = offset - ind;
@@ -677,17 +679,21 @@ static void asm_parse_directive(TCCState *s1, int global)
         }
     case TOK_ASMDIR_org:
         {
-            unsigned long n;
 	    ExprValue e;
 	    ElfSym *esym;
             next();
 	    asm_expr(s1, &e);
 	    n = e.v;
+	    if (n != e.v || n < 0)
+	range:
+		tcc_error(".org out of range");
 	    esym = elfsym(e.sym);
 	    if (esym) {
 		if (esym->st_shndx != cur_text_section->sh_num)
 		  expect("constant or same-section symbol");
 		n += esym->st_value;
+		if (n < esym->st_value)
+		    goto range;
 	    }
             if (n < ind)
                 tcc_error("attempt to .org backwards");
@@ -713,6 +719,8 @@ static void asm_parse_directive(TCCState *s1, int global)
 	do { 
             Sym *sym;
             next();
+	    if (tok < TOK_IDENT || tok >= SYM_FIRST_ANOM)
+		tcc_error("Illegal symbol %s", get_tok_str(tok1, NULL));
             sym = get_asm_sym(tok, NULL);
 	    if (tok1 != TOK_ASMDIR_hidden)
                 sym->type.t &= ~VT_STATIC;
@@ -799,7 +807,7 @@ static void asm_parse_directive(TCCState *s1, int global)
             if (tok == TOK_STR)
                 pstrcat(ident, sizeof(ident), tokc.str.data);
             else
-                pstrcat(ident, sizeof(ident), get_tok_str(tok, NULL));
+                pstrcat(ident, sizeof(ident), get_tok_str(tok, &tokc));
             tcc_warning_c(warn_unsupported)("ignoring .ident %s", ident);
             next();
         }
@@ -808,10 +816,11 @@ static void asm_parse_directive(TCCState *s1, int global)
         { 
             Sym *sym;
 
+	    tok1 = tok;
             next();
             sym = asm_label_find(tok);
             if (!sym) {
-                tcc_error("label not found: %s", get_tok_str(tok, NULL));
+                tcc_error("label not found: %s", get_tok_str(tok1, NULL));
             }
             /* XXX .size name,label2-label1 */
             tcc_warning_c(warn_unsupported)("ignoring .size %s,*", get_tok_str(tok, NULL));
@@ -828,7 +837,10 @@ static void asm_parse_directive(TCCState *s1, int global)
             const char *newtype;
             int st_type;
 
+	    tok1 = tok;
             next();
+	    if (tok < TOK_IDENT || tok >= SYM_FIRST_ANOM)
+		tcc_error("Illegal symbol %s", get_tok_str(tok1, NULL));
             sym = get_asm_sym(tok, NULL);
             next();
             skip(',');
@@ -1177,11 +1189,14 @@ static void subst_asm_operands(ASMOperand *operands, int nb_operands,
                 modifier = *str++;
             index = find_constraint(operands, nb_operands, str, &str);
             if (index < 0)
+		error:
                 tcc_error("invalid operand reference after %%");
             op = &operands[index];
             if (modifier == 'l') {
                 cstr_cat(out_str, get_tok_str(op->is_label, NULL), -1);
             } else {
+		if (op->vt == NULL)
+		    goto error;
                 sv = *op->vt;
                 if (op->reg >= 0) {
                     sv.r = op->reg;
@@ -1318,6 +1333,8 @@ ST_FUNC void asm_instr(void)
                           tcc_error("too many asm operands");
                         if (tok < TOK_UIDENT)
                           expect("label identifier");
+			memset(operands + nb_operands + nb_labels, 0,
+			       sizeof(operands[0]));
                         operands[nb_operands + nb_labels++].id = tok;
 
                         csym = label_find(tok);
