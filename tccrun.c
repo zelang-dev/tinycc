@@ -323,7 +323,7 @@ static void cleanup_sections(TCCState *s1)
 
 #ifndef CONFIG_RUNMEM_RO
 # ifdef __APPLE__
-#   define CONFIG_RUNMEM_RO 2
+#   define CONFIG_RUNMEM_RO 1
 # else
 #   define CONFIG_RUNMEM_RO 0
 #  endif
@@ -359,23 +359,13 @@ redo:
     if (copy == 3)
         return 0;
 
-#if defined TCC_TARGET_MACHO
-    for (k = 0; k < 3; ++k) { /* 0:rx, 1:ro, 3:rw sections */
-#else
     for (k = 0; k < 4; ++k) { /* 0:rx, 1:ro, 2:ro debug , 3:rw sections */
-#endif
         n = 0; addr = 0;
         for(i = 1; i < s1->nb_sections; i++) {
-#if defined TCC_TARGET_MACHO
-            static const char shf[] = {
-                SHF_ALLOC|SHF_EXECINSTR, SHF_ALLOC, SHF_ALLOC|SHF_WRITE
-                };
-#else
             static const char shf[] = {
                 SHF_ALLOC|SHF_EXECINSTR, SHF_ALLOC, 0, SHF_ALLOC|SHF_WRITE
                 };
 	    if (k == 2 && s1->do_debug == 0) continue;
-#endif
             s = s1->sections[i];
             if (shf[k] != (s->sh_flags & (SHF_ALLOC|SHF_WRITE|SHF_EXECINSTR)))
                 continue;
