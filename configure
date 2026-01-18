@@ -58,8 +58,6 @@ build_cross=
 test -n "$CC" && cc="$CC"
 test -n "$AR" && ar="$AR"
 
-host_cc="$CC"
-
 # set default CFLAGS if unset in environment
 test -z "$CFLAGS" && CFLAGS="-Wall -O2"
 
@@ -124,7 +122,7 @@ for opt do
   ;;
   --source-path=*) assign_opt "$opt" source_path
   ;;
-  --cross-prefix=*) assign_opt "$opt" cross_prefix; assign_opt "gcc" host_cc
+  --cross-prefix=*) assign_opt "$opt" cross_prefix
   ;;
   --os-release=*) assign_opt "$opt" os_release
   ;;
@@ -586,7 +584,6 @@ mandir=\$(DESTDIR)$mandir
 infodir=\$(DESTDIR)$infodir
 docdir=\$(DESTDIR)$docdir
 CC=$cc
-HOST_CC=$host_cc
 CC_NAME=$cc_name
 GCC_MAJOR=$gcc_major
 GCC_MINOR=$gcc_minor

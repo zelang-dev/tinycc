@@ -256,7 +256,7 @@ endif
 	$S./c2str.exe $< $@
 
 c2str.exe : conftest.c
-	$S$(HOST_CC) -DC2STR $< -o $@
+	$S$(CC) -DC2STR $< -o $@
 
 # target specific object rule
 $(X)%.o : %.c $(LIBTCC_INC)
