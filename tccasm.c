@@ -25,6 +25,26 @@
 static Section *last_text_section; /* to handle .previous asm directive */
 static int asmgoto_n;
 
+static int tcc_assemble_internal(TCCState *s1, int do_preprocess, int global);
+static Sym* asm_new_label(TCCState *s1, int label, int is_local);
+static Sym* asm_new_label1(TCCState *s1, int label, int is_local, int sh_num, int value);
+
+#if PTR_SIZE == 8
+/* output constant with relocation if 'r & VT_SYM' is true */
+ST_FUNC void gen_addr64(int r, Sym *sym, int64_t c)
+{
+    if (r & VT_SYM)
+        greloca(cur_text_section, sym, ind, R_DATA_PTR, c), c=0;
+    gen_le32(c);
+    gen_le32(c>>32);
+}
+
+ST_FUNC void gen_expr64(ExprValue *pe)
+{
+    gen_addr64(pe->sym ? VT_SYM : 0, pe->sym, pe->v);
+}
+#endif
+
 static int asm_get_prefix_name(TCCState *s1, const char *prefix, unsigned int n)
 {
     char buf[64];
@@ -36,10 +56,6 @@ ST_FUNC int asm_get_local_label_name(TCCState *s1, unsigned int n)
 {
     return asm_get_prefix_name(s1, "L..", n);
 }
-
-static int tcc_assemble_internal(TCCState *s1, int do_preprocess, int global);
-static Sym* asm_new_label(TCCState *s1, int label, int is_local);
-static Sym* asm_new_label1(TCCState *s1, int label, int is_local, int sh_num, int value);
 
 /* If a C name has an _ prepended then only asm labels that start
    with _ are representable in C, by removing the first _.  ASM names
@@ -328,12 +344,12 @@ static inline void asm_expr_sum(TCCState *s1, ExprValue *pe)
 		if (esym1 && esym1->st_shndx == esym2->st_shndx
 		    && esym1->st_shndx != SHN_UNDEF) {
 		    /* we also accept defined symbols in the same section */
-		    pe->v += esym1->st_value - esym2->st_value;
+		    pe->v += (int)(esym1->st_value - esym2->st_value);
 		    pe->sym = NULL;
 		} else if (esym2->st_shndx == cur_text_section->sh_num) {
 		    /* When subtracting a defined symbol in current section
 		       this actually makes the value PC-relative.  */
-		    pe->v += 0 - esym2->st_value;
+		    pe->v += (int)(0 - esym2->st_value);
 		    pe->pcrel = 1;
 		    e2.sym = NULL;
 		} else {
@@ -398,6 +414,8 @@ ST_FUNC int asm_int_expr(TCCState *s1)
     asm_expr(s1, &e);
     if (e.sym)
         expect("constant");
+    if ((int)e.v != e.v)
+	tcc_error("integer out of range %lld", (long long)e.v);
     return e.v;
 }
 
@@ -515,7 +533,7 @@ static void asm_parse_directive(TCCState *s1, int global)
             tok1 = TOK_ASMDIR_align;
         }
         if (tok1 == TOK_ASMDIR_align || tok1 == TOK_ASMDIR_balign) {
-            if (n < 0 || (n & (n-1)) != 0)
+            if (n <= 0 || (n & (n-1)) != 0)
                 tcc_error("alignment must be a positive power of two");
             offset = (ind + n - 1) & -n;
             size = offset - ind;
@@ -541,7 +559,7 @@ static void asm_parse_directive(TCCState *s1, int global)
         ind += size;
         break;
     case TOK_ASMDIR_quad:
-#ifdef TCC_TARGET_X86_64
+#if PTR_SIZE == 8
 	size = 8;
 	goto asm_data;
 #else
@@ -590,7 +608,7 @@ static void asm_parse_directive(TCCState *s1, int global)
             if (sec->sh_type != SHT_NOBITS) {
                 if (size == 4) {
                     gen_expr32(&e);
-#ifdef TCC_TARGET_X86_64
+#if PTR_SIZE == 8
 		} else if (size == 8) {
 		    gen_expr64(&e);
 #endif
@@ -677,7 +695,6 @@ static void asm_parse_directive(TCCState *s1, int global)
         }
     case TOK_ASMDIR_org:
         {
-            unsigned long n;
 	    ExprValue e;
 	    ElfSym *esym;
             next();
@@ -689,6 +706,8 @@ static void asm_parse_directive(TCCState *s1, int global)
 		  expect("constant or same-section symbol");
 		n += esym->st_value;
 	    }
+	    if (n < 0 || n > 0x100000)
+		tcc_error(".org out of range");
             if (n < ind)
                 tcc_error("attempt to .org backwards");
             v = 0;
@@ -713,6 +732,8 @@ static void asm_parse_directive(TCCState *s1, int global)
 	do { 
             Sym *sym;
             next();
+	    if (tok < TOK_IDENT)
+		expect("identifier");
             sym = get_asm_sym(tok, NULL);
 	    if (tok1 != TOK_ASMDIR_hidden)
                 sym->type.t &= ~VT_STATIC;
@@ -799,7 +820,7 @@ static void asm_parse_directive(TCCState *s1, int global)
             if (tok == TOK_STR)
                 pstrcat(ident, sizeof(ident), tokc.str.data);
             else
-                pstrcat(ident, sizeof(ident), get_tok_str(tok, NULL));
+                pstrcat(ident, sizeof(ident), get_tok_str(tok, &tokc));
             tcc_warning_c(warn_unsupported)("ignoring .ident %s", ident);
             next();
         }
@@ -807,18 +828,22 @@ static void asm_parse_directive(TCCState *s1, int global)
     case TOK_ASMDIR_size:
         { 
             Sym *sym;
+            ElfSym *esym;
 
             next();
+	    if (tok < TOK_IDENT)
+		expect("identifier");
             sym = asm_label_find(tok);
-            if (!sym) {
+            if (!sym)
                 tcc_error("label not found: %s", get_tok_str(tok, NULL));
-            }
             /* XXX .size name,label2-label1 */
             tcc_warning_c(warn_unsupported)("ignoring .size %s,*", get_tok_str(tok, NULL));
             next();
             skip(',');
-            while (tok != TOK_LINEFEED && tok != ';' && tok != CH_EOF) {
-                next();
+            n = asm_int_expr(s1);
+            esym = elfsym(sym);
+            if (esym) {
+                esym->st_size = n;
             }
         }
         break;
@@ -829,6 +854,8 @@ static void asm_parse_directive(TCCState *s1, int global)
             int st_type;
 
             next();
+	    if (tok < TOK_IDENT)
+		expect("identifier");
             sym = get_asm_sym(tok, NULL);
             next();
             skip(',');
@@ -842,7 +869,7 @@ static void asm_parse_directive(TCCState *s1, int global)
 
             if (!strcmp(newtype, "function") || !strcmp(newtype, "STT_FUNC")) {
                 if (IS_ASM_SYM(sym))
-                    sym->type.t = (sym->type.t & ~VT_ASM) | VT_ASM_FUNC;
+                    sym->type.t |= VT_ASM_FUNC;
                 st_type = STT_FUNC;
             set_st_type:
                 if (sym->c) {
@@ -907,6 +934,10 @@ static void asm_parse_directive(TCCState *s1, int global)
 	       sets alignment to PTR_SIZE.  The assembler behaves different. */
 	    if (old_nb_section != s1->nb_sections) {
 	        cur_text_section->sh_addralign = 1;
+                /* Make .init and .fini sections executable by default.
+                   GAS does so, too, and musl relies on it. */
+                if (!strcmp(sname, ".init") || !strcmp(sname, ".fini"))
+                    flags |= SHF_EXECINSTR;
 	        cur_text_section->sh_flags = flags;
             }
         }
@@ -940,7 +971,7 @@ static void asm_parse_directive(TCCState *s1, int global)
         }
         break;
 #endif
-#ifdef TCC_TARGET_X86_64
+#if PTR_SIZE == 8
     /* added for compatibility with GAS */
     case TOK_ASMDIR_code64:
         next();
@@ -980,6 +1011,23 @@ static void asm_parse_directive(TCCState *s1, int global)
         skip('@');
 	next();
 	break;
+    case TOK_ASMDIR_reloc:
+	{
+	    ExprValue e;
+
+	    next();
+	    asm_expr(s1, &e);
+	    skip(',');
+#if defined(TCC_TARGET_ARM64)
+	    if (strcmp(get_tok_str(tok, NULL), "R_AARCH64_CALL26"))
+#endif
+	        tcc_error("unimp: reloc '%s' unknown", get_tok_str(tok, NULL));
+	    next();
+	    skip(',');
+	    greloca(cur_text_section, get_asm_sym(tok, NULL), e.v, R_AARCH64_CALL26, 0);
+	    next();
+	}
+	break;
     default:
         tcc_error("unknown assembler directive '.%s'", get_tok_str(tok, NULL));
         break;
@@ -1003,11 +1051,14 @@ static int tcc_assemble_internal(TCCState *s1, int do_preprocess, int global)
         tcc_debug_line(s1);
         parse_flags |= PARSE_FLAG_LINEFEED; /* XXX: suppress that hack */
     redo:
+#if !defined(TCC_TARGET_ARM64)
         if (tok == '#') {
             /* horrible gas comment */
             while (tok != TOK_LINEFEED)
                 next();
-        } else if (tok >= TOK_ASMDIR_FIRST && tok <= TOK_ASMDIR_LAST) {
+        } else
+#endif
+        if (tok >= TOK_ASMDIR_FIRST && tok <= TOK_ASMDIR_LAST) {
             asm_parse_directive(s1, global);
         } else if (tok == TOK_PPNUM) {
             const char *p;
@@ -1071,7 +1122,7 @@ static void tcc_assemble_inline(TCCState *s1, const char *str, int len, int glob
 {
     const int *saved_macro_ptr = macro_ptr;
     int dotid = set_idnum('.', IS_ID);
-#ifndef TCC_TARGET_RISCV64
+#if !defined(TCC_TARGET_RISCV64) && !defined(TCC_TARGET_X86_64)
     int dolid = set_idnum('$', 0);
 #endif
 
@@ -1081,7 +1132,7 @@ static void tcc_assemble_inline(TCCState *s1, const char *str, int len, int glob
     tcc_assemble_internal(s1, 0, global);
     tcc_close();
 
-#ifndef TCC_TARGET_RISCV64
+#if !defined(TCC_TARGET_RISCV64) && !defined(TCC_TARGET_X86_64)
     set_idnum('$', dolid);
 #endif
     set_idnum('.', dotid);
@@ -1147,6 +1198,9 @@ static void subst_asm_operands(ASMOperand *operands, int nb_operands,
             if (*str == 'c' || *str == 'n' ||
                 *str == 'b' || *str == 'w' || *str == 'h' || *str == 'k' ||
 		*str == 'q' || *str == 'l' ||
+#ifdef TCC_TARGET_ARM64
+                *str == 'x' || *str == 's' || *str == 'd' || *str == 'Z' ||
+#endif
 #ifdef TCC_TARGET_RISCV64
 		*str == 'z' ||
 #endif
@@ -1156,15 +1210,18 @@ static void subst_asm_operands(ASMOperand *operands, int nb_operands,
                 modifier = *str++;
             index = find_constraint(operands, nb_operands, str, &str);
             if (index < 0)
+        error:
                 tcc_error("invalid operand reference after %%");
             op = &operands[index];
             if (modifier == 'l') {
                 cstr_cat(out_str, get_tok_str(op->is_label, NULL), -1);
             } else {
+		if (op->vt == NULL)
+		    goto error;
                 sv = *op->vt;
                 if (op->reg >= 0) {
                     sv.r = op->reg;
-                    if ((op->vt->r & VT_VALMASK) == VT_LLOCAL && op->is_memory)
+                    if (op->is_memory)
                       sv.r |= VT_LVAL;
                 }
                 subst_asm_operand(out_str, &sv, modifier);
@@ -1216,7 +1273,12 @@ static void parse_asm_operands(ASMOperand *operands, int *nb_operands_ptr,
                 if ((vtop->r & VT_LVAL) &&
                     ((vtop->r & VT_VALMASK) == VT_LLOCAL ||
                      (vtop->r & VT_VALMASK) < VT_CONST) &&
-                    !strchr(op->constraint, 'm')) {
+                    !strchr(op->constraint, 'm')
+#ifdef TCC_TARGET_ARM64
+                    && !strchr(op->constraint, 'Q')
+                    && !strstr(op->constraint, "Ump")
+#endif
+                    ) {
                     gv(RC_INT);
                 }
             }
@@ -1297,6 +1359,8 @@ ST_FUNC void asm_instr(void)
                           tcc_error("too many asm operands");
                         if (tok < TOK_UIDENT)
                           expect("label identifier");
+			memset(operands + nb_operands + nb_labels, 0,
+			       sizeof(operands[0]));
                         operands[nb_operands + nb_labels++].id = tok;
 
                         csym = label_find(tok);

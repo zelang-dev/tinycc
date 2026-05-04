@@ -17,10 +17,6 @@
 /* __VA_ARGS__ and __func__ support */
 #define C99_MACROS
 
-#ifndef __TINYC__
-typedef __SIZE_TYPE__ uintptr_t;
-#endif
-
 #if defined(_WIN32) \
     || (defined(__arm__) \
         && (defined(__FreeBSD__) \
@@ -44,6 +40,8 @@ typedef __SIZE_TYPE__ uintptr_t;
 #define LONG_DOUBLE long double
 #define LONG_DOUBLE_LITERAL(x) x ## L
 #endif
+
+typedef __SIZE_TYPE__ uintptr_t;
 
 /* test various include syntaxes */
 
@@ -82,9 +80,6 @@ typedef __SIZE_TYPE__ uintptr_t;
 #include INC(42test)
 #include incname
 #include stringify(funnyname)
-
-int puts(const char *s);
-void *alloca(size_t size);
 
 int fib(int n);
 void num(int n);
@@ -289,6 +284,7 @@ comment
 
     printf("basefromheader %s\n", get_basefile_from_header());
     printf("base %s\n", __BASE_FILE__);
+#if !(defined _WIN32 && CC_NAME == CC_clang)
     {
       /* Some compilers (clang) prepend './' to __FILE__ from included
          files.  */
@@ -297,6 +293,8 @@ comment
         fn += 2;
       printf("filefromheader %s\n", fn);
     }
+#endif
+
     printf("file %s\n", __FILE__);
 
     /* Check that funnily named include was in fact included */
@@ -1097,8 +1095,10 @@ void struct_test()
            sizeof(struct aligntest2), __alignof__(struct aligntest2));
     printf("aligntest3 sizeof=%d alignof=%d\n",
            sizeof(struct aligntest3), __alignof__(struct aligntest3));
+#if !(defined _WIN32 && CC_NAME == CC_clang)
     printf("aligntest4 sizeof=%d alignof=%d\n",
            sizeof(struct aligntest4), __alignof__(struct aligntest4));
+#endif
     printf("aligntest5 sizeof=%d alignof=%d\n",
            sizeof(struct aligntest5), __alignof__(struct aligntest5));
     printf("aligntest6 sizeof=%d alignof=%d\n",
@@ -1107,8 +1107,10 @@ void struct_test()
            sizeof(struct aligntest7), __alignof__(struct aligntest7));
     printf("aligntest8 sizeof=%d alignof=%d\n",
            sizeof(struct aligntest8), __alignof__(struct aligntest8));
+#if !(defined _WIN32 && CC_NAME == CC_clang)
     printf("aligntest9 sizeof=%d alignof=%d\n",
            sizeof(struct aligntest9), __alignof__(struct aligntest9));
+#endif
     printf("aligntest10 sizeof=%d alignof=%d\n",
            sizeof(struct aligntest10), __alignof__(struct aligntest10));
     printf("altest5 sizeof=%d alignof=%d\n",
@@ -1119,7 +1121,9 @@ void struct_test()
            sizeof(altest7), __alignof__(altest7));
            
     /* empty structures (GCC extension) */
+#if !(defined _WIN32 && CC_NAME == CC_clang)
     printf("sizeof(struct empty) = %d\n", sizeof(struct empty));
+#endif
     printf("alignof(struct empty) = %d\n", __alignof__(struct empty));
 
     printf("Large: sizeof=%d\n", sizeof(ls));
@@ -1175,6 +1179,10 @@ void char_short_test()
        the presence of undefined behaviour (like __csf is).  */
     var1 = csf(unsigned char,0x89898989);
     var4 = csf(signed char,0xabababab);
+#ifdef __clang__
+    /* on macos 15 arm64 this prints -1987475063 instead of 137 */
+    var1 &= 0xff;
+#endif
     printf("promote char/short funcret %d "LONG_LONG_FORMAT"\n", var1, var4);
     printf("promote char/short fumcret VA %d %d %d %d\n",
         csf(unsigned short,0xcdcdcdcd),
@@ -1686,7 +1694,7 @@ struct structinit1 {
 
 int sinit1 = 2;
 int sinit2 = { 3 };
-int sinit3[3] = { 1, 2, {{3}}, };
+int sinit3[3] = { 1, 2, {3}, };
 int sinit4[3][2] = { {1, 2}, {3, 4}, {5, 6} };
 int sinit5[3][2] = { 1, 2, 3, 4, 5, 6 };
 int sinit6[] = { 1, 2, 3 };
@@ -1767,9 +1775,13 @@ struct complexinit2 cix22 = {
 };
 
 typedef int arrtype1[];
+arrtype1 sinit19;
+arrtype1 sinit20;
 arrtype1 sinit19 = {1};
 arrtype1 sinit20 = {2,3};
 typedef int arrtype2[3];
+arrtype2 sinit21;
+arrtype2 sinit22;
 arrtype2 sinit21 = {4};
 arrtype2 sinit22 = {5,6,7};
 
@@ -2170,15 +2182,6 @@ float strtof(const char *nptr, char **endptr);
 LONG_DOUBLE strtold(const char *nptr, char **endptr);
 #endif
 
-#if CC_NAME == CC_clang
-/* In clang 0.0/0.0 is nan and not -nan.
-   Also some older clang version do v=-v
-   as v = -0 - v */
-static char enable_nan_test = 0;
-#else
-static char enable_nan_test = 1;
-#endif
-
 #define FTEST(prefix, typename, type, fmt)\
 void prefix ## cmp(type a, type b)\
 {\
@@ -2234,7 +2237,7 @@ void prefix ## fcast(type a)\
     b = llia;\
     printf("lltof: " fmt "\n", b);\
     b = llua;\
-    printf("ulltof: " fmt "\n", b);\
+    if (CC_NAME != CC_clang) printf("ulltof: " fmt "\n", b);\
 }\
 \
 float prefix ## retf(type a) { return a; }\
@@ -2294,7 +2297,7 @@ void prefix ## test(void)\
     prefix ## fcast(-2334.6);\
     prefix ## call();\
     prefix ## signed_zeros();\
-    if (enable_nan_test) prefix ## nan();\
+    if (CC_NAME != CC_clang) prefix ## nan();\
 }
 
 FTEST(f, float, float, "%f")
@@ -2550,8 +2553,8 @@ void longlong_test(void)
     a = ia;
     b = ua;
     printf(LONG_LONG_FORMAT " " LONG_LONG_FORMAT "\n", a, b);
-    printf(LONG_LONG_FORMAT " " LONG_LONG_FORMAT " " LONG_LONG_FORMAT " %Lx\n", 
-           (long long)1, 
+    printf(LONG_LONG_FORMAT " " LONG_LONG_FORMAT " " LONG_LONG_FORMAT " "XLONG_LONG_FORMAT"\n",
+           (long long)1,
            (long long)-2,
            1LL,
            0x1234567812345679);
@@ -2861,12 +2864,14 @@ void stdarg_test(void)
     stdarg_for_struct(bob, bob2, bob3, bob4, bob, bob, bob.profile);
     stdarg_for_libc("stdarg_for_libc: %s %.2f %d\n", "string", 1.23, 456);
     stdarg_syntax(1, 17);
+#if !(defined _WIN32 && CC_NAME == CC_clang) /* broken clang */
     stdarg_double_struct(6,-1,pts[0],pts[1],pts[2],pts[3],pts[4],pts[5]);
     stdarg_double_struct(7,1,pts[0],-1.0,pts[1],pts[2],pts[3],pts[4],pts[5]);
     stdarg_double_struct(7,2,pts[0],pts[1],-1.0,pts[2],pts[3],pts[4],pts[5]);
     stdarg_double_struct(7,3,pts[0],pts[1],pts[2],-1.0,pts[3],pts[4],pts[5]);
     stdarg_double_struct(7,4,pts[0],pts[1],pts[2],pts[3],-1.0,pts[4],pts[5]);
     stdarg_double_struct(7,5,pts[0],pts[1],pts[2],pts[3],pts[4],-1.0,pts[5]);
+#endif
 }
 
 int reltab[3] = { 1, 2, 3 };
@@ -2939,14 +2944,12 @@ void old_style_function_test(void)
 
 void alloca_test()
 {
-#if defined __i386__ || defined __x86_64__ || defined __arm__
     char *p = alloca(16);
     strcpy(p,"123456789012345");
     printf("alloca: p is %s\n", p);
     char *demo = "This is only a test.\n";
     /* Test alloca embedded in a larger expression */
     printf("alloca: %s\n", strcpy(alloca(strlen(demo)+1),demo) );
-#endif
 }
 
 void *bounds_checking_is_enabled()
@@ -3285,7 +3288,7 @@ void local_label_test(void)
 }
 
 /* inline assembler test */
-#if defined(__i386__) || defined(__x86_64__)
+#if (defined(__i386__) || defined(__x86_64__)) && !(defined _WIN32 && CC_NAME == CC_clang)
 
 typedef __SIZE_TYPE__ word;
 
@@ -3547,8 +3550,8 @@ void asm_local_label_diff (void)
 {
   printf ("asm_local_label_diff: %d %d\n", alld_stuff[0], alld_stuff[1]);
 }
-#endif
-#endif
+#endif //!__APPLE__
+#endif //!_WIN32
 
 /* This checks that static local variables are available from assembler.  */
 void asm_local_statics (void)
@@ -4206,7 +4209,6 @@ double get100 () { return 100.0; }
 
 void callsave_test(void)
 {
-#if defined __i386__ || defined __x86_64__ || defined __arm__
   int i, s; double *d; double t;
   s = sizeof (double);
   printf ("callsavetest: %d\n", s);
@@ -4219,7 +4221,6 @@ void callsave_test(void)
      generates a segfault.  */
   i = d[0] > get100 ();
   printf ("%d\n", i);
-#endif
 }
 
 

@@ -206,9 +206,10 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
     const char *top_sym;
     jmp_buf main_jb;
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
-    char **envp = NULL;
-#elif defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__APPLE__)
+    extern char ***_NSGetEnviron(void);
+    char **envp = *_NSGetEnviron();
+#elif defined(__OpenBSD__) || defined(__NetBSD__)  || defined(__FreeBSD__)
     extern char **environ;
     char **envp = environ;
 #else
@@ -220,28 +221,38 @@ LIBTCCAPI int tcc_run(TCCState *s1, int argc, char **argv)
         return 0;
 
     tcc_add_symbol(s1, "__rt_exit", rt_exit);
-    if (s1->nostdlib) {
-        s1->run_main = top_sym = s1->elf_entryname ? s1->elf_entryname : "_start";
-    } else {
-        tcc_add_support(s1, "runmain.o");
-        s1->run_main = "_runmain";
-        top_sym = "main";
-    }
+    s1->run_main = "_runmain", top_sym = "main";
+    if (s1->elf_entryname)
+        s1->run_main = top_sym = s1->elf_entryname;
+    tcc_add_support(s1, "runmain.o");
+
     if (tcc_relocate(s1) < 0)
         return -1;
 
     prog_main = (void*)get_sym_addr(s1, s1->run_main, 1, 1);
     if ((addr_t)-1 == (addr_t)prog_main)
         return -1;
+
+    /* custom stdin for run_main, mainly if stdin is/was an input file.
+     * fileno(stdin) should remain 0, as posix mandates to use the smallest
+     * free fd, which is 0 after the initial fclose in freopen. windows too.
+     * to set stdin to the tty, use /dev/tty (posix) or con (windows).
+     */
+    if (s1->run_stdin && !freopen(s1->run_stdin, "r", stdin)) {
+        tcc_error_noabort("failed to reopen stdin from '%s'", s1->run_stdin);
+        return -1;
+    }
+
     errno = 0; /* clean errno value */
     fflush(stdout);
     fflush(stderr);
 
     ret = tcc_setjmp(s1, main_jb, tcc_get_symbol(s1, top_sym));
-    if (0 == ret)
+    if (0 == ret) {
         ret = prog_main(argc, argv, envp);
-    else if (RT_EXIT_ZERO == ret)
+    } else if (RT_EXIT_ZERO == ret) {
         ret = 0;
+    }
 
     if (s1->dflag & 16 && ret) /* tcc -dt -run ... */
         fprintf(s1->ppfp, "[returns %d]\n", ret), fflush(s1->ppfp);
@@ -312,6 +323,7 @@ static int tcc_relocate_ex(TCCState *s1, void *ptr, unsigned ptr_diff)
     addr_t mem, addr;
 
     if (NULL == ptr) {
+        s1->nb_errors = 0;
 #ifdef TCC_TARGET_PE
         pe_output_file(s1, NULL);
 #else
@@ -422,6 +434,8 @@ redo:
 
     /* relocate symbols */
     relocate_syms(s1, s1->symtab, 1);
+    if (s1->nb_errors)
+        goto redo;
     /* relocate sections */
 #ifdef TCC_TARGET_PE
     s1->pe_imagebase = mem;
@@ -495,10 +509,6 @@ static void bt_link(TCCState *s1)
 {
 #ifdef CONFIG_TCC_BACKTRACE
     rt_context *rc;
-#ifdef CONFIG_TCC_BCHECK
-    void *p;
-#endif
-
     if (!s1->do_backtrace)
         return;
     rc = tcc_get_symbol(s1, "__rt_info");
@@ -511,6 +521,7 @@ static void bt_link(TCCState *s1)
         rc->prog_base &= 0xffffffff00000000ULL;
 #ifdef CONFIG_TCC_BCHECK
     if (s1->do_bounds_check) {
+        void *p;
         if ((p = tcc_get_symbol(s1, "__bound_init")))
             ((void(*)(void*,int))p)(rc->bounds_start, 1);
     }
@@ -599,6 +610,13 @@ static void rt_exit(rt_frame *f, int code)
     s = rt_find_state(f);
     rt_post_sem();
     if (s && s->run_lj) {
+#ifdef CONFIG_TCC_BCHECK
+        if (f->fp) { /* called from signal */
+            void *p = tcc_get_symbol(s, "__bound_exit");
+            if (p)
+                ((void (*)(void))p)();
+        }
+#endif
         if (code == 0)
             code = RT_EXIT_ZERO;
         ((void(*)(void*,int))s->run_lj)(s->run_jb, code);
@@ -1183,7 +1201,11 @@ static int rt_error(rt_frame *f, const char *fmt, ...)
 /* translate from ucontext_t* to internal rt_context * */
 static void rt_getcontext(ucontext_t *uc, rt_frame *rc)
 {
-#if defined _WIN64
+#if defined _WIN64 && defined __aarch64__
+    rc->ip = uc->Pc;      /* Program Counter */
+    rc->fp = uc->Fp;      /* Frame Pointer (X29) */
+    rc->sp = uc->Sp;      /* Stack Pointer (X30 is LR, but SP is separate) */
+#elif defined _WIN64
     rc->ip = uc->Rip;
     rc->fp = uc->Rbp;
     rc->sp = uc->Rsp;
@@ -1382,7 +1404,11 @@ static long __stdcall cpu_exception_handler(EXCEPTION_POINTERS *ex_info)
 /* Generate a stack backtrace when a CPU exception occurs. */
 static void set_exception_handler(void)
 {
+#ifdef _WIN64
+    AddVectoredExceptionHandler(1, cpu_exception_handler);
+#else
     SetUnhandledExceptionFilter(cpu_exception_handler);
+#endif
 }
 
 #endif

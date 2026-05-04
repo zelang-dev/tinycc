@@ -35,13 +35,13 @@ endif
 
 XFLAGS += -I$(TOP)
 
-I386_O = libtcc1.o alloca.o alloca-bt.o $(COMMON_O)
-X86_64_O = libtcc1.o alloca.o alloca-bt.o $(COMMON_O)
-ARM_O = libtcc1.o armeabi.o alloca.o armflush.o $(COMMON_O)
+I386_O = libtcc1.o $(COMMON_O)
+X86_64_O = libtcc1.o $(COMMON_O)
+ARM_O = libtcc1.o armeabi.o armflush.o $(COMMON_O)
 ARM64_O = lib-arm64.o $(COMMON_O)
 RISCV64_O = lib-arm64.o $(COMMON_O)
-COMMON_O = stdatomic.o atomic.o builtin.o
-WIN_O = crt1.o crt1w.o wincrt1.o wincrt1w.o dllcrt1.o dllmain.o
+COMMON_O = stdatomic.o atomic.o builtin.o alloca.o alloca-bt.o
+WIN_O = crt1.o crt1w.o wincrt1.o wincrt1w.o dllcrt1.o dllmain.o winex.o
 LIN_O = dsohandle.o
 OSX_O =
 
@@ -58,13 +58,14 @@ $(Cbc)COMMON_O += bcheck.o
 # not in libtcc1.a
 EXTRA_O = runmain.o bt-exe.o bt-dll.o bt-log.o bcheck.o
 
-OBJ-i386 = $(I386_O) $(LIN_O)
+OBJ-i386 = $(I386_O) pic86.o $(LIN_O)
 OBJ-x86_64 = $(X86_64_O) va_list.o $(LIN_O)
 OBJ-x86_64-osx = $(X86_64_O) va_list.o $(OSX_O)
 OBJ-i386-win32 = $(I386_O) chkstk.o $(WIN_O)
 OBJ-x86_64-win32 = $(X86_64_O) chkstk.o $(WIN_O)
-OBJ-arm64 = $(ARM64_O) $(LIN_O)
+OBJ-arm64 = $(ARM64_O) armflush.o $(LIN_O)
 OBJ-arm64-osx = $(ARM64_O) $(OSX_O)
+OBJ-arm64-win32 = $(ARM64_O) chkstk.o $(WIN_O)
 OBJ-arm = $(ARM_O) $(LIN_O)
 OBJ-arm-fpa = $(OBJ-arm)
 OBJ-arm-fpa-ld = $(OBJ-arm)

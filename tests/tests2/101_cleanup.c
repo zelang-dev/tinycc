@@ -5,6 +5,8 @@ typedef struct { int a; int b; int c; int d; int e; int f; int g; int h; } tstl;
 typedef struct { int a; int b; int c; int d; } tsti;
 typedef struct { double a; double b; } tstd;
 typedef struct { long double a; } tstld;
+typedef struct { int a; double b; } tstm;
+typedef struct { float a; float b; float c; float d; } tstf;
 
 void incr_glob_i(int *i)
 {
@@ -258,6 +260,44 @@ tstld test_cleanup5(void) {
     return n;
 }
 
+void my_cleanup6(tstm *p) {
+    printf("%d %g\n", p->a, p->b);
+    p->a = 90;
+    p->b = 91.0;
+}
+
+tstm test_cleanup6(void) {
+    tstm __attribute__((cleanup(my_cleanup6))) n;
+    n.a = 42;
+    n.b = 43.0;
+    return n;
+}
+
+void my_cleanup7(tstf *p) {
+    printf("%f %f %f %f\n", p->a, p->b, p->c, p->d);
+    p->a = 0x90; p->b = 0x91; p->c = 0x92; p->d = 0x93;
+}
+
+tstf test_cleanup7(void) {
+    tstf __attribute__((cleanup(my_cleanup7))) n;
+    n.a = 42; n.b = 43; n.c = 44; n.d = 45;
+    return n;
+}
+
+void my_cleanup8(int **p) {
+    **p = 0x90;
+}
+
+int test_cleanup8(void) {
+    int n = 42;
+    int __attribute__((cleanup(my_cleanup8))) *p = &n;
+    return n;
+}
+
+static void my_cleanupe(int *p) {
+    *p = 0x90;
+}
+
 int main()
 {
     int i __attribute__ ((__cleanup__(check))) = 0, not_i;
@@ -267,6 +307,8 @@ int main()
     tsti ti;
     tstd td;
     tstld tld;
+    tstm tm;
+    tstf tf;
 
     {
 	__attribute__ ((__cleanup__(check_oh_i))) char oh_i = 'o', o = 'a';
@@ -299,6 +341,14 @@ int main()
     printf("%g %g\n", td.a, td.b);
     tld = test_cleanup5();
     printf("%Lf\n", tld.a);
+    tm = test_cleanup6();
+    printf("%d %g\n", tm.a, tm.b);
+    tf = test_cleanup7();
+    printf("%f %f %f %f\n", tf.a, tf.b, tf.c, tf.d);
+    printf("%d\n", test_cleanup8());
+    printf("%d\n", ({
+            int __attribute__ ((cleanup(my_cleanupe))) n = 42;
+            n; }));
     return i;
 }
 

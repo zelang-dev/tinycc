@@ -221,6 +221,13 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
                 qrel->r_addend = (int)read32le(ptr) + val;
                 qrel++;
             }
+            if ((type == R_X86_64_32 ? val != (unsigned)val : val != (int)val)
+                /* ignore relocation check for stab section */
+                && (stab_section == NULL ||
+                    addr < stab_section->sh_addr ||
+                    addr >= (stab_section->sh_addr + stab_section->data_offset))) {
+                tcc_error_noabort("relocation 'R_X86_64_32[S]' out of range");
+            }
             add32le(ptr, val);
             break;
 
@@ -251,7 +258,7 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
               /* ignore overflow with undefined weak symbols */
               if (((ElfW(Sym)*)symtab_section->data)[sym_index].st_shndx != SHN_UNDEF)
 #endif
-                tcc_error_noabort("internal error: relocation failed");
+                tcc_error_noabort("relocation '%d' out of range", type);
             }
             add32le(ptr, diff);
         }

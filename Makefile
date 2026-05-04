@@ -31,9 +31,11 @@ ifdef CONFIG_WIN32
   LIBTCCDEF = libtcc.def
  endif
  ifneq ($(CONFIG_debug),yes)
-  LDFLAGS += -s
+  ifneq ($(CC_NAME),clang)
+   LDFLAGS += -s
+  endif
  endif
- NATIVE_TARGET = $(ARCH)-win$(if $(findstring arm,$(ARCH)),ce,32)
+ NATIVE_TARGET = $(if $(findstring arm64,$(ARCH)),arm64-win32,$(ARCH)-win$(if $(findstring arm,$(ARCH)),ce,32))
 else
  CFG = -unx
  LIBS+=-lm
@@ -113,6 +115,7 @@ DEF-arm64-osx      = $(DEF-arm64) -DTCC_TARGET_MACHO
 DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
 DEF-arm64-NetBSD   = $(DEF-arm64) -DTARGETOS_NetBSD
 DEF-arm64-OpenBSD  = $(DEF-arm64) -DTARGETOS_OpenBSD
+DEF-arm64-win32    = $(DEF-arm64) -DTCC_TARGET_PE
 DEF-riscv64        = -DTCC_TARGET_RISCV64
 DEF-c67            = -DTCC_TARGET_C67 -w # disable warnigs
 DEF-x86_64-FreeBSD = $(DEF-x86_64) -DTARGETOS_FreeBSD
@@ -130,7 +133,7 @@ TCCDOCS = tcc.1 tcc-doc.html tcc-doc.info
 all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # cross compiler targets to build
-TCC_X = i386 x86_64 i386-win32 x86_64-win32 x86_64-osx arm arm64 arm-wince c67
+TCC_X = i386 x86_64 i386-win32 x86_64-win32 x86_64-osx arm arm64 arm64-win32 arm-wince c67
 TCC_X += riscv64 arm64-osx
 # TCC_X += arm-fpa arm-fpa-ld arm-vfp arm-eabi
 
@@ -212,8 +215,9 @@ arm-fpa-ld_FILES  = $(arm_FILES)
 arm-vfp_FILES     = $(arm_FILES)
 arm-eabi_FILES    = $(arm_FILES)
 arm-eabihf_FILES  = $(arm_FILES)
-arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c
+arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c arm64-tok.h
 arm64-osx_FILES = $(arm64_FILES) tccmacho.c
+arm64-win32_FILES = $(arm64_FILES) tccpe.c
 c67_FILES = $(CORE_FILES) c67-gen.c c67-link.c tcccoff.c
 riscv64_FILES = $(CORE_FILES) riscv64-gen.c riscv64-link.c riscv64-asm.c
 
@@ -252,8 +256,11 @@ LDFLAGS += -g
 endif
 
 # convert "include/tccdefs.h" to "tccdefs_.h"
-%_.h : include/%.h conftest.c
-	$S$(CC) -DC2STR $(filter %.c,$^) -o c2str.exe && ./c2str.exe $< $@
+%_.h : include/%.h c2str.exe
+	$S./c2str.exe $< $@
+
+c2str.exe : conftest.c
+	$S$(CC) -DC2STR $< -o $@
 
 # target specific object rule
 $(X)%.o : %.c $(LIBTCC_INC)
@@ -287,6 +294,11 @@ tcc_p$(EXESUF): $($T_FILES)
 # static libtcc library
 libtcc.a: $(LIBTCC_OBJ)
 	$S$(AR) rcs $@ $^
+
+ifeq ($(CC_NAME)-$(ARCH),clang-x86_64)
+# avoid 32-bit relocations in libtcc.a for its usage with tcc -run
+libtcc.a: override CFLAGS += -fPIC
+endif
 
 # dynamic libtcc library
 libtcc.so: $(LIBTCC_OBJ)
@@ -350,8 +362,8 @@ doc : $(TCCDOCS)
 # --------------------------------------------------------------------------
 # install
 
-INSTALL = install -m644
-INSTALLBIN = install -m755 $(STRIP_$(CONFIG_strip))
+INSTALL = install -m 644
+INSTALLBIN = install -m 755 $(STRIP_$(CONFIG_strip))
 STRIP_yes = -s
 
 LIBTCC1_W = $(filter %-win32-libtcc1.a %-wince-libtcc1.a,$(LIBTCC1_CROSS))
@@ -386,7 +398,7 @@ endif
 # uninstall
 uninstall-unx:
 	@rm -fv $(addprefix "$(bindir)/",$(PROGS) $(PROGS_CROSS))
-	@rm -fv $(addprefix "$(libdir)/", libtcc*.a libtcc*.so libtcc.dylib,$P)
+	@rm -fv $(addprefix "$(libdir)/", libtcc*.a libtcc*.so libtcc.dylib)
 	@rm -fv $(addprefix "$(includedir)/", libtcc.h)
 	@rm -fv "$(mandir)/man1/tcc.1" "$(infodir)/tcc-doc.info"
 	@rm -fv "$(docdir)/tcc-doc.html"
@@ -464,12 +476,17 @@ tcov-tes% : tcc_c$(EXESUF)
 	@$(MAKE) --no-print-directory TCC_LOCAL=$(CURDIR)/$< tes$*
 tcc_c$(EXESUF): $($T_FILES)
 	$S$(TCC) tcc.c -o $@ -ftest-coverage $(DEFINES) $(LIBS)
+# run tests with sanitize option
+sani-tes% : tcc_s$(EXESUF)
+	@$(MAKE) --no-print-directory TCC_LOCAL=$(CURDIR)/$< tes$*
+tcc_s$(EXESUF): $($T_FILES)
+	$S$(CC) tcc.c -o $@ -fsanitize=address,undefined $(DEFINES) $(CFLAGS) $(LDFLAGS) $(LIBS)
 # test the installed tcc instead
 test-install: $(TCCDEFS_H)
 	@$(MAKE) -C tests TESTINSTALL=yes #_all
 
 clean:
-	@rm -f tcc *-tcc tcc_p tcc_c
+	@rm -f tcc *-tcc tcc_p tcc_c tcc_s
 	@rm -f tags ETAGS *.o *.a *.so* *.out *.log lib*.def *.exe *.dll
 	@rm -f a.out *.dylib *_.h *.pod *.tcov
 	@$(MAKE) -s -C lib $@
@@ -498,8 +515,10 @@ help:
 	@echo "   run all/single test(s) from tests2, optionally update .expect"
 	@echo "make testspp.all / make testspp.17"
 	@echo "   run all/single test(s) from tests/pp"
-	@echo "make tcov-test / tcov-tests2... / tcov-testspp..."
+	@echo "make tcov-test / tcov-tests2.37 / tcov-testspp.17"
 	@echo "   run tests as above with code coverage. After test(s) see tcc_c$(EXESUF).tcov"
+	@echo "make sani-test / sani-tests2.37 / sani-testspp.17"
+	@echo "   run tests as above with sanitize option."
 	@echo "make test-install"
 	@echo "   run tests with the installed tcc"
 	@echo "Other supported make targets:"

@@ -191,7 +191,7 @@
 #if defined __x86_64__
 #if !defined _WIN32
     /* GCC compatible definition of va_list. */
-    /* This should be in sync with the declaration in our lib/libtcc1.c */
+    /* This should be in sync with the declaration in our lib/va_list.c */
     typedef struct {
         unsigned gp_offset, fp_offset;
         union {
@@ -224,7 +224,9 @@
                            &~3), *(type *)(ap - ((sizeof(type)+3)&~3)))
 
 #elif defined __aarch64__
-#if defined __APPLE__
+#if defined _WIN32
+    typedef char *__builtin_va_list;
+#elif defined __APPLE__
     typedef struct {
         void *__stack;
     } __builtin_va_list;
@@ -308,11 +310,8 @@
     __MAYBE_REDIR(void*, calloc, (__SIZE_TYPE__, __SIZE_TYPE__))
     __MAYBE_REDIR(void*, memalign, (__SIZE_TYPE__, __SIZE_TYPE__))
     __MAYBE_REDIR(void, free, (void*))
-#if defined __i386__ || defined __x86_64__
     __BOTH(void*, alloca, (__SIZE_TYPE__))
-#else
-    __BUILTIN(void*, alloca, (__SIZE_TYPE__))
-#endif
+    void *alloca(__SIZE_TYPE__);
     __BUILTIN(void, abort, (void))
     __BOUND(void, longjmp, ())
 #if !defined _WIN32

@@ -310,7 +310,7 @@ static uint32_t stuff_const(uint32_t op, uint32_t c)
     if(c<256) /* catch undefined <<32 */
       return op|c;
     for(i=2;i<32;i+=2) {
-      m=(0xff>>i)|(0xff<<(32-i));
+      m=(0xffu>>i)|(0xffu<<(32-i));
       if(!(c&~m))
 	return op|(i<<7)|(c<<i)|(c>>(32-i));
     }
@@ -593,7 +593,7 @@ void load(int r, SValue *sv)
     sign=0;
   else {
     sign=1;
-    fc=-fc;
+    fc=-(unsigned)fc;
   }
 
   v = fr & VT_VALMASK;
@@ -1311,10 +1311,6 @@ again:
   if (++pass < 2)
     goto again;
 
-  /* Manually free remaining registers since next parameters are loaded
-   * manually, without the help of gv(int). */
-  save_regs(nb_args);
-
   if(todo) {
     o(0xE8BD0000|todo); /* pop {todo} */
     for(pplan = plan->clsplans[CORE_STRUCT_CLASS]; pplan; pplan = pplan->prev) {
@@ -1353,6 +1349,8 @@ void gfunc_call(int nb_args)
   if (tcc_state->do_bounds_check)
     gbound_args(nb_args);
 #endif
+
+  save_regs(nb_args + 1);
 
 #ifdef TCC_ARM_EABI
   if (float_abi == ARM_HARD_FLOAT) {
@@ -1495,8 +1493,7 @@ from_stack:
       addr = (n + nf + sn) * 4;
       sn += size;
     }
-    sym_push(sym->v & ~SYM_FIELD, type, VT_LOCAL | VT_LVAL,
-             addr + 12);
+    gfunc_set_param(sym, addr + 12, 0);
   }
   last_itod_magic=0;
   leaffunc = 1;
