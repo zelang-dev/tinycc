@@ -1148,6 +1148,7 @@ static void relocate_section(TCCState *s1, Section *s, Section *sr)
         addr = s->sh_addr + rel->r_offset;
         relocate(s1, rel, type, ptr, addr, tgt);
     }
+
 #ifndef ELF_OBJ_ONLY
     /* if the relocation is allocated, we change its symbol table */
     if (sr->sh_flags & SHF_ALLOC) {
@@ -1164,6 +1165,10 @@ static void relocate_section(TCCState *s1, Section *s, Section *sr)
 #endif
         }
     }
+#endif
+
+#ifdef TCC_TARGET_RISCV64
+    dynarray_reset(&s1->pcrel_hi_entries, &s1->nb_pcrel_hi_entries);
 #endif
 }
 
@@ -3096,7 +3101,7 @@ static void alloc_sec_names(TCCState *s1, int is_obj)
 }
 
 /* Output an elf .o file */
-LIBTCCAPI int elf_output_obj(TCCState *s1, const char *filename)
+static int elf_output_obj(TCCState *s1, const char *filename)
 {
     Section *s;
     int i, ret, file_offset;

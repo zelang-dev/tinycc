@@ -2504,7 +2504,7 @@ static void gen_opic(int op)
     }
 }
 
-#if defined TCC_TARGET_X86_64 || defined TCC_TARGET_I386
+#if defined TCC_TARGET_X86_64 || defined TCC_TARGET_I386 || defined TCC_TARGET_ARM64
 # define gen_negf gen_opf
 #elif defined TCC_TARGET_ARM
 void gen_negf(int op)
@@ -2526,6 +2526,14 @@ void gen_negf(int op)
 
     size = type_size(&vtop->type, &align);
     bt = vtop->type.t & VT_BTYPE;
+#if defined TCC_TARGET_X86_64 || defined TCC_TARGET_I386
+    /* sizeof long double is 12 or 16 here, but it's really the 80bit
+       extended float format.  */
+    if (bt == VT_LDOUBLE)
+        size = 10;
+#endif
+    if (nocode_wanted) /* save_reg() wont work */
+        goto gv2;
     save_reg(gv(RC_TYPE(bt)));
     vdup();
     incr_bf_adr(size - 1);
@@ -2534,6 +2542,8 @@ void gen_negf(int op)
     gen_op('^');
     vstore();
     vpop();
+gv2:
+    gv(RC_TYPE(bt)); /* -n is not a lvalue */
 }
 #endif
 
@@ -3097,6 +3107,7 @@ op_err:
 #endif
             type1 = vtop[-1].type;
             vpush_type_size(pointed_type(&vtop[-1].type), &align);
+            vtop->type.t &= ~VT_UNSIGNED;
             gen_op('*');
 #ifdef CONFIG_TCC_BCHECK
             if (tcc_state->do_bounds_check && !CONST_WANTED) {

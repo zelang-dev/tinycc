@@ -31,9 +31,11 @@ ifdef CONFIG_WIN32
   LIBTCCDEF = libtcc.def
  endif
  ifneq ($(CONFIG_debug),yes)
-  LDFLAGS += -s
+  ifneq ($(CC_NAME),clang)
+   LDFLAGS += -s
+  endif
  endif
- NATIVE_TARGET = $(ARCH)-win$(if $(findstring arm,$(ARCH)),ce,32)
+ NATIVE_TARGET = $(if $(findstring arm64,$(ARCH)),arm64-win32,$(ARCH)-win$(if $(findstring arm,$(ARCH)),ce,32))
 else
  CFG = -unx
  LIBS+=-lm
@@ -113,6 +115,7 @@ DEF-arm64-osx      = $(DEF-arm64) -DTCC_TARGET_MACHO
 DEF-arm64-FreeBSD  = $(DEF-arm64) -DTARGETOS_FreeBSD
 DEF-arm64-NetBSD   = $(DEF-arm64) -DTARGETOS_NetBSD
 DEF-arm64-OpenBSD  = $(DEF-arm64) -DTARGETOS_OpenBSD
+DEF-arm64-win32    = $(DEF-arm64) -DTCC_TARGET_PE
 DEF-riscv64        = -DTCC_TARGET_RISCV64
 DEF-c67            = -DTCC_TARGET_C67 -w # disable warnigs
 DEF-x86_64-FreeBSD = $(DEF-x86_64) -DTARGETOS_FreeBSD
@@ -130,7 +133,7 @@ TCCDOCS = tcc.1 tcc-doc.html tcc-doc.info
 all: $(PROGS) $(TCCLIBS) $(TCCDOCS)
 
 # cross compiler targets to build
-TCC_X = i386 x86_64 i386-win32 x86_64-win32 x86_64-osx arm arm64 arm-wince c67
+TCC_X = i386 x86_64 i386-win32 x86_64-win32 x86_64-osx arm arm64 arm64-win32 arm-wince c67
 TCC_X += riscv64 arm64-osx
 # TCC_X += arm-fpa arm-fpa-ld arm-vfp arm-eabi
 
@@ -212,8 +215,9 @@ arm-fpa-ld_FILES  = $(arm_FILES)
 arm-vfp_FILES     = $(arm_FILES)
 arm-eabi_FILES    = $(arm_FILES)
 arm-eabihf_FILES  = $(arm_FILES)
-arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c
+arm64_FILES = $(CORE_FILES) arm64-gen.c arm64-link.c arm64-asm.c arm64-tok.h
 arm64-osx_FILES = $(arm64_FILES) tccmacho.c
+arm64-win32_FILES = $(arm64_FILES) tccpe.c
 c67_FILES = $(CORE_FILES) c67-gen.c c67-link.c tcccoff.c
 riscv64_FILES = $(CORE_FILES) riscv64-gen.c riscv64-link.c riscv64-asm.c
 

@@ -124,8 +124,15 @@ static void tcc_add_systemdir(TCCState *s)
     tcc_add_library_path(s, normalize_slashes(buf));
 }
 #endif
+/* for tcc -E : On windows (depending on compiler) a FILE*
+   must be created by the same module where it is used. */
+PUB_FUNC FILE *tcc_fopen(const char *f, const char *m) {
+    return fopen(f, m);
+}
+PUB_FUNC int tcc_fclose(FILE *f) {
+    return fclose(f);
+}
 #endif
-
 /********************************************************/
 
 PUB_FUNC void tcc_enter_state(TCCState *s1)
@@ -264,9 +271,9 @@ ST_FUNC void libc_free(void *ptr)
 /* global so that every tcc_alloc()/tcc_free() call doesn't need to be changed */
 static void *(*reallocator)(void*, unsigned long) = default_reallocator;
 
-LIBTCCAPI void tcc_set_realloc(TCCReallocFunc *realloc)
+LIBTCCAPI void tcc_set_realloc(TCCReallocFunc *my_realloc)
 {
-    reallocator = realloc ? realloc : default_reallocator;
+    reallocator = my_realloc ? my_realloc : default_reallocator;
 }
 
 /* in case MEM_DEBUG is #defined */
@@ -791,7 +798,7 @@ ST_FUNC int tcc_open(TCCState *s1, const char *filename)
 }
 
 /* compile the file opened in 'file'. Return non zero if errors. */
-static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, const char *filename)
+static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd)
 {
     /* Here we enter the code section where we use the global variables for
        parsing and code generation (tccpp.c, tccgen.c, <target>-gen.c).
@@ -807,16 +814,8 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
 
         if (fd == -1) {
             int len = strlen(str);
-            tcc_open_bf(s1, filename ? filename : "<string>", len);
+            tcc_open_bf(s1, "<string>", len);
             memcpy(file->buffer, str, len);
-	    if (s1->do_debug && filename) {
-		FILE *fp = fopen(filename, "w");
-
-		if (fp) {
-		    fputs(str, fp);
-		    fclose(fp);
-		}
-	    }
         } else {
             tcc_open_bf(s1, str, 0);
             file->fd = fd;
@@ -846,12 +845,7 @@ static int tcc_compile(TCCState *s1, int filetype, const char *str, int fd, cons
 
 LIBTCCAPI int tcc_compile_string(TCCState *s, const char *str)
 {
-    return tcc_compile(s, s->filetype, str, -1, NULL);
-}
-
-LIBTCCAPI int tcc_compile_string_file(TCCState *s, const char *str, const char *filename)
-{
-    return tcc_compile(s, s->filetype, str, -1, filename);
+    return tcc_compile(s, s->filetype, str, -1);
 }
 
 /* define a preprocessor symbol. value can be NULL, sym can be "sym=val" */
@@ -1246,7 +1240,7 @@ ST_FUNC int tcc_add_file_internal(TCCState *s1, const char *filename, int flags)
         return tcc_add_binary(s1, flags, filename, fd);
 
     dynarray_add(&s1->target_deps, &s1->nb_target_deps, tcc_strdup(filename));
-    return tcc_compile(s1, flags, filename, fd, NULL);
+    return tcc_compile(s1, flags, filename, fd);
 }
 
 LIBTCCAPI int tcc_add_file(TCCState *s, const char *filename)
@@ -1585,30 +1579,6 @@ enum {
 #define TCC_OPTION_HAS_ARG 0x0001
 #define TCC_OPTION_NOSEP   0x0002 /* cannot have space before option and arg */
 
-/*
- * in tcc_options, if opt-string A is a prefix of opt-string B,
- * it's un-ambiguous if and only if option A is without TCC_OPTION_HAS_ARG.
- * otherwise (A with HAS_ARG), if, for instance, A is FOO and B is FOOBAR,
- * then "-FOOBAR" is either A with arg BAR, or B (-FOOBARX too, if B HAS_ARG).
- *
- * tcc_parse_args searches tcc_options in order, so if ambiguous:
- * - if the shorter (A) is earlier: the longer (B) is completely unreachable.
- * - else B wins, and A can't be used with adjacent arg if it also matches B.
- *
- * there are few clashes currently, and the longer is always earlier/reachable.
- * when it's ambiguous, shorter-concat-arg is not useful currently.
- * the sh(1) script 'optclash' can identifiy clashes (tcc root dir, try "-h").
- * at the time of writing, running './optclash' prints this:
-
-    -Wl,... (1642) overrides -W... (1644)
-    -Wp,... (1643) overrides -W... (1644)
-    -dumpmachine (1630) overrides -d... (1632)
-    -dumpversion (1631) overrides -d... (1632)
-    -dynamiclib (1623) overrides -d... (1632)
-    -flat_namespace (1624) overrides -f... (1650)
-    -mfloat-abi... (1647) overrides -m... (1649)
-
- */
 static const TCCOption tcc_options[] = {
     { "h", TCC_OPTION_HELP, 0 },
     { "-help", TCC_OPTION_HELP, 0 },
@@ -1848,27 +1818,6 @@ static void args_parser_add_file(TCCState *s, const char* filename, int filetype
         ++s->nb_libraries;
 }
 
-/*  parsing is between getopt(3) and getopt_long(3), and permuting-like:
- *  - an option is 1 or more chars.
- *  - at most 1 option per arg in argv.
- *  - an option in argv is "-OPT[...]" (few are --OPT, if OPT is "-...").
- *  - optarg is next arg, or adjacent non-empty (no '='. -std=.. is arg "=..").
- *  - supports also adjacent-only optarg (typically optional).
- *  - supports mixed options and operands ("--" is ignored, except with -run).
- *  - -OPT[...] can be ambiguous, which is resolved using tcc_options's order.
- *    (see tcc_options for details)
- *
- *  specifically, per arg of argv, in order:
- *  - if arg begins with '@' and is not exactly "@": process as @listfile.
- *  - elif arg is exactly "-" or doesn't begin with '-': process as input file.
- *    - if -run... is already set: also stop, arg... become argv of run_main.
- *  - elif arg is "--":
- *    - if -run... is already set: stop, arg... become argv of run_main.
- *    - else ignore it.
- *  - else ("-STRING") try to apply it as option, maybe with next (opt)arg.
- *
- *  after all args, if -run... but no "stop": run_main gets our argv (tcc ...)
- */
 /* using * to argc/argv to let "tcc -ar" benefit from @listfile expansion */
 PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
 {
@@ -2217,7 +2166,7 @@ unsupported_option:
     if (run) {
         if (*run && tcc_set_options(s, run) < 0)
             return -1;
-        x = 0;
+        x = 0, r = 0;
         goto extra_action;
     }
     if (!empty)

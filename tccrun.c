@@ -287,7 +287,7 @@ static void cleanup_sections(TCCState *s1)
     do {
         for (i = --f; i < p->nb_secs; i++) {
             Section *s = p->secs[i];
-            if (s1->do_debug || s == s1->symtab || s == s1->symtab->link || s == s1->symtab->hash) {
+            if (s == s1->symtab || s == s1->symtab->link || s == s1->symtab->hash) {
                 s->data = tcc_realloc(s->data, s->data_allocated = s->data_offset);
             } else {
                 free_section(s), tcc_free(s), p->secs[i] = NULL;
@@ -299,11 +299,10 @@ static void cleanup_sections(TCCState *s1)
 /* ------------------------------------------------------------- */
 /* 0 = .text rwx  other rw (memory >= 2 pages a 4096 bytes) */
 /* 1 = .text rx   other rw (memory >= 3 pages) */
-/* 2 = .debug    .debug ro (optional) */
-/* 3 = .text rx  .rdata ro  .data/.bss rw (memory >= 4 pages) */
+/* 2 = .text rx  .rdata ro  .data/.bss rw (memory >= 4 pages) */
 
 /* Some targets implement secutiry options that do not allow write in
-   executable code. These targets need CONFIG_RUNMEM_RO=2.
+   executable code. These targets need CONFIG_RUNMEM_RO=1.
    The disadvantage of this is that it requires a little bit more memory. */
 
 #ifndef CONFIG_RUNMEM_RO
@@ -344,13 +343,12 @@ redo:
     if (copy == 3)
         return 0;
 
-    for (k = 0; k < 4; ++k) { /* 0:rx, 1:ro, 2:ro debug , 3:rw sections */
+    for (k = 0; k < 3; ++k) { /* 0:rx, 1:ro, 2:rw sections */
         n = 0; addr = 0;
         for(i = 1; i < s1->nb_sections; i++) {
             static const char shf[] = {
-                SHF_ALLOC|SHF_EXECINSTR, SHF_ALLOC, 0, SHF_ALLOC|SHF_WRITE
+                SHF_ALLOC|SHF_EXECINSTR, SHF_ALLOC, SHF_ALLOC|SHF_WRITE
                 };
-	    if (k == 2 && s1->do_debug == 0) continue;
             s = s1->sections[i];
             if (shf[k] != (s->sh_flags & (SHF_ALLOC|SHF_WRITE|SHF_EXECINSTR)))
                 continue;
@@ -436,6 +434,8 @@ redo:
 
     /* relocate symbols */
     relocate_syms(s1, s1->symtab, 1);
+    if (s1->nb_errors)
+        goto redo;
     /* relocate sections */
 #ifdef TCC_TARGET_PE
     s1->pe_imagebase = mem;
@@ -1201,7 +1201,11 @@ static int rt_error(rt_frame *f, const char *fmt, ...)
 /* translate from ucontext_t* to internal rt_context * */
 static void rt_getcontext(ucontext_t *uc, rt_frame *rc)
 {
-#if defined _WIN64
+#if defined _WIN64 && defined __aarch64__
+    rc->ip = uc->Pc;      /* Program Counter */
+    rc->fp = uc->Fp;      /* Frame Pointer (X29) */
+    rc->sp = uc->Sp;      /* Stack Pointer (X30 is LR, but SP is separate) */
+#elif defined _WIN64
     rc->ip = uc->Rip;
     rc->fp = uc->Rbp;
     rc->sp = uc->Rsp;
@@ -1400,7 +1404,11 @@ static long __stdcall cpu_exception_handler(EXCEPTION_POINTERS *ex_info)
 /* Generate a stack backtrace when a CPU exception occurs. */
 static void set_exception_handler(void)
 {
+#ifdef _WIN64
+    AddVectoredExceptionHandler(1, cpu_exception_handler);
+#else
     SetUnhandledExceptionFilter(cpu_exception_handler);
+#endif
 }
 
 #endif

@@ -50,6 +50,16 @@
 # define IMAGE_FILE_MACHINE 0x01C0
 # define RSRC_RELTYPE 7 /* ??? (not tested) */
 
+#elif defined TCC_TARGET_ARM64
+# define ADDR3264 ULONGLONG
+# define PE_IMAGE_REL IMAGE_REL_BASED_DIR64
+# define REL_TYPE_DIRECT R_AARCH64_ABS64
+# define R_XXX_THUNKFIX R_AARCH64_ABS64
+# define R_XXX_RELATIVE R_AARCH64_RELATIVE
+# define R_XXX_FUNCCALL R_AARCH64_CALL26
+# define IMAGE_FILE_MACHINE 0xAA64
+# define RSRC_RELTYPE 3
+
 #elif defined TCC_TARGET_I386
 # define ADDR3264 DWORD
 # define PE_IMAGE_REL IMAGE_REL_BASED_HIGHLOW
@@ -126,7 +136,7 @@ typedef struct _IMAGE_OPTIONAL_HEADER {
     DWORD   SizeOfUninitializedData;
     DWORD   AddressOfEntryPoint;
     DWORD   BaseOfCode;
-#ifndef TCC_TARGET_X86_64
+#if !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_ARM64)
     DWORD   BaseOfData;
 #endif
     /* NT additional fields. */
@@ -225,6 +235,19 @@ typedef struct _IMAGE_BASE_RELOCATION {
 
 #define IMAGE_SIZEOF_BASE_RELOCATION     8
 
+#ifndef IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA
+#define IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA 0x0020
+#endif
+#ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
+#define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE 0x0040
+#endif
+#ifndef IMAGE_DLLCHARACTERISTICS_NX_COMPAT
+#define IMAGE_DLLCHARACTERISTICS_NX_COMPAT 0x0100
+#endif
+#ifndef IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE
+#define IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE 0x8000
+#endif
+
 #define IMAGE_REL_BASED_ABSOLUTE         0
 #define IMAGE_REL_BASED_HIGH             1
 #define IMAGE_REL_BASED_LOW              2
@@ -250,6 +273,9 @@ typedef struct _IMAGE_BASE_RELOCATION {
 #endif /* ndef IMAGE_NT_SIGNATURE */
 /* ----------------------------------------------------------- */
 
+#ifndef IMAGE_FILE_MACHINE_ARM64
+#define IMAGE_FILE_MACHINE_ARM64 0xAA64
+#endif
 #ifndef IMAGE_REL_BASED_DIR64
 # define IMAGE_REL_BASED_DIR64 10
 #endif
@@ -261,7 +287,7 @@ struct pe_header
     BYTE dosstub[0x40];
     DWORD nt_sig;
     IMAGE_FILE_HEADER filehdr;
-#ifdef TCC_TARGET_X86_64
+#if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
     IMAGE_OPTIONAL_HEADER64 opthdr;
 #else
 #ifdef _WIN64
@@ -605,11 +631,15 @@ static int pe_write(struct pe_info *pe)
     0x00E0, /*WORD    SizeOfOptionalHeader; */
     0x010F, /*WORD    Characteristics; */
 #define CHARACTERISTICS_DLL 0x230F
+#elif defined(TCC_TARGET_ARM64)
+    0x00F0, /*WORD    SizeOfOptionalHeader; */
+    0x0022  /*WORD    Characteristics; */
+#define CHARACTERISTICS_DLL 0x2022
 #endif
 },{
     /* IMAGE_OPTIONAL_HEADER opthdr */
     /* Standard fields. */
-#ifdef TCC_TARGET_X86_64
+#if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
     0x020B, /*WORD    Magic; */
 #else
     0x010B, /*WORD    Magic; */
@@ -621,29 +651,48 @@ static int pe_write(struct pe_info *pe)
     0x00000000, /*DWORD   SizeOfUninitializedData; */
     0x00000000, /*DWORD   AddressOfEntryPoint; */
     0x00000000, /*DWORD   BaseOfCode; */
-#ifndef TCC_TARGET_X86_64
+#if !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_ARM64)
     0x00000000, /*DWORD   BaseOfData; */
 #endif
     /* NT additional fields. */
 #if defined(TCC_TARGET_ARM)
     0x00100000,	    /*DWORD   ImageBase; */
+#elif defined(TCC_TARGET_ARM64)
+    0x140000000ULL, /*ULONGLONG ImageBase; */
 #else
     0x00400000,	    /*DWORD   ImageBase; */
 #endif
     0x00001000, /*DWORD   SectionAlignment; */
     0x00000200, /*DWORD   FileAlignment; */
+#if defined(TCC_TARGET_ARM64)
+    0x0006, /*WORD    MajorOperatingSystemVersion; */
+    0x0002, /*WORD    MinorOperatingSystemVersion; */
+#else
     0x0004, /*WORD    MajorOperatingSystemVersion; */
     0x0000, /*WORD    MinorOperatingSystemVersion; */
+#endif
     0x0000, /*WORD    MajorImageVersion; */
     0x0000, /*WORD    MinorImageVersion; */
+#if defined(TCC_TARGET_ARM64)
+    0x0006, /*WORD    MajorSubsystemVersion; */
+    0x0002, /*WORD    MinorSubsystemVersion; */
+#else
     0x0004, /*WORD    MajorSubsystemVersion; */
     0x0000, /*WORD    MinorSubsystemVersion; */
+#endif
     0x00000000, /*DWORD   Win32VersionValue; */
     0x00000000, /*DWORD   SizeOfImage; */
     0x00000200, /*DWORD   SizeOfHeaders; */
     0x00000000, /*DWORD   CheckSum; */
     0x0002, /*WORD    Subsystem; */
+#if defined(TCC_TARGET_ARM64)
+    IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
+    IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE |
+    IMAGE_DLLCHARACTERISTICS_NX_COMPAT |
+    IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
+#else
     0x0000, /*WORD    DllCharacteristics; */
+#endif
     0x00100000, /*DWORD   SizeOfStackReserve; */
     0x00001000, /*DWORD   SizeOfStackCommit; */
     0x00100000, /*DWORD   SizeOfHeapReserve; */
@@ -702,7 +751,7 @@ static int pe_write(struct pe_info *pe)
                 break;
 
             case sec_data:
-#ifndef TCC_TARGET_X86_64
+#if !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_ARM64)
                 if (!pe_header.opthdr.BaseOfData)
                     pe_header.opthdr.BaseOfData = addr;
 #endif
@@ -1191,7 +1240,11 @@ static int pe_assign_addresses (struct pe_info *pe)
     Section *s;
     TCCState *s1 = pe->s1;
 
-    if (PE_DLL == pe->type)
+    if (PE_DLL == pe->type
+#ifdef TCC_TARGET_ARM64
+        || PE_EXE == pe->type || PE_GUI == pe->type
+#endif
+        )
         pe->reloc = new_section(s1, ".reloc", SHT_PROGBITS, 0);
     //pe->thunk = new_section(s1, ".iedat", SHT_PROGBITS, SHF_ALLOC);
 
@@ -1380,6 +1433,18 @@ static int pe_check_symbols(struct pe_info *pe)
                     write32le(p + 4, 0xE59CF000); // arm code ldr pc, [ip]
                     put_elf_reloc(symtab_section, text_section,
                         offset + 8, R_XXX_THUNKFIX, is->iat_index); // offset to IAT position
+#elif defined(TCC_TARGET_ARM64)
+                    p = section_ptr_add(text_section, 24);
+                    /* ldr x16, [pc, #16] */
+                    write32le(p + 0, 0x58000090);
+                    /* ldr x16, [x16] */
+                    write32le(p + 4, 0xf9400210);
+                    /* br x16 */
+                    write32le(p + 8, 0xd61f0200);
+                    /* nop for 8-byte literal alignment */
+                    write32le(p + 12, 0xd503201f);
+                    put_elf_reloc(symtab_section, text_section,
+                        offset + 16, R_XXX_THUNKFIX, is->iat_index);
 #else
                     p = section_ptr_add(text_section, 8);
                     write16le(p, 0x25FF);
@@ -1611,7 +1676,7 @@ static int get_dllexports(int fd, char **pp)
         if (IMAGE_DIRECTORY_ENTRY_EXPORT >= oh.NumberOfRvaAndSizes)
             goto the_end_0;
         addr = oh.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-    } else if (ih.Machine == 0x8664) {
+    } else if (ih.Machine == 0x8664 || ih.Machine == IMAGE_FILE_MACHINE_ARM64) {
         IMAGE_OPTIONAL_HEADER64 oh;
         sec_hdroffset = opt_hdroffset + sizeof oh;
         if (!read_mem(fd, opt_hdroffset, &oh, sizeof oh))
@@ -1834,7 +1899,7 @@ PUB_FUNC int tcc_get_dllexports(const char *filename, char **pp)
 
 /* ------------------------------------------------------------- */
 #ifdef TCC_TARGET_X86_64
-static unsigned pe_add_uwwind_info(TCCState *s1)
+static unsigned pe_add_unwind_info(TCCState *s1)
 {
     if (NULL == s1->uw_pdata) {
         s1->uw_pdata = find_section(s1, ".pdata");
@@ -1879,7 +1944,7 @@ ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack)
       DWORD UnwindData;
     } *p;
 
-    d = pe_add_uwwind_info(s1);
+    d = pe_add_unwind_info(s1);
     pd = s1->uw_pdata;
     o = pd->data_offset;
     p = section_ptr_add(pd, sizeof *p);
@@ -1893,9 +1958,85 @@ ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack)
     for (n = o + sizeof *p; o < n; o += sizeof p->BeginAddress)
         put_elf_reloc(symtab_section, pd, o, R_XXX_RELATIVE, s1->uw_sym);
 }
+
+#elif defined(TCC_TARGET_ARM64)
+/* ARM64 unwind codes:
+   save_fplr_x: 10iiiiii  - stp x29,lr,[sp,#-(i+1)*8]!
+   set_fp:      11100001  - mov x29,sp
+   alloc_s:     000iiiii  - sub sp,sp,#i*16 (up to 496 bytes)
+   alloc_m:     11000iii xxxxxxxx - sub sp,sp,#X*16 (up to 32KB)
+   end:         11100100  - end of unwind codes
+*/
+static Section *pe_add_unwind_info(TCCState *s1)
+{
+    Section *s;
+
+    if (NULL == s1->uw_pdata) {
+        s1->uw_pdata = find_section(s1, ".pdata");
+        s1->uw_pdata->sh_addralign = 4;
+    }
+    s = find_section(s1, ".xdata");
+    s->sh_addralign = 4;
+    if (0 == s1->uw_sym)
+        s1->uw_sym = put_elf_sym(symtab_section, 0, 0, 0, 0,
+                                  text_section->sh_num, ".uw_text_base");
+    if (0 == s1->uw_xsym)
+        s1->uw_xsym = put_elf_sym(symtab_section, 0, 0, 0, 0,
+                                  s->sh_num, ".uw_base");
+    return s;
+}
+
+ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack)
+{
+    TCCState *s1 = tcc_state;
+    Section *pd, *xd;
+    unsigned o, d, code_bytes, func_len;
+    unsigned char *q;
+    uint32_t header;
+    struct /* _RUNTIME_FUNCTION */ {
+        DWORD BeginAddress;
+        DWORD UnwindData;
+    } *p;
+
+    int epilog;
+
+    xd = pe_add_unwind_info(s1);
+    pd = s1->uw_pdata;
+
+    func_len = (end - start) >> 2;
+    code_bytes = 0;
+    epilog = code_bytes;
+    code_bytes += 3; /* set_fp, save_fplr_x, end */
+    code_bytes = (code_bytes + 3) & ~3;
+
+    section_ptr_add(xd, -xd->data_offset & 3);
+    d = xd->data_offset;
+    q = section_ptr_add(xd, 4 + code_bytes);
+
+    /* Full ARM64 xdata header: E=1 with one epilog and no exception handler. */
+    header = (func_len & 0x3ffff)
+        | 1 << 21
+        | (epilog & 0x1F) << 22
+        | (code_bytes >> 2) << 27
+        ;
+    write32le(q, header);
+    q += 4;
+    *q++ = 0xE1; /* set_fp */
+    *q++ = 0x9B; /* save_fplr_x: stp x29,lr,[sp,#-224]! */
+    *q++ = 0xE4; /* end */
+    while ((unsigned)(q - (xd->data + d + 4)) < code_bytes)
+        *q++ = 0xE3; /* nop padding */
+
+    o = pd->data_offset;
+    p = section_ptr_add(pd, sizeof *p);
+    p->BeginAddress = start;
+    p->UnwindData = d;
+    put_elf_reloc(symtab_section, pd, o, R_XXX_RELATIVE, s1->uw_sym);
+    put_elf_reloc(symtab_section, pd, o + 4, R_XXX_RELATIVE, s1->uw_xsym);
+}
 #endif
 /* ------------------------------------------------------------- */
-#ifdef TCC_TARGET_X86_64
+#if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
 #define PE_STDSYM(n,s) n
 #else
 #define PE_STDSYM(n,s) "_" n s
@@ -1991,7 +2132,7 @@ static void pe_add_runtime(TCCState *s1, struct pe_info *pe)
 ST_FUNC int pe_setsubsy(TCCState *s1, const char *arg)
 {
     static const struct subsy { const char* p; int v; } x[] = {
-#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64)
+#if defined(TCC_TARGET_I386) || defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
         { "native", 1 },
         { "gui", 2 },
         { "windows", 2 },
@@ -2020,10 +2161,16 @@ static void pe_set_options(TCCState * s1, struct pe_info *pe)
 {
     if (PE_DLL == pe->type) {
         /* XXX: check if is correct for arm-pe target */
+#if defined(TCC_TARGET_ARM64)
+        pe->imagebase = 0x180000000ULL;
+#else
         pe->imagebase = 0x10000000;
+#endif
     } else {
 #if defined(TCC_TARGET_ARM)
         pe->imagebase = 0x00010000;
+#elif defined(TCC_TARGET_ARM64)
+        pe->imagebase = 0x140000000ULL;
 #else
         pe->imagebase = 0x00400000;
 #endif
@@ -2080,29 +2227,33 @@ ST_FUNC int pe_output_file(TCCState *s1, const char *filename)
     resolve_common_syms(s1);
     pe_set_options(s1, &pe);
     pe_check_symbols(&pe);
-
     if (s1->nb_errors)
-        ;
-    else if (filename) {
+        goto done;
+    if (filename) {
         pe_assign_addresses(&pe);
         relocate_syms(s1, s1->symtab, 0);
+        if (s1->nb_errors)
+            goto done;
         s1->pe_imagebase = pe.imagebase;
         relocate_sections(s1);
         pe.start_addr = (DWORD)
             (get_sym_addr(s1, pe.start_symbol, 1, 1) - pe.imagebase);
-        if (0 == s1->nb_errors)
-            pe_write(&pe);
-        dynarray_reset(&pe.sec_info, &pe.sec_count);
+        if (s1->nb_errors)
+            goto done;
+        pe_write(&pe);
     } else {
+        /* -run */
 #ifdef TCC_IS_NATIVE
         pe.thunk = data_section;
         pe_build_imports(&pe);
         s1->run_main = pe.start_symbol;
-#ifdef TCC_TARGET_X86_64
+#if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
         s1->uw_pdata = find_section(s1, ".pdata");
 #endif
 #endif
     }
+done:
+    dynarray_reset(&pe.sec_info, &pe.sec_count);
     pe_free_imports(&pe);
 #if PE_PRINT_SECTIONS
     if (g_debug & 8)

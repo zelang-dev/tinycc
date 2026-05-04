@@ -11,6 +11,21 @@
 # define __declspec(n)
 #endif
 
+#ifdef _WIN64
+static void bt_init_pe_prog_base(rt_context *p)
+{
+    MEMORY_BASIC_INFORMATION mbi;
+    addr_t imagebase;
+
+    if (!p->prog_base)
+        return;
+    if (!VirtualQuery(p, &mbi, sizeof(mbi)) || !mbi.AllocationBase)
+        return;
+    imagebase = (addr_t)mbi.AllocationBase - p->prog_base;
+    p->prog_base = (addr_t)mbi.AllocationBase - (imagebase & 0xffffffffu);
+}
+#endif
+
 __declspec(dllexport)
 void __bt_init(rt_context *p, int is_exe)
 {
@@ -23,6 +38,10 @@ void __bt_init(rt_context *p, int is_exe)
     /* needed to add global symbols */
     if (p->bounds_start)
 	__bound_init(p->bounds_start, -1);
+
+#ifdef _WIN64
+    bt_init_pe_prog_base(p);
+#endif
 
     /* add to chain */
     rt_wait_sem();
@@ -66,3 +85,13 @@ ST_FUNC char *pstrcpy(char *buf, size_t buf_size, const char *s)
     buf[l] = 0;
     return buf;
 }
+
+#if defined(_WIN64) && defined(__aarch64__)
+/* The bt-only Windows ARM64 build should not rely on importing this helper. */
+LONG InterlockedExchange(LONG volatile *Target, LONG Value)
+{
+    LONG Old = *Target;
+    *Target = Value;
+    return Old;
+}
+#endif

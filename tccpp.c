@@ -942,11 +942,11 @@ redo_start:
                 else if (parse_flags & PARSE_FLAG_ASM_FILE)
                     p = parse_line_comment(p - 1);
             }
-#if !defined(TCC_TARGET_ARM)
+#if !defined(TCC_TARGET_ARM) && !defined(TCC_TARGET_ARM64)
             else if (parse_flags & PARSE_FLAG_ASM_FILE)
                 p = parse_line_comment(p - 1);
 #else
-            /* ARM assembly uses '#' for constants */
+            /* ARM/ARM64 assembly uses '#' for constants */
 #endif
             break;
 _default:
@@ -1995,7 +1995,7 @@ ST_FUNC void preprocess(int is_bof)
         if (tok == '!' && is_bof)
             /* '#!' is ignored at beginning to allow C scripts. */
             goto ignore;
-        tcc_warning("Ignoring unknown preprocessing directive #%s", get_tok_str(tok, &tokc));
+        tcc_warning("ignoring unknown preprocessing directive #%s", get_tok_str(tok, &tokc));
     ignore:
         skip_to_eol(0);
         goto the_end;
@@ -2678,7 +2678,7 @@ maybe_newline:
                 p++;
                 tok = TOK_TWOSHARPS;
             } else {
-#if !defined(TCC_TARGET_ARM)
+#if !defined(TCC_TARGET_ARM) && !defined(TCC_TARGET_ARM64)
                 if (parse_flags & PARSE_FLAG_ASM_FILE) {
                     p = parse_line_comment(p - 1);
                     goto redo_no_start;
@@ -3691,7 +3691,7 @@ ST_FUNC void preprocess_start(TCCState *s1, int filetype)
     s1->pack_stack[0] = 0;
     s1->pack_stack_ptr = s1->pack_stack;
 
-    set_idnum('$', !is_asm && s1->dollars_in_identifiers ? IS_ID : 0);
+    set_idnum('$', s1->dollars_in_identifiers ? IS_ID : 0);
     set_idnum('.', is_asm ? IS_ID : 0);
 
     if (!(filetype & AFF_TYPE_ASM)) {

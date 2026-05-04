@@ -316,6 +316,7 @@
      DEF(TOK___extenddftf2, "__extenddftf2")
      DEF(TOK___trunctfsf2, "__trunctfsf2")
      DEF(TOK___trunctfdf2, "__trunctfdf2")
+     DEF(TOK___negtf2, "__negtf2")
      DEF(TOK___fixtfsi, "__fixtfsi")
      DEF(TOK___fixtfdi, "__fixtfdi")
      DEF(TOK___fixunstfsi, "__fixunstfsi")
@@ -401,12 +402,13 @@
  DEF_ASMDIR(endr)
  DEF_ASMDIR(org)
  DEF_ASMDIR(quad)
-#if defined(TCC_TARGET_I386)
+#if PTR_SIZE == 4
  DEF_ASMDIR(code16)
  DEF_ASMDIR(code32)
-#elif defined(TCC_TARGET_X86_64)
+#else
  DEF_ASMDIR(code64)
-#elif defined(TCC_TARGET_RISCV64)
+#endif
+#if defined(TCC_TARGET_RISCV64)
  DEF_ASMDIR(option)
 #endif
  DEF_ASMDIR(short)
@@ -420,8 +422,12 @@
 #include "i386-tok.h"
 #endif
 
-#if defined TCC_TARGET_ARM || defined TCC_TARGET_ARM64
+#if defined TCC_TARGET_ARM
 #include "arm-tok.h"
+#endif
+
+#if defined TCC_TARGET_ARM64
+#include "arm64-tok.h"
 #endif
 
 #if defined TCC_TARGET_RISCV64

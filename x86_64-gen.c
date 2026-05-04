@@ -267,14 +267,6 @@ ST_FUNC void gen_addr32(int r, Sym *sym, int c)
 }
 
 /* output constant with relocation if 'r & VT_SYM' is true */
-ST_FUNC void gen_addr64(int r, Sym *sym, int64_t c)
-{
-    if (r & VT_SYM)
-        greloca(cur_text_section, sym, ind, R_X86_64_64, c), c=0;
-    gen_le64(c);
-}
-
-/* output constant with relocation if 'r & VT_SYM' is true */
 ST_FUNC void gen_addrpc32(int r, Sym *sym, int c)
 {
     if (r & VT_SYM)
@@ -495,7 +487,8 @@ void load(int r, SValue *sv)
                     orex(0,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
                     gen_le32(sv->c.i);
                 } else {
-                    o(0xc031 + REG_VALUE(r) * 0x900); /* xor r, r */
+                    orex(0, r, r, 0x31); /* xor r, r */
+                    o(0xc0 + REG_VALUE(r) * 9);
                 }
             } else {
                 orex(0,r,0, 0xb8 + REG_VALUE(r)); /* mov $xx, r */
@@ -1839,6 +1832,7 @@ void gen_opf(int op)
             o(0x80); /* xor $0x80, $n(rbp) */
             gen_modrm(6, vtop->r, NULL, vtop->c.i + (bt == VT_DOUBLE ? 7 : 3));
             o(0x80);
+            gv(float_type); /* -n is not a lvalue */
         }
         return;
     }

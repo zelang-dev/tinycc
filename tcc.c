@@ -293,7 +293,7 @@ int main(int argc, char **argv)
     const char *first_file;
     int argc0 = argc;
     char **argv0 = argv;
-    FILE *ppfp = stdout;
+    FILE *ppfp = NULL;
 
 redo:
     argc = argc0, argv = argv0;
@@ -335,7 +335,7 @@ redo:
             tcc_error_noabort("no input files");
         } else if (s->output_type == TCC_OUTPUT_PREPROCESS) {
             if (s->outfile && 0!=strcmp("-",s->outfile)) {
-                ppfp = fopen(s->outfile, "wb");
+                ppfp = tcc_fopen(s->outfile, "wb");
                 if (!ppfp)
                     tcc_error_noabort("could not write '%s'", s->outfile);
             }
@@ -355,8 +355,8 @@ redo:
     if (s->output_type == 0)
         s->output_type = TCC_OUTPUT_EXE;
     tcc_set_output_type(s, s->output_type);
-    s->ppfp = ppfp;
-
+    if (ppfp)
+        s->ppfp = ppfp;
     if ((s->output_type == TCC_OUTPUT_MEMORY
       || s->output_type == TCC_OUTPUT_PREPROCESS)
         && (s->dflag & 16)) { /* -dt option */
@@ -422,7 +422,7 @@ redo:
     tcc_delete(s);
     if (!done)
         goto redo;
-    if (ppfp && ppfp != stdout)
-        fclose(ppfp);
+    if (ppfp)
+        tcc_fclose(ppfp);
     return ret;
 }

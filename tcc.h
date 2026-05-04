@@ -52,6 +52,9 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 #ifdef _WIN32
 # define WIN32_LEAN_AND_MEAN 1
+# ifndef _WIN32_WINNT
+#  define _WIN32_WINNT 0x502 /* AddVectoredExceptionHandler */
+# endif
 # include <windows.h>
 # include <io.h> /* open, close etc. */
 # include <direct.h> /* getcwd */
@@ -85,6 +88,9 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  ifdef _AMD64_
 #   define __x86_64__ 1
 #  endif
+# endif
+# if defined(_M_ARM64) && !defined(__aarch64__)
+#  define __aarch64__ 1
 # endif
 # ifndef va_copy
 #  define va_copy(a,b) a = b
@@ -228,8 +234,7 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* No ten-byte long doubles on window and macos except in
    cross-compilers made by a mingw-GCC */
 #if defined TCC_TARGET_PE \
-    || (defined TCC_TARGET_MACHO && defined TCC_TARGET_ARM64) \
-    || (defined _WIN32 && !defined __GNUC__)
+    || (defined TCC_TARGET_MACHO && defined TCC_TARGET_ARM64)
 # define TCC_USING_DOUBLE_FOR_LDOUBLE 1
 #endif
 
@@ -938,8 +943,8 @@ struct TCCState {
     #define qrel s1->qrel
 
 #ifdef TCC_TARGET_RISCV64
-    struct pcrel_hi { addr_t addr, val; } last_hi;
-    #define last_hi s1->last_hi
+    struct pcrel_hi { addr_t addr, val; } **pcrel_hi_entries;
+    int nb_pcrel_hi_entries;
 #endif
 
 #ifdef TCC_TARGET_PE
@@ -949,9 +954,10 @@ struct TCCState {
     unsigned pe_file_align;
     unsigned pe_stack_size;
     addr_t pe_imagebase;
-# ifdef TCC_TARGET_X86_64
+# if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
     Section *uw_pdata;
     int uw_sym;
+    int uw_xsym;
     unsigned uw_offs;
 # endif
 #endif
@@ -1311,6 +1317,11 @@ PUB_FUNC void tcc_print_stats(TCCState *s, unsigned total_time);
 PUB_FUNC int tcc_parse_args(TCCState *s, int *argc, char ***argv);
 #ifdef _WIN32
 ST_FUNC char *normalize_slashes(char *path);
+PUB_FUNC FILE *tcc_fopen(const char *f, const char *m);
+PUB_FUNC int tcc_fclose(FILE *f);
+#else
+# define tcc_fopen fopen
+# define tcc_fclose fclose
 #endif
 ST_FUNC DLLReference *tcc_add_dllref(TCCState *s1, const char *dllname, int level);
 ST_FUNC char *tcc_load_text(int fd);
@@ -1682,7 +1693,6 @@ ST_FUNC void gen_increment_tcov (SValue *sv);
 
 /* ------------ x86_64-gen.c ------------ */
 #ifdef TCC_TARGET_X86_64
-ST_FUNC void gen_addr64(int r, Sym *sym, int64_t c);
 ST_FUNC void gen_opl(int op);
 #ifdef TCC_TARGET_PE
 ST_FUNC void gen_vla_result(int addr);
@@ -1741,11 +1751,11 @@ ST_FUNC int find_constraint(ASMOperand *operands, int nb_operands, const char *n
 ST_FUNC Sym* get_asm_sym(int name, Sym *csym);
 ST_FUNC void asm_expr(TCCState *s1, ExprValue *pe);
 ST_FUNC int asm_int_expr(TCCState *s1);
-/* ------------ i386-asm.c ------------ */
-ST_FUNC void gen_expr32(ExprValue *pe);
-#ifdef TCC_TARGET_X86_64
+#if PTR_SIZE == 8
 ST_FUNC void gen_expr64(ExprValue *pe);
 #endif
+/* ------------ i386-asm.c ------------ */
+ST_FUNC void gen_expr32(ExprValue *pe);
 ST_FUNC void asm_opcode(TCCState *s1, int opcode);
 ST_FUNC int asm_parse_regvar(int t);
 ST_FUNC void asm_compute_constraints(ASMOperand *operands, int nb_operands, int nb_outputs, const uint8_t *clobber_regs, int *pout_reg);
@@ -1762,7 +1772,7 @@ ST_FUNC int pe_putimport(TCCState *s1, int dllindex, const char *name, addr_t va
 ST_FUNC int pe_setsubsy(TCCState *s1, const char *arg);
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
 #endif
-#ifdef TCC_TARGET_X86_64
+#if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
 ST_FUNC void pe_add_unwind_data(unsigned start, unsigned end, unsigned stack);
 #endif
 PUB_FUNC int tcc_get_dllexports(const char *filename, char **pp);
