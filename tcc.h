@@ -252,15 +252,14 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #ifndef CONFIG_SYSROOT
 # define CONFIG_SYSROOT ""
 #endif
+
 #if !defined CONFIG_TCCDIR && !defined _WIN32
 # define CONFIG_TCCDIR "/usr/local/lib/tcc"
 #endif
-#ifndef CONFIG_LDDIR
-# define CONFIG_LDDIR "lib"
-#endif
+
 #ifdef CONFIG_TRIPLET
 # define USE_TRIPLET(s) s "/" CONFIG_TRIPLET
-# define ALSO_TRIPLET(s) USE_TRIPLET(s) ":" s
+# define ALSO_TRIPLET(s) USE_TRIPLET(s) PATHSEP s
 #else
 # define USE_TRIPLET(s) s
 # define ALSO_TRIPLET(s) s
@@ -268,11 +267,8 @@ extern long double strtold (const char *__nptr, char **__endptr);
 
 /* path to find crt1.o, crti.o and crtn.o */
 #ifndef CONFIG_TCC_CRTPREFIX
-# define CONFIG_TCC_CRTPREFIX USE_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR)
-#endif
-
-#ifndef CONFIG_USR_INCLUDE
-# define CONFIG_USR_INCLUDE "/usr/include"
+# define CONFIG_TCC_CRTPREFIX \
+    USE_TRIPLET(CONFIG_SYSROOT "/usr/lib")
 #endif
 
 /* Below: {B} is substituted by CONFIG_TCCDIR (rsp. -B option) */
@@ -280,25 +276,22 @@ extern long double strtold (const char *__nptr, char **__endptr);
 /* system include paths */
 #ifndef CONFIG_TCC_SYSINCLUDEPATHS
 # if defined TCC_TARGET_PE || defined _WIN32
-#  define CONFIG_TCC_SYSINCLUDEPATHS "{B}/include"PATHSEP"{B}/include/winapi"
+#  define CONFIG_TCC_SYSINCLUDEPATHS \
+    "{B}/include" PATHSEP "{B}/include/winapi"
 # else
 #  define CONFIG_TCC_SYSINCLUDEPATHS \
-        "{B}/include" \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/include") \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT CONFIG_USR_INCLUDE)
+    "{B}/include" PATHSEP ALSO_TRIPLET(CONFIG_SYSROOT "/usr/include")
 # endif
 #endif
 
 /* library search paths */
 #ifndef CONFIG_TCC_LIBPATHS
 # if defined TCC_TARGET_PE || defined _WIN32
-#  define CONFIG_TCC_LIBPATHS "{B}/lib"
+#  define CONFIG_TCC_LIBPATHS \
+    "{B}/lib"
 # else
 #  define CONFIG_TCC_LIBPATHS \
-        "{B}" \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/" CONFIG_LDDIR) \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR) \
-    ":" ALSO_TRIPLET(CONFIG_SYSROOT "/usr/local/" CONFIG_LDDIR)
+    "{B}" PATHSEP ALSO_TRIPLET(CONFIG_SYSROOT "/usr/lib")
 # endif
 #endif
 
@@ -314,26 +307,17 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define CONFIG_TCC_ELFINTERP "/lib64/ld-linux-x86-64.so.2"
 # elif defined(TCC_TARGET_RISCV64)
 #  define CONFIG_TCC_ELFINTERP "/lib/ld-linux-riscv64-lp64d.so.1"
-# elif defined(TCC_ARM_EABI)
-#  define DEFAULT_ELFINTERP(s) default_elfinterp(s)
+# elif defined(TCC_TARGET_ARM)
+#  define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.3"
+#  define CONFIG_TCC_ELFINTERP_ARMHF "/lib/ld-linux-armhf.so.3"
 # else
 #  define CONFIG_TCC_ELFINTERP "/lib/ld-linux.so.2"
 # endif
 #endif
 
-/* var elf_interp dans *-gen.c */
-#ifndef DEFAULT_ELFINTERP
-# define DEFAULT_ELFINTERP(s) CONFIG_TCC_ELFINTERP
-#endif
-
 /* (target specific) libtcc1.a */
 #ifndef TCC_LIBTCC1
 # define TCC_LIBTCC1 "libtcc1.a"
-#endif
-
-/* library to use with CONFIG_USE_LIBGCC instead of libtcc1.a */
-#if defined CONFIG_USE_LIBGCC && !defined TCC_LIBGCC
-#define TCC_LIBGCC USE_TRIPLET(CONFIG_SYSROOT "/" CONFIG_LDDIR) "/libgcc_s.so.1"
 #endif
 
 /* <cross-prefix-to->libtcc1.a */
@@ -475,6 +459,9 @@ typedef struct CType {
     struct Sym *ref;
 } CType;
 
+/* long double words on host(!) platform */
+#define LDOUBLE_WORDS ((sizeof(long double)+3)/4)
+
 /* constant value */
 typedef union CValue {
     long double ld;
@@ -485,7 +472,7 @@ typedef union CValue {
         char *data;
         int size;
     } str;
-    int tab[LDOUBLE_SIZE/4];
+    int tab[LDOUBLE_WORDS];
 } CValue;
 
 /* value on stack */
@@ -740,6 +727,15 @@ struct sym_attr {
 #endif
 };
 
+#ifdef TCC_TARGET_PE
+#define PE_IMAGE_FILE_RELOCS_STRIPPED            0x0001
+#define PE_IMAGE_FILE_LARGE_ADDRESS_AWARE        0x0020
+#define PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA    0x0020
+#define PE_DLLCHARACTERISTICS_DYNAMIC_BASE       0x0040
+#define PE_DLLCHARACTERISTICS_NX_COMPAT          0x0100
+#define PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE 0x8000
+#endif
+
 struct TCCState {
     unsigned char verbose; /* if true, display some information during compilation */
     unsigned char nostdinc; /* if true, no standard headers are added */
@@ -902,6 +898,7 @@ struct TCCState {
 
     /* predefined sections */
     Section *text_section, *data_section, *rodata_section, *bss_section;
+    Section *tdata_section, *tbss_section;
     Section *common_section;
     Section *cur_text_section; /* current section where function code is generated */
 #ifdef CONFIG_TCC_BCHECK
@@ -951,6 +948,8 @@ struct TCCState {
     /* PE info */
     int pe_subsystem;
     unsigned pe_characteristics;
+    unsigned pe_dll_characteristics;
+    unsigned pe_dll_characteristics_clear;
     unsigned pe_file_align;
     unsigned pe_stack_size;
     addr_t pe_imagebase;
@@ -1076,7 +1075,8 @@ struct filespec {
 #define VT_STATIC  0x00002000  /* static variable */
 #define VT_TYPEDEF 0x00004000  /* typedef definition */
 #define VT_INLINE  0x00008000  /* inline definition */
-/* currently unused: 0x000[1248]0000  */
+#define VT_TLS     0x00010000  /* thread-local storage */
+/* currently unused: 0x000[248]0000  */
 
 #define VT_STRUCT_SHIFT 20     /* shift for bitfield shift values (32 - 2*6) */
 #define VT_STRUCT_MASK (((1U << (6+6)) - 1) << VT_STRUCT_SHIFT | VT_BITFIELD)
@@ -1094,7 +1094,7 @@ struct filespec {
 #define VT_ATOMIC   VT_VOLATILE
 
 /* type mask (except storage) */
-#define VT_STORAGE (VT_EXTERN | VT_STATIC | VT_TYPEDEF | VT_INLINE)
+#define VT_STORAGE (VT_EXTERN | VT_STATIC | VT_TYPEDEF | VT_INLINE | VT_TLS)
 #define VT_TYPE (~(VT_STORAGE|VT_STRUCT_MASK))
 
 /* symbol was created by tccasm.c first */
@@ -1446,8 +1446,8 @@ ST_DATA int nocode_wanted; /* true if no code generation wanted for an expressio
 ST_DATA int global_expr;  /* true if compound literals must be allocated globally (used during initializers parsing */
 ST_DATA CType func_vt; /* current function return type (used by return instruction) */
 ST_DATA int func_var; /* true if current function is variadic */
-ST_DATA int func_vc;
-ST_DATA int func_ind;
+ST_DATA int func_vc; /* stack address for implicit struct return storage */
+ST_DATA int func_ind; /* function start address */
 ST_DATA const char *funcname;
 
 ST_FUNC void tccgen_init(TCCState *s1);
@@ -1725,10 +1725,10 @@ ST_FUNC void gen_increment_tcov (SValue *sv);
 /* ------------ riscv64-gen.c ------------ */
 #ifdef TCC_TARGET_RISCV64
 ST_FUNC void gen_opl(int op);
-//ST_FUNC void gfunc_return(CType *func_type);
 ST_FUNC void gen_va_start(void);
 ST_FUNC void arch_transfer_ret_regs(int);
 ST_FUNC void gen_cvt_sxtw(void);
+ST_FUNC void gen_cvt_csti(int t);
 ST_FUNC void gen_increment_tcov (SValue *sv);
 #endif
 
@@ -1929,10 +1929,15 @@ dwarf_read_sleb128(unsigned char **ln, unsigned char *end)
 /********************************************************/
 #if CONFIG_TCC_SEMLOCK
 #if defined _WIN32
-typedef struct { int init; CRITICAL_SECTION cs; } TCCSem;
+typedef struct { volatile LONG init; CRITICAL_SECTION cs; } TCCSem;
 static inline void wait_sem(TCCSem *p) {
-    if (!p->init)
-        InitializeCriticalSection(&p->cs), p->init = 1;
+    if (InterlockedCompareExchange(&p->init, 1, 0) == 0) {
+        InitializeCriticalSection(&p->cs);
+        InterlockedExchange(&p->init, 2);
+    } else {
+        while (InterlockedCompareExchange(&p->init, 2, 2) != 2)
+            Sleep(0);
+    }
     EnterCriticalSection(&p->cs);
 }
 static inline void post_sem(TCCSem *p) {
@@ -1983,6 +1988,8 @@ static inline void post_sem(TCCSem *p) {
 #define data_section        TCC_STATE_VAR(data_section)
 #define rodata_section      TCC_STATE_VAR(rodata_section)
 #define bss_section         TCC_STATE_VAR(bss_section)
+#define tdata_section       TCC_STATE_VAR(tdata_section)
+#define tbss_section        TCC_STATE_VAR(tbss_section)
 #define common_section      TCC_STATE_VAR(common_section)
 #define cur_text_section    TCC_STATE_VAR(cur_text_section)
 #define bounds_section      TCC_STATE_VAR(bounds_section)

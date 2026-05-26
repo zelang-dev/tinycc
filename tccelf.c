@@ -70,6 +70,8 @@ ST_FUNC void tccelf_new(TCCState *s)
     /* create ro data section (make ro after relocation done with GNU_RELRO) */
     rodata_section = new_section(s, rdata, SHT_PROGBITS, shf_RELRO);
     bss_section = new_section(s, ".bss", SHT_NOBITS, SHF_ALLOC | SHF_WRITE);
+    tdata_section = new_section(s, ".tdata", SHT_PROGBITS, SHF_ALLOC | SHF_WRITE | SHF_TLS);
+    tbss_section = new_section(s, ".tbss", SHT_NOBITS, SHF_ALLOC | SHF_WRITE | SHF_TLS);
     common_section = new_section(s, ".common", SHT_NOBITS, SHF_PRIVATE);
     common_section->sh_num = SHN_COMMON;
 
@@ -110,6 +112,21 @@ ST_FUNC void tccelf_new(TCCState *s)
     if (s->elf_entryname)
         set_global_sym(s, s->elf_entryname, NULL, 0); /* SHN_UNDEF */
 #endif
+
+#ifndef ELF_OBJ_ONLY
+    if (NULL == s->elfint && s1->output_type != TCC_OUTPUT_OBJ) {
+        const char *p = CONFIG_TCC_ELFINTERP;
+#if defined TCC_TARGET_ARM && defined CONFIG_TCC_ELFINTERP_ARMHF
+        if (s->float_abi == ARM_HARD_FLOAT)
+            p = CONFIG_TCC_ELFINTERP_ARMHF;
+#endif
+#if defined TCC_IS_NATIVE && defined TARGETOS_BSD
+        /* see commit 55cb2170cd5ce77a7d76dcaf462fad2707281605 */
+        { const char *e = getenv("LD_SO"); if (e) p = e; }
+#endif
+        s->elfint = tcc_strdup(p);
+    }
+#endif /* ndef ELF_OBJ_ONLY */
 }
 
 ST_FUNC void free_section(Section *s)
@@ -1106,7 +1123,7 @@ ST_FUNC void relocate_syms(TCCState *s1, Section *symtab, int do_resolve)
             if (sym_bind == STB_WEAK)
                 sym->st_value = 0;
             else
-                tcc_error_noabort("undefined symbol '%s'", name);
+                tcc_error_noabort("unresolved reference to '%s'", name);
 
         } else if (sh_num < SHN_LORESERVE) {
             /* add section base */
@@ -2074,7 +2091,7 @@ static void bind_exe_dynsyms(TCCState *s1, int is_PIE)
                 if (ELFW(ST_BIND)(sym->st_info) == STB_WEAK ||
                     !strcmp(name, "_fp_hw")) {
                 } else {
-                    tcc_error_noabort("undefined symbol '%s'", name);
+                    tcc_error_noabort("unresolved reference to '%s'", name);
                 }
             }
         }
@@ -2105,7 +2122,7 @@ static void bind_libs_dynsyms(TCCState *s1)
             if (esym->st_shndx == SHN_UNDEF) {
                 /* weak symbols can stay undefined */
                 if (ELFW(ST_BIND)(esym->st_info) != STB_WEAK)
-                    tcc_warning("undefined dynamic symbol '%s'", name);
+                    tcc_warning("unresolved dynamic reference to '%s'", name);
             }
         }
     }
@@ -2279,7 +2296,7 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         if (k < 0x900)
             ++d->shnum;
         if (k < 0x700) {
-            f = s->sh_flags & (SHF_ALLOC|SHF_WRITE|SHF_EXECINSTR|SHF_TLS);
+            f = s->sh_flags & (SHF_ALLOC|SHF_WRITE|SHF_EXECINSTR);
 #if TARGETOS_NetBSD
 	    /* NetBSD only supports 2 PT_LOAD sections.
 	       See: https://blog.netbsd.org/tnf/entry/the_first_report_on_lld */
@@ -2338,6 +2355,18 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         ++phnum;
     if (d->roinf)
         ++phnum;
+    {
+        int has_tls = 0;
+        for (i = 1; i < s1->nb_sections; i++) {
+            s = s1->sections[i];
+            if (s->sh_flags & SHF_TLS) {
+                has_tls = 1;
+                break;
+            }
+        }
+        if (has_tls)
+            ++phnum;
+    }
     d->phnum = phnum;
     d->phdr = tcc_mallocz(phnum * sizeof(ElfW(Phdr)));
 
@@ -2414,10 +2443,6 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
                 ph->p_flags |= PF_W;
             if (f & SHF_EXECINSTR)
                 ph->p_flags |= PF_X;
-            if (f & SHF_TLS) {
-                ph->p_type = PT_TLS;
-                ph->p_align = align + 1;
-            }
 
             ph->p_offset = file_offset;
             ph->p_vaddr = addr;
@@ -2462,6 +2487,34 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         fill_phdr(++ph, PT_GNU_EH_FRAME, eh_frame_hdr_section);
     if (d->roinf)
         fill_phdr(++ph, PT_GNU_RELRO, d->roinf)->p_flags |= PF_W;
+    {
+        /* Create PT_TLS segment covering all TLS sections */
+        Section *tls_start_sec = NULL;
+        addr_t tls_start = 0, tls_end = 0;
+        for (i = 1; i < s1->nb_sections; i++) {
+            s = s1->sections[i];
+            if (s->sh_flags & SHF_TLS && s->sh_size) {
+                if (!tls_start_sec) {
+                    tls_start_sec = s;
+                    tls_start = s->sh_addr;
+                    tls_end = s->sh_addr + s->sh_size;
+                } else {
+                    if (s->sh_addr < tls_start)
+                        tls_start = s->sh_addr;
+                    if (s->sh_addr + s->sh_size > tls_end)
+                        tls_end = s->sh_addr + s->sh_size;
+                }
+            }
+        }
+        if (tls_start_sec) {
+            ph = fill_phdr(++ph, PT_TLS, tls_start_sec);
+            ph->p_vaddr = tls_start;
+            ph->p_paddr = tls_start;
+            ph->p_filesz = tls_end - tls_start;
+            ph->p_memsz = ph->p_filesz;
+            ph->p_align = tls_start_sec->sh_addralign;
+        }
+    }
     if (d->interp)
         fill_phdr(&d->phdr[1], PT_INTERP, d->interp);
     if (phfill) {
@@ -2837,6 +2890,28 @@ static void create_arm_attribute_section(TCCState *s1)
 }
 #endif
 
+#ifdef TCC_TARGET_RISCV64
+static void create_riscv_attribute_section(TCCState *s1)
+{
+    static const unsigned char riscv_attr[] = {
+        0x41,                           /* 'A' */
+        0x49, 0x00, 0x00, 0x00,         /* total_len = 73 */
+        'r', 'i', 's', 'c', 'v', 0x00,  /* "riscv\0" */
+        0x3a, 0x00, 0x00, 0x00,         /* file_len = 58 */
+        0x05,                           /* Tag_RISCV_arch */
+        0x35, 0x00, 0x00, 0x00,         /* isa_len = 53 */
+        'r','v','6','4','i','2','p','1','_','m','2','p','0','_',
+        'a','2','p','1','_','f','2','p','2','_','d','2','p','2','_',
+        'c','2','p','0','_','z','i','c','s','r','2','p','0','_',
+        'z','i','f','e','n','c','e','i','2','p','0', 0x00,
+    };
+    Section *attr = new_section(s1, ".riscv.attributes", SHT_RISCV_ATTRIBUTES, 0);
+    unsigned char *ptr = section_ptr_add(attr, sizeof(riscv_attr));
+    attr->sh_addralign = 1;
+    memcpy(ptr, riscv_attr, sizeof(riscv_attr));
+}
+#endif
+
 #if TARGETOS_OpenBSD || TARGETOS_NetBSD || TARGETOS_FreeBSD
 
 static void fill_bsd_note(Section *s, int type,
@@ -2939,18 +3014,10 @@ static int elf_output_file(TCCState *s1, const char *filename)
 
         if (!s1->static_link) {
             if (file_type & TCC_OUTPUT_EXE) {
-                char *ptr;
-                /* allow override the dynamic loader */
-                const char *elfint = s1->elfint;
-                if (elfint == NULL)
-                    elfint = getenv("LD_SO");
-                if (elfint == NULL)
-                    elfint = DEFAULT_ELFINTERP(s1);
                 /* add interpreter section only if executable */
                 interp = new_section(s1, ".interp", SHT_PROGBITS, SHF_ALLOC);
                 interp->sh_addralign = 1;
-                ptr = section_ptr_add(interp, 1 + strlen(elfint));
-                strcpy(ptr, elfint);
+                put_elf_str(interp, s1->elfint);
                 dyninf.interp = interp;
             }
 
@@ -3105,6 +3172,9 @@ static int elf_output_obj(TCCState *s1, const char *filename)
 {
     Section *s;
     int i, ret, file_offset;
+#ifdef TCC_TARGET_RISCV64
+    create_riscv_attribute_section(s1);
+#endif
     /* Allocate strings for section names */
     alloc_sec_names(s1, 1);
     file_offset = (sizeof (ElfW(Ehdr)) + 3) & -4;
@@ -3301,6 +3371,8 @@ invalid:
                 continue;
             if (sh->sh_type != s->sh_type
                 && strcmp (s->name, ".eh_frame")
+                /* some crt1.o seem to have two ".note.GNU-stack" (SHT_NOTE & SHT_PROGBITS) */
+                && strcmp (s->name, ".note.GNU-stack")
                 ) {
                 tcc_error_noabort("section type conflict: %s %02x <> %02x", s->name, sh->sh_type, s->sh_type);
                 goto the_end;

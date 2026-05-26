@@ -27,6 +27,8 @@
 #define stricmp strcasecmp
 #define strnicmp strncasecmp
 #include <sys/stat.h> /* chmod() */
+#else
+#include <process.h>
 #endif
 
 #ifdef TCC_TARGET_X86_64
@@ -236,16 +238,16 @@ typedef struct _IMAGE_BASE_RELOCATION {
 #define IMAGE_SIZEOF_BASE_RELOCATION     8
 
 #ifndef IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA
-#define IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA 0x0020
+#define IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA
 #endif
 #ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
-#define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE 0x0040
+#define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE PE_DLLCHARACTERISTICS_DYNAMIC_BASE
 #endif
 #ifndef IMAGE_DLLCHARACTERISTICS_NX_COMPAT
-#define IMAGE_DLLCHARACTERISTICS_NX_COMPAT 0x0100
+#define IMAGE_DLLCHARACTERISTICS_NX_COMPAT PE_DLLCHARACTERISTICS_NX_COMPAT
 #endif
 #ifndef IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE
-#define IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE 0x8000
+#define IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE
 #endif
 
 #define IMAGE_REL_BASED_ABSOLUTE         0
@@ -272,6 +274,21 @@ typedef struct _IMAGE_BASE_RELOCATION {
 /* ----------------------------------------------------------- */
 #endif /* ndef IMAGE_NT_SIGNATURE */
 /* ----------------------------------------------------------- */
+
+static WORD pe_get_dll_characteristics(TCCState *s1)
+{
+    unsigned v = 0;
+
+#ifdef TCC_TARGET_ARM64
+    v = PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
+        PE_DLLCHARACTERISTICS_DYNAMIC_BASE |
+        PE_DLLCHARACTERISTICS_NX_COMPAT |
+        PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE;
+#endif
+    v |= s1->pe_dll_characteristics;
+    v &= ~s1->pe_dll_characteristics_clear;
+    return v;
+}
 
 #ifndef IMAGE_FILE_MACHINE_ARM64
 #define IMAGE_FILE_MACHINE_ARM64 0xAA64
@@ -563,17 +580,55 @@ static void pe_add_coffsym(struct pe_info *pe)
 
 /* Run cv2pdb, available at https://github.com/rainers/cv2pdb.  It reads
    and strips the dwarf info and creates a <exename>.pdb file instead */
+#ifndef _WIN32
+static void pe_shell_quote(CString *cmd, const char *arg)
+{
+    cstr_cat(cmd, "'", 1);
+    while (*arg) {
+        if (*arg == '\'')
+            cstr_cat(cmd, "'\\''", 4);
+        else
+            cstr_cat(cmd, arg, 1);
+        ++arg;
+    }
+    cstr_cat(cmd, "'", 1);
+}
+#endif
+
+static intptr_t pe_run_cv2pdb(const char *exename)
+{
+#ifdef _WIN32
+    const char *argv[] = { "cv2pdb.exe", exename, NULL };
+    return _spawnvp(_P_WAIT, "cv2pdb.exe", argv);
+#else
+    CString cmd;
+    intptr_t ret;
+
+    cstr_new(&cmd);
+    cstr_cat(&cmd, "cv2pdb.exe ", -1);
+    pe_shell_quote(&cmd, exename);
+    cstr_ccat(&cmd, 0);
+    ret = system(cmd.data);
+    cstr_free(&cmd);
+    return ret;
+#endif
+}
+
 static void pe_create_pdb(TCCState *s1, const char *exename)
 {
-    char buf[300]; int r;
-    snprintf(buf, sizeof buf, "cv2pdb.exe %s", exename);
-    r = system(buf);
-    strcpy(tcc_fileextension(strcpy(buf, exename)), ".pdb");
+    size_t len = strlen(exename);
+    char *pdbfile = tcc_malloc(len + sizeof(".pdb"));
+    intptr_t r;
+
+    strcpy(pdbfile, exename);
+    strcpy(tcc_fileextension(pdbfile), ".pdb");
+    r = pe_run_cv2pdb(exename);
     if (r) {
-        tcc_error_noabort("could not create '%s'\n(need working cv2pdb from https://github.com/rainers/cv2pdb)", buf);
+        tcc_error_noabort("could not create '%s'\n(need working cv2pdb from https://github.com/rainers/cv2pdb)", pdbfile);
     } else if (s1->verbose) {
-        printf("<- %s\n", buf);
+        printf("<- %s\n", pdbfile);
     }
+    tcc_free(pdbfile);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -685,14 +740,7 @@ static int pe_write(struct pe_info *pe)
     0x00000200, /*DWORD   SizeOfHeaders; */
     0x00000000, /*DWORD   CheckSum; */
     0x0002, /*WORD    Subsystem; */
-#if defined(TCC_TARGET_ARM64)
-    IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
-    IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE |
-    IMAGE_DLLCHARACTERISTICS_NX_COMPAT |
-    IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
-#else
     0x0000, /*WORD    DllCharacteristics; */
-#endif
     0x00100000, /*DWORD   SizeOfStackReserve; */
     0x00001000, /*DWORD   SizeOfStackCommit; */
     0x00100000, /*DWORD   SizeOfHeapReserve; */
@@ -813,11 +861,14 @@ static int pe_write(struct pe_info *pe)
     pe_header.opthdr.SizeOfHeaders = pe->sizeofheaders;
     pe_header.opthdr.ImageBase = pe->imagebase;
     pe_header.opthdr.Subsystem = pe->subsystem;
+    pe_header.opthdr.DllCharacteristics = pe_get_dll_characteristics(s1);
     if (s1->pe_stack_size)
         pe_header.opthdr.SizeOfStackReserve = s1->pe_stack_size;
     if (PE_DLL == pe->type)
         pe_header.filehdr.Characteristics = CHARACTERISTICS_DLL;
     pe_header.filehdr.Characteristics |= s1->pe_characteristics;
+    if (pe->reloc)
+        pe_header.filehdr.Characteristics &= ~PE_IMAGE_FILE_RELOCS_STRIPPED;
 
     if (pe->coffsym) {
         pe_add_coffsym(pe);
@@ -1240,11 +1291,8 @@ static int pe_assign_addresses (struct pe_info *pe)
     Section *s;
     TCCState *s1 = pe->s1;
 
-    if (PE_DLL == pe->type
-#ifdef TCC_TARGET_ARM64
-        || PE_EXE == pe->type || PE_GUI == pe->type
-#endif
-        )
+    if (PE_DLL == pe->type ||
+        (pe_get_dll_characteristics(s1) & PE_DLLCHARACTERISTICS_DYNAMIC_BASE))
         pe->reloc = new_section(s1, ".reloc", SHT_PROGBITS, 0);
     //pe->thunk = new_section(s1, ".iedat", SHT_PROGBITS, SHF_ALLOC);
 

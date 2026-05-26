@@ -252,7 +252,7 @@ static void *default_reallocator(void *ptr, unsigned long size)
     else {
         ptr1 = realloc(ptr, size);
         if (!ptr1) {
-            fprintf(stderr, "memory full\n");
+            fprintf(stderr, "tcc: memory full\n");
             exit (1);
         }
     }
@@ -896,8 +896,8 @@ LIBTCCAPI TCCState *tcc_new(void)
 #if defined TCC_TARGET_MACHO /* || defined TCC_TARGET_PE */
     s->leading_underscore = 1;
 #endif
-#ifdef TCC_TARGET_ARM
-    s->float_abi = ARM_FLOAT_ABI;
+#ifdef TCC_ARM_HARDFLOAT
+    s->float_abi = ARM_HARD_FLOAT;
 #endif
 #ifdef CONFIG_NEW_DTAGS
     s->enable_new_dtags = 1;
@@ -995,17 +995,19 @@ LIBTCCAPI int tcc_set_output_type(TCCState *s, int output_type)
     /* allow linking with system dll's directly */
     tcc_add_systemdir(s);
 # endif
+
 #elif defined TCC_TARGET_MACHO
 # ifdef TCC_IS_NATIVE
     tcc_add_macos_sdkpath(s);
 # endif
+
 #else
     /* paths for crt objects */
     tcc_split_path(s, &s->crt_paths, &s->nb_crt_paths, CONFIG_TCC_CRTPREFIX);
     if (output_type != TCC_OUTPUT_MEMORY && !s->nostdlib)
-        tccelf_add_crtbegin(s);
+        tccelf_add_crtbegin(s); /* may produce errors */
 #endif
-    return 0;
+    return s->nb_errors ? -1 : 0;
 }
 
 LIBTCCAPI int tcc_add_include_path(TCCState *s, const char *pathname)
@@ -1362,10 +1364,11 @@ struct lopt {
 /* match linker option */
 static int link_option(struct lopt *o, const char *q)
 {
-    const char *p = o->opt;
+    const char *p;
     int c;
-
+redo:
     /* there should be 1 or 2 dashes */
+    p = o->opt;
     if (*p++ != '-')
         return 0;
     if (*p == '-')
@@ -1378,16 +1381,22 @@ static int link_option(struct lopt *o, const char *q)
             goto succ; /* -Wl,-opt=arg */
         ++q;
     }
-    if (c == '=' || c == ':') {
-        if (*p == '\0') {
+    if (*p == '\0') {
+        if (c == '|')
+            goto succ;
+        if (c == '=' || c == ':') {
             if (o->s->link_optind + 1 < o->s->link_argc) {
                 p = o->s->link_argv[++o->s->link_optind];
                 goto succ; /* -Wl,-opt,arg */
             }
             o->match = 1; /* -Wl,-opt -Wl,arg */
-        } else if (c == ':')
-            goto succ; /* -Wl,-Iarg */
-    }
+            return 0;
+        }
+    } else if (c == ':')
+        goto succ; /* -Wl,-Iarg */
+    while (*q)
+        if (*q++ == '|')
+            goto redo;
     return 0;
 succ:
     o->arg = p;
@@ -1396,6 +1405,20 @@ succ:
 }
 
 static void args_parser_add_file(TCCState *s, const char* filename, int filetype);
+
+#ifdef TCC_TARGET_PE
+static void tcc_pe_set_dll_characteristics(TCCState *s, unsigned flags)
+{
+    s->pe_dll_characteristics |= flags;
+    s->pe_dll_characteristics_clear &= ~flags;
+}
+
+static void tcc_pe_clear_dll_characteristics(TCCState *s, unsigned flags)
+{
+    s->pe_dll_characteristics &= ~flags;
+    s->pe_dll_characteristics_clear |= flags;
+}
+#endif
 
 /* set linker options */
 static int tcc_set_linker(TCCState *s, const char *optarg)
@@ -1415,9 +1438,9 @@ static int tcc_set_linker(TCCState *s, const char *optarg)
             s->symbolic = 1;
         } else if (link_option(&o, "nostdlib")) {
             s->nostdlib_paths = 1;
-        } else if (link_option(&o, "e=") || link_option(&o, "entry=")) {
+        } else if (link_option(&o, "e=|entry=")) {
             tcc_set_str(&s->elf_entryname, o.arg);
-        } else if (link_option(&o, "image-base=") || link_option(&o, "Ttext=")) {
+        } else if (link_option(&o, "image-base=|Ttext=")) {
             s->text_addr = strtoull(o.arg, &end, 16);
             s->has_text_addr = 1;
         } else if (link_option(&o, "init=")) {
@@ -1446,18 +1469,17 @@ static int tcc_set_linker(TCCState *s, const char *optarg)
 #endif
             else
                 goto err;
-        } else if (link_option(&o, "export-all-symbols")
-                || link_option(&o, "export-dynamic")) {
+        } else if (link_option(&o, "export-all-symbols|export-dynamic|E")) {
             s->rdynamic = 1;
         } else if (link_option(&o, "rpath=")) {
             tcc_concat_str(&s->rpath, o.arg, ':');
-        } else if (link_option(&o, "dynamic-linker=") || link_option(&o, "I:")) {
+        } else if (link_option(&o, "dynamic-linker=|I:")) {
             tcc_set_str(&s->elfint, o.arg);
         } else if (link_option(&o, "enable-new-dtags")) {
             s->enable_new_dtags = 1;
         } else if (link_option(&o, "section-alignment=")) {
             s->section_align = strtoul(o.arg, &end, 16);
-        } else if (link_option(&o, "soname=") || link_option(&o, "install_name=")) {
+        } else if (link_option(&o, "soname=|install_name=")) {
             tcc_set_str(&s->soname, o.arg);
         } else if (link_option(&o, "whole-archive")) {
             s->filetype |= AFF_WHOLE_ARCHIVE;
@@ -1467,7 +1489,31 @@ static int tcc_set_linker(TCCState *s, const char *optarg)
             s->znodelete = 1;
 #ifdef TCC_TARGET_PE
         } else if (link_option(&o, "large-address-aware")) {
-            s->pe_characteristics |= 0x20;
+            s->pe_characteristics |= PE_IMAGE_FILE_LARGE_ADDRESS_AWARE;
+        } else if (link_option(&o, "dynamicbase")) {
+            tcc_pe_set_dll_characteristics(s, PE_DLLCHARACTERISTICS_DYNAMIC_BASE);
+        } else if (link_option(&o, "disable-dynamicbase|no-dynamicbase")) {
+            tcc_pe_clear_dll_characteristics(s,
+                PE_DLLCHARACTERISTICS_DYNAMIC_BASE |
+                PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA);
+        } else if (link_option(&o, "nxcompat")) {
+            tcc_pe_set_dll_characteristics(s, PE_DLLCHARACTERISTICS_NX_COMPAT);
+        } else if (link_option(&o, "disable-nxcompat|no-nxcompat")) {
+            tcc_pe_clear_dll_characteristics(s, PE_DLLCHARACTERISTICS_NX_COMPAT);
+        } else if (link_option(&o, "high-entropy-va")) {
+# if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
+            tcc_pe_set_dll_characteristics(s,
+                PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
+                PE_DLLCHARACTERISTICS_DYNAMIC_BASE);
+# else
+            goto err;
+# endif
+        } else if (link_option(&o, "disable-high-entropy-va|no-high-entropy-va")) {
+            tcc_pe_clear_dll_characteristics(s, PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA);
+        } else if (link_option(&o, "tsaware")) {
+            tcc_pe_set_dll_characteristics(s, PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE);
+        } else if (link_option(&o, "disable-tsaware|no-tsaware")) {
+            tcc_pe_clear_dll_characteristics(s, PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE);
         } else if (link_option(&o, "file-alignment=")) {
             s->pe_file_align = strtoul(o.arg, &end, 16);
         } else if (link_option(&o, "stack=")) {
@@ -2024,7 +2070,7 @@ PUB_FUNC int tcc_parse_args(TCCState *s, int *pargc, char ***pargv)
                 s->float_abi = ARM_HARD_FLOAT;
             else
                 return tcc_error_noabort("unsupported float abi '%s'", optarg);
-            break;
+            continue;
 #endif
         case TCC_OPTION_m:
             if (set_flag(s, options_m, optarg) < 0) {

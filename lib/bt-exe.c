@@ -85,13 +85,3 @@ ST_FUNC char *pstrcpy(char *buf, size_t buf_size, const char *s)
     buf[l] = 0;
     return buf;
 }
-
-#if defined(_WIN64) && defined(__aarch64__)
-/* The bt-only Windows ARM64 build should not rely on importing this helper. */
-LONG InterlockedExchange(LONG volatile *Target, LONG Value)
-{
-    LONG Old = *Target;
-    *Target = Value;
-    return Old;
-}
-#endif

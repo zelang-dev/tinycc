@@ -421,7 +421,7 @@ int f() { return v(); }
 #elif defined test_switch_W4
 #pragma comment(option, "-Wunsupported -Wno-error=implicit-function-declaration -Werror")
 #endif
-void func()
+void func(void)
 {
     char *ccp = "123";
     fink();

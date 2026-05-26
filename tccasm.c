@@ -510,7 +510,7 @@ static void pop_section(TCCState *s1)
 
 static void asm_parse_directive(TCCState *s1, int global)
 {
-    int n, offset, v, size, tok1;
+    int n, offset, v, size, tok1, c;
     Section *sec;
     uint8_t *ptr;
 
@@ -540,18 +540,25 @@ static void asm_parse_directive(TCCState *s1, int global)
             /* the section must have a compatible alignment */
             if (sec->sh_addralign < n)
                 sec->sh_addralign = n;
+            c = sec->sh_flags & SHF_EXECINSTR;
         } else {
 	    if (n < 0)
 	        n = 0;
-            size = n;
+            size = n, c = 0;
         }
         v = 0;
         if (tok == ',') {
             next();
-            v = asm_int_expr(s1);
+            v = asm_int_expr(s1), c = 0;
         }
     zero_pad:
+	if ((uint64_t)ind + size >= 1<<30)
+	    tcc_error("too much data");
         if (sec->sh_type != SHT_NOBITS) {
+            if (c) {
+                gen_fill_nops(size);
+                break;
+            }
             sec->data_offset = ind;
             ptr = section_ptr_add(sec, size);
             memset(ptr, v, size);
@@ -706,11 +713,9 @@ static void asm_parse_directive(TCCState *s1, int global)
 		  expect("constant or same-section symbol");
 		n += esym->st_value;
 	    }
-	    if (n < 0 || n > 0x100000)
-		tcc_error(".org out of range");
             if (n < ind)
                 tcc_error("attempt to .org backwards");
-            v = 0;
+            v = c = 0;
             size = n - ind;
             goto zero_pad;
         }
@@ -1014,17 +1019,41 @@ static void asm_parse_directive(TCCState *s1, int global)
     case TOK_ASMDIR_reloc:
 	{
 	    ExprValue e;
+	    const char *reloc_name;
+	    int reloc_type = -1;
 
 	    next();
 	    asm_expr(s1, &e);
 	    skip(',');
+	    reloc_name = get_tok_str(tok, NULL);
 #if defined(TCC_TARGET_ARM64)
-	    if (strcmp(get_tok_str(tok, NULL), "R_AARCH64_CALL26"))
+	    if (!strcmp(reloc_name, "R_AARCH64_CALL26"))
+	        reloc_type = R_AARCH64_CALL26;
+#elif defined(TCC_TARGET_RISCV64)
+	    if (!strcmp(reloc_name, "R_RISCV_CALL") || !strcmp(reloc_name, "R_RISCV_CALL_PLT"))
+	        reloc_type = R_RISCV_CALL;
+	    else if (!strcmp(reloc_name, "R_RISCV_BRANCH"))
+	        reloc_type = R_RISCV_BRANCH;
+	    else if (!strcmp(reloc_name, "R_RISCV_JAL"))
+	        reloc_type = R_RISCV_JAL;
+	    else if (!strcmp(reloc_name, "R_RISCV_PCREL_HI20"))
+	        reloc_type = R_RISCV_PCREL_HI20;
+	    else if (!strcmp(reloc_name, "R_RISCV_PCREL_LO12_I"))
+	        reloc_type = R_RISCV_PCREL_LO12_I;
+	    else if (!strcmp(reloc_name, "R_RISCV_PCREL_LO12_S"))
+	        reloc_type = R_RISCV_PCREL_LO12_S;
+	    else if (!strcmp(reloc_name, "R_RISCV_32_PCREL"))
+	        reloc_type = R_RISCV_32_PCREL;
+	    else if (!strcmp(reloc_name, "R_RISCV_32"))
+	        reloc_type = R_RISCV_32;
+	    else if (!strcmp(reloc_name, "R_RISCV_64"))
+	        reloc_type = R_RISCV_64;
 #endif
-	        tcc_error("unimp: reloc '%s' unknown", get_tok_str(tok, NULL));
+	    if (reloc_type < 0)
+	        tcc_error("unimp: reloc '%s' unknown", reloc_name);
 	    next();
 	    skip(',');
-	    greloca(cur_text_section, get_asm_sym(tok, NULL), e.v, R_AARCH64_CALL26, 0);
+	    greloca(cur_text_section, get_asm_sym(tok, NULL), e.v, reloc_type, 0);
 	    next();
 	}
 	break;

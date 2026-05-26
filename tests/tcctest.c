@@ -32,8 +32,9 @@
 #define XLONG_LONG_FORMAT "%Lx"
 #endif
 
-// MinGW has 80-bit rather than 64-bit long double which isn't compatible with TCC or MSVC
-#if defined(_WIN32) && defined(__GNUC__)
+/* MinGW has 80-bit rather than 64-bit long double which isn't
+   compatible with printf in msvcrt */
+#if defined(_WIN32)
 #define LONG_DOUBLE double
 #define LONG_DOUBLE_LITERAL(x) x
 #else
@@ -1174,7 +1175,7 @@ void char_short_test()
     var4 = 0x11223344aa998877ULL;
     printf("promote char/short assign VA %d %d\n", var3 = var1 + 1, var3 = var4 + 1);
     printf("promote char/short cast VA %d %d\n", (signed char)(var1 + 1), (signed char)(var4 + 1));
-#if !defined(__arm__)
+#if !defined __arm__ && !defined __riscv
     /* We can't really express GCC behaviour of return type promotion in
        the presence of undefined behaviour (like __csf is).  */
     var1 = csf(unsigned char,0x89898989);
@@ -1465,16 +1466,36 @@ static int tab_reinit[10];
 static int tentative_ar[];
 static int tentative_ar[] = {1,2,3};
 
-//int cinit1; /* a global variable can be defined several times without error ! */
-int cinit1; 
+int cinit1; /* a global variable can be defined several times without error ! */
 int cinit1; 
 int cinit1 = 0;
 int *cinit2 = (int []){3, 2, 1};
+uintptr_t cinit3 = (uintptr_t)"AA";
+char const * const cinit8[] = { [0 ... 1] = "BB", [2 ... 4] = "CC" };
+void *cinit52 = &(void*){ (void*) 52 };
+
+#if __TINYC__ || __GNUC__ >= 6
+int cinit4 = (int){44};
+void *cinit51 = (void*){ (void*) 51 };
+struct _c6 { int a,b; } cinit6 = (struct _c6){61,62}, *cinit7 = &(struct _c6){71,72};
+#else
+int cinit4 = 44;
+void *cinit51 = (void*)51;
+struct _c6 { int a,b; } cinit6 = { 61,62 }, cinit70 = {71,72}, *cinit7 = &cinit70;
+#endif
 
 void compound_literal_test(void)
 {
     int *p, i;
     char *q, *q3;
+
+    printf("cinit3 : %s\n", cinit3);
+    printf("cinit4 : %d\n", cinit4);
+    printf("cinit51 : %d\n", (int)cinit51);
+    printf("cinit52 : %d\n", *(int*)cinit52);
+    printf("cinit6 : %d %d\n", cinit6.a, cinit6.b);
+    printf("cinit7 : %d %d\n", cinit7->a, cinit7->b);
+    printf("cinit8 : %s %s %s %s %s\n", cinit8[0], cinit8[1], cinit8[2], cinit8[3], cinit8[4]);
 
     p = (int []){1, 2, 3};
     for(i=0;i<3;i++)

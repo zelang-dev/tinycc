@@ -43,6 +43,8 @@ ST_FUNC int code_reloc (int reloc_type)
         case R_AARCH64_LDST32_ABS_LO12_NC:
         case R_AARCH64_LDST16_ABS_LO12_NC:
         case R_AARCH64_LDST8_ABS_LO12_NC:
+        case R_AARCH64_TLSLE_ADD_TPREL_HI12:
+        case R_AARCH64_TLSLE_ADD_TPREL_LO12:
         case R_AARCH64_GLOB_DAT:
         case R_AARCH64_COPY:
             return 0;
@@ -80,6 +82,8 @@ ST_FUNC int gotplt_entry_type (int reloc_type)
         case R_AARCH64_COPY:
         case R_AARCH64_CONDBR19:
         case R_AARCH64_TSTBR14:
+        case R_AARCH64_TLSLE_ADD_TPREL_HI12:
+        case R_AARCH64_TLSLE_ADD_TPREL_LO12:
             return NO_GOTPLT_ENTRY;
 
         case R_AARCH64_ABS32:
@@ -365,6 +369,27 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
 #endif
             write64le(ptr, val - rel->r_addend);
             return;
+        case R_AARCH64_TLSLE_ADD_TPREL_HI12:
+        case R_AARCH64_TLSLE_ADD_TPREL_LO12: {
+            addr_t tls_start = 0;
+            int i;
+            for (i = 1; i < s1->nb_sections; i++) {
+                Section *s = s1->sections[i];
+                if (s->sh_flags & SHF_TLS && s->sh_size) {
+                    if (!tls_start || s->sh_addr < tls_start)
+                        tls_start = s->sh_addr;
+                }
+            }
+            /* glibc arm64: tp points to tcbhead_t (DTV), TLS data starts after it */
+            int64_t tp_offset = val - tls_start + 16;
+            int64_t imm;
+            if (type == R_AARCH64_TLSLE_ADD_TPREL_HI12)
+                imm = (tp_offset >> 12) & 0xfff;
+            else
+                imm = tp_offset & 0xfff;
+            write32le(ptr, ((read32le(ptr) & 0xffc003ff) | (imm << 10)));
+            return;
+        }
         case R_AARCH64_RELATIVE:
 #ifdef TCC_TARGET_PE
             add32le(ptr, val - s1->pe_imagebase);

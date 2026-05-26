@@ -53,6 +53,8 @@ ST_FUNC int code_reloc (int reloc_type)
     case R_RISCV_64:
     case R_RISCV_SET_ULEB128:
     case R_RISCV_SUB_ULEB128:
+    case R_RISCV_TPREL_HI20:
+    case R_RISCV_TPREL_LO12_I:
         return 0;
 
     case R_RISCV_CALL_PLT:
@@ -101,6 +103,10 @@ ST_FUNC int gotplt_entry_type (int reloc_type)
 
     case R_RISCV_GOT_HI20:
         return ALWAYS_GOTPLT_ENTRY;
+
+    case R_RISCV_TPREL_HI20:
+    case R_RISCV_TPREL_LO12_I:
+        return NO_GOTPLT_ENTRY;
     }
     return -1;
 }
@@ -393,6 +399,36 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
     case R_RISCV_COPY:
         /* XXX */
         return;
+    case R_RISCV_RELATIVE:
+        /* R_RISCV_RELATIVE value is already applied in R_RISCV_32/64
+           dynamic output paths, but we need this case for incoming
+           RELATIVE relocations from object files. */
+        return;
+
+    case R_RISCV_TPREL_HI20:
+    case R_RISCV_TPREL_LO12_I: {
+        addr_t tls_start = 0;
+        int i;
+        for (i = 1; i < s1->nb_sections; i++) {
+            Section *s = s1->sections[i];
+            if (s->sh_flags & SHF_TLS && s->sh_size) {
+                if (!tls_start || s->sh_addr < tls_start)
+                    tls_start = s->sh_addr;
+            }
+        }
+        int64_t tp_offset = val - tls_start;
+        if (type == R_RISCV_TPREL_HI20) {
+            off64 = (int64_t)(tp_offset + 0x800) >> 12;
+            if ((off64 + ((uint64_t)1 << 20)) >> 21)
+                tcc_error_noabort("R_RISCV_TPREL_HI20 relocation failed");
+            write32le(ptr, (read32le(ptr) & 0xfff)
+                           | ((off64 & 0xfffff) << 12));
+        } else {
+            write32le(ptr, (read32le(ptr) & 0xfffff)
+                           | (((tp_offset) & 0xfff) << 20));
+        }
+        return;
+    }
 
     default:
         fprintf(stderr, "FIXME: handle reloc type %x at %x [%p] to %x\n",
