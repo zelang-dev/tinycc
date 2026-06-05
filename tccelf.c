@@ -2992,6 +2992,10 @@ static int elf_output_file(TCCState *s1, const char *filename)
     create_arm_attribute_section (s1);
 #endif
 
+#ifdef TCC_TARGET_RISCV64
+    create_riscv_attribute_section(s1);
+#endif
+
 #if TARGETOS_OpenBSD
     dyninf.note = create_bsd_note_section (s1, ".note.openbsd.ident", "OpenBSD");
 #endif
@@ -3172,9 +3176,6 @@ static int elf_output_obj(TCCState *s1, const char *filename)
 {
     Section *s;
     int i, ret, file_offset;
-#ifdef TCC_TARGET_RISCV64
-    create_riscv_attribute_section(s1);
-#endif
     /* Allocate strings for section names */
     alloc_sec_names(s1, 1);
     file_offset = (sizeof (ElfW(Ehdr)) + 3) & -4;

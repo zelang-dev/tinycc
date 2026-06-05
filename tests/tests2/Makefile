@@ -19,9 +19,6 @@ ifeq (,$(filter i386 x86_64,$(ARCH)))
  SKIP += 85_asm-outside-function.test # x86 asm
  SKIP += 127_asm_goto.test    # hardcodes x86 asm
 endif
-ifeq (,$(filter x86_64 riscv64 arm64 i386,$(ARCH)))
- SKIP += 144_tls.test # TLS only implemented on these architectures so far
-endif
 ifeq ($(CONFIG_backtrace),no)
  SKIP += 113_btdll.test
  CONFIG_bcheck = no
@@ -57,21 +54,22 @@ ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
  SKIP += 114_bound_signal.test # libc problem signal/fork
  SKIP += 116_bound_setjmp2.test # No TLS_FUNC/TLS_VAR in bcheck.c
 endif
-ifdef CONFIG_OSX
+ifeq ($(CONFIG_OSX),yes)
  SKIP += 144_tls.test # TLS runtime not supported on Mach-O
 endif
-ifeq (,$(filter arm64 aarch64,$(ARCH)))
+ifeq (,$(filter i386 x86_64 riscv64 arm64,$(ARCH)))
+ SKIP += 144_tls.test # TLS only implemented on these architectures so far
+endif
+ifneq (-$(ARCH)-,-arm64-)
  SKIP += 138_arm64_encoding.test
  SKIP += 139_arm64_errors.test
  SKIP += 140_arm64_extasm.test
 endif
-ifneq ($(CONFIG_WIN32),yes)
- SKIP += 145_winarm64_interlocked.test
-else ifeq (,$(filter arm64 aarch64,$(ARCH)))
- SKIP += 145_winarm64_interlocked.test
-endif
-ifeq (,$(filter riscv64,$(ARCH)))
+ifneq (-$(ARCH)-,-riscv64-)
  SKIP += 141_riscv_asm.test # riscv64 asm
+endif
+ifneq (-$(ARCH)-$(CONFIG_WIN32)-,-arm64-yes-)
+ SKIP += 145_winarm64_interlocked.test
 endif
 
 # Some tests might need arguments

@@ -3280,6 +3280,8 @@ again:
         dbt_bt = dbt & VT_BTYPE;
         sbt_bt = sbt & VT_BTYPE;
         if (dbt_bt == VT_VOID) {
+            /* do not confuse backends with VT_VOID in registers */
+            vpop(), vpushi(0);
             goto done;
         }
         if (sbt_bt == VT_VOID) {

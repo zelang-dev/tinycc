@@ -439,7 +439,7 @@ ST_FUNC void store(int r, SValue *v)
     } else
 #endif
 
-    if ((fr & VT_SYM) && v->sym->type.t & VT_TLS) {
+    if ((v->r & VT_SYM) && v->sym->type.t & VT_TLS) {
         o(0x65); /* gs segment prefix */
         o(opc);
         o(0x04 | (REG_VALUE(r) << 3)); /* modrm: [sib] | srcreg */
@@ -467,7 +467,7 @@ static void gadd_sp(int val)
     }
 }
 
-#if defined CONFIG_TCC_BCHECK || defined TCC_TARGET_PE || defined CONFIG_TCC_PIC
+#if defined TCC_TARGET_PE || defined CONFIG_TCC_PIC
 static void gen_static_call(int v)
 {
     Sym *sym;

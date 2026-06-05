@@ -727,15 +727,6 @@ struct sym_attr {
 #endif
 };
 
-#ifdef TCC_TARGET_PE
-#define PE_IMAGE_FILE_RELOCS_STRIPPED            0x0001
-#define PE_IMAGE_FILE_LARGE_ADDRESS_AWARE        0x0020
-#define PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA    0x0020
-#define PE_DLLCHARACTERISTICS_DYNAMIC_BASE       0x0040
-#define PE_DLLCHARACTERISTICS_NX_COMPAT          0x0100
-#define PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE 0x8000
-#endif
-
 struct TCCState {
     unsigned char verbose; /* if true, display some information during compilation */
     unsigned char nostdinc; /* if true, no standard headers are added */
@@ -949,7 +940,6 @@ struct TCCState {
     int pe_subsystem;
     unsigned pe_characteristics;
     unsigned pe_dll_characteristics;
-    unsigned pe_dll_characteristics_clear;
     unsigned pe_file_align;
     unsigned pe_stack_size;
     addr_t pe_imagebase;
