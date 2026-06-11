@@ -1730,6 +1730,7 @@ ST_FUNC void arch_transfer_ret_regs(int);
 ST_FUNC void gen_cvt_sxtw(void);
 ST_FUNC void gen_cvt_csti(int t);
 ST_FUNC void gen_increment_tcov (SValue *sv);
+ST_FUNC void gen_clear_cache(void);
 #endif
 
 /* ------------ c67-gen.c ------------ */

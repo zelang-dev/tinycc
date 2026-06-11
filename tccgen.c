@@ -5953,8 +5953,21 @@ ST_FUNC void unary(void)
         vtop->type = type;
         break;
     }
+#endif
+#ifdef TCC_TARGET_ARM64
     case TOK___arm64_clear_cache: {
 	parse_builtin_params(0, "ee");
+        gen_clear_cache();
+        vpushi(0);
+        vtop->type.t = VT_VOID;
+        break;
+    }
+#endif
+#ifdef TCC_TARGET_RISCV64
+    case TOK___riscv64_clear_cache: {
+	parse_builtin_params(0, "ee");
+	vpop();
+	vpop();
         gen_clear_cache();
         vpushi(0);
         vtop->type.t = VT_VOID;
