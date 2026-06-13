@@ -34,16 +34,16 @@ jobs:
     timeout-minutes: 6
     steps:
     - uses: actions/checkout@v4
+    - name: build tcc (x86_64-win32)
+      shell: cmd
+      run: |
+        cd win32
+        for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" amd64
+        call build-tcc.bat -c cl -t x86_64
     - name: test (x86_64-win32)
       shell: cmd
       run: |
-        echo ::group:: run build-tcc.bat
-        cd win32
-        call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=amd64
-        call build-tcc.bat -c cl -t x86_64
-        @echo off
-        echo ::endgroup::
-        cd ..\tests
+        cd tests
         call test-win32.bat all -k
 
   test-i386-win32:
@@ -51,16 +51,16 @@ jobs:
     timeout-minutes: 6
     steps:
     - uses: actions/checkout@v4
+    - name: build tcc (i386-win32)
+      shell: cmd
+      run: |
+        cd win32
+        for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" x86
+        call build-tcc.bat -c cl -t i386
     - name: test (i386-win32)
       shell: cmd
       run: |
-        echo ::group:: run build-tcc.bat
-        cd win32
-        call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=x86
-        call build-tcc.bat -c cl -t i386
-        @echo off
-        echo ::endgroup::
-        cd ..\tests
+        cd tests
         call test-win32.bat -p c:\mingw32\bin all -k
 
   test-arm64-win32:
@@ -68,15 +68,13 @@ jobs:
     timeout-minutes: 6
     steps:
     - uses: actions/checkout@v4
-    - name: test (arm64-win32)
+    - name: build and test (arm64-win32)
       shell: cmd
       run: |
-        echo ::group:: run build-tcc.bat
         cd win32
-        call "%ProgramFiles%\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\VsDevCmd.bat" -arch=arm64
+        for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" amd64_arm64
         call build-tcc.bat -c cl -t arm64
-        @echo off
-        echo ::endgroup::
+        set "PATH=C:\Program Files\LLVM\bin;%CD%;%PATH%"
         cd ..\tests
         call test-win32.bat -c clang all -k
 

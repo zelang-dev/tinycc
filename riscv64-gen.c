@@ -294,13 +294,29 @@ ST_FUNC void load(int r, SValue *sv)
         EI(opcode, func3, rr, br, fc); // l[bhwd][u] / fl[wd] RR, fc(BR)
     } else if (v == VT_CONST) {
         int rb = 0, do32bit = 8, zext = 0;
-        assert((!is_float(sv->type.t) && is_ireg(r)) || bt == VT_LDOUBLE);
+        if (is_float(sv->type.t) && bt != VT_LDOUBLE) {
+            /* load float/double constant: move bit pattern from int reg */
+            uint64_t val = sv->c.i;
+            int is_dbl = bt == VT_DOUBLE;
+            if (val == 0) {
+                o(0x53 | (rr << 7) | ((unsigned)(0x78 | is_dbl) << 25));
+                return;
+            }
+            if (is_dbl) {
+                load_large_constant(6, (int)val, (int)(val >> 32));
+            } else {
+                if (LOW_OVERFLOW(fc))
+                    o(0x37 | (6 << 7) | UPPER(fc)); // lui t1, upper
+                EI(0x13 | 8, 0, 6, LOW_OVERFLOW(fc) ? 6 : 0, SIGN11(fc)); // addiw t1,...
+            }
+            o(0x53 | (rr << 7) | (6 << 15) | ((unsigned)(0x78 | is_dbl) << 25));
+            return;
+        }
+        assert(is_ireg(r) || bt == VT_LDOUBLE);
         if (fr & VT_SYM) {
             rb = load_symofs(r, sv, 0, &fc);
             do32bit = 0;
         }
-        if (is_float(sv->type.t) && bt != VT_LDOUBLE)
-          tcc_error("unimp: load(float)");
         if (do32bit && fc != sv->c.i) {
             int64_t si = sv->c.i;
             si >>= 32;
