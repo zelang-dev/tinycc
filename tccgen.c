@@ -6184,7 +6184,8 @@ special_math_val:
             gen_op('+');
             /* change type to field type, and set to lvalue */
             vtop->type = s->type;
-            vtop->type.t |= qualifiers;
+            if (qualifiers)
+                parse_btype_qualify(&vtop->type, qualifiers);
             /* an array is never an lvalue */
             if (!(vtop->type.t & VT_ARRAY)) {
                 vtop->r |= VT_LVAL;
