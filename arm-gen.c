@@ -588,7 +588,9 @@ void load(int r, SValue *sv)
 
   v = fr & VT_VALMASK;
   if (fr & VT_LVAL) {
+
     if ((fr & VT_SYM) && sv->sym->type.t & VT_TLS) {
+        /* XXX: this does not work */
         uint32_t op;
         o(0xee1d0fe0); /* mrc p15, 0, lr, c13, c0, 3 */
         op = 0xe510e000; /* ldr r, [lr, #0] */
@@ -596,6 +598,7 @@ void load(int r, SValue *sv)
         o(op | (intr(r) << 12));
         return;
     }
+
     base = 0xB; // fp
     if(v == VT_LLOCAL) {
       v1.type.t = VT_PTR;
@@ -726,7 +729,9 @@ void store(int r, SValue *sv)
 
   v = fr & VT_VALMASK;
   if (fr & VT_LVAL || fr == VT_LOCAL) {
+
     if ((fr & VT_SYM) && sv->sym->type.t & VT_TLS) {
+        /* XXX: this does not work */
         uint32_t op;
         o(0xee1d0fe0); /* mrc p15, 0, lr, c13, c0, 3 */
         op = 0xe500e000; /* str r, [lr, #0] */
@@ -734,6 +739,7 @@ void store(int r, SValue *sv)
         o(op | (intr(r) << 12));
         return;
     }
+
     base = 0xb; /* fp */
     if(v < VT_CONST) {
       base=intr(v);

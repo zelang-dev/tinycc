@@ -241,8 +241,13 @@ static void gen_modrm(int opc, int op_r2, int r, Sym *sym, int c)
 {
     int op_reg = REG_VALUE(op_r2) << 3;
 
+    if ((r & VT_SYM) && (sym->type.t & VT_TLS)) {
+        o(0x65); /* gs segment prefix */
+        o(opc);
+        oad(0x05 | op_reg, c);
+        greloc(cur_text_section, sym, ind - 4, R_386_TLS_LE);
 #if defined CONFIG_TCC_PIC
-    if ((r & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
+    } else if ((r & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
         int is_got = (op_r2 & TREG_MEM) && !(sym->type.t & VT_STATIC);
         int here = ind;
         get_pc_thunk(TREG_EBX, is_got);
@@ -261,9 +266,8 @@ static void gen_modrm(int opc, int op_r2, int r, Sym *sym, int c)
         } else {
             g(0x00 | op_reg | REG_VALUE(r));
         }
-    } else
 #endif
-    if ((r & VT_VALMASK) == VT_CONST) {
+    } else if ((r & VT_VALMASK) == VT_CONST) {
         /* constant memory reference */
         o(opc);
         o(0x05 | op_reg);
@@ -299,7 +303,7 @@ ST_FUNC void load(int r, SValue *sv)
 #if defined CONFIG_TCC_PIC
     /* we use indirect access via got */
     if ((fr & (VT_VALMASK|VT_SYM|VT_LVAL)) == (VT_CONST|VT_SYM|VT_LVAL)
-        && !(sv->sym->type.t & VT_STATIC)) {
+        && !(sv->sym->type.t & (VT_STATIC|VT_TLS))) {
         /* use the result register as a temporal register */
         int tr = r | TREG_MEM;
         if (is_float(ft)) {
@@ -313,16 +317,6 @@ ST_FUNC void load(int r, SValue *sv)
 #endif
 
     if (fr & VT_LVAL) {
-        if ((fr & VT_SYM) && sv->sym->type.t & VT_TLS) {
-            int dst_reg = REG_VALUE(r);
-            o(0x65); /* gs segment prefix */
-            o(0x8b); /* mov r/m, r */
-            o(0x04 | (dst_reg << 3)); /* modrm: [sib] | destreg */
-            o(0x25); /* sib: disp32 */
-            greloca(cur_text_section, sv->sym, ind, R_386_TLS_LE, fc);
-            gen_le32(0);
-            return;
-        }
         if (v == VT_LLOCAL) {
             v1.type.t = VT_INT;
             v1.r = VT_LOCAL | VT_LVAL;
@@ -356,8 +350,12 @@ ST_FUNC void load(int r, SValue *sv)
         }
         gen_modrm(opc, r, fr, sv->sym, fc);
     } else {
+        if ((fr & VT_SYM) && (sv->sym->type.t & VT_TLS)) {
+            oad(0x058b65 | REG_VALUE(r) << 19, 0); /* mov gs:0,r */
+            oad(0xC081 | REG_VALUE(r) << 8, 0); /* add tpoffs,r */
+            greloc(cur_text_section, sv->sym, ind - 4, R_386_TLS_LE);
 #if defined CONFIG_TCC_PIC
-        if ((fr & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
+        } else if ((fr & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
             if (sv->sym->type.t & VT_STATIC) {
                 get_pc_thunk(r, 0);
                 o(0x808d | REG_VALUE(r) * 0x900); /* lea $xx(r), r */
@@ -367,10 +365,8 @@ ST_FUNC void load(int r, SValue *sv)
                 o(0x808b | REG_VALUE(r) * 0x900); /* mov $xx(r), r */
                 gen_gotpcrel(r, sv->sym, fc);
             }
-        } else
-
 #endif
-        if (v == VT_CONST) {
+        } else if (v == VT_CONST) {
             o(0xb8 + r); /* mov $xx, r */
             gen_addr32(fr, sv->sym, fc);
         } else if (v == VT_LOCAL) {
@@ -430,7 +426,7 @@ ST_FUNC void store(int r, SValue *v)
 #if defined CONFIG_TCC_PIC
     /* we need to access the variable via got */
     if ((v->r & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)
-        && !(v->sym->type.t & VT_STATIC)) {
+        && !(v->sym->type.t & (VT_STATIC|VT_TLS))) {
 	get_pc_thunk(TREG_EBX, 1);
 	o(0x9b8b); /* mov xx(%ebx),%ebx */
 	gen_gotpcrel(TREG_EBX, v->sym, v->c.i);
@@ -438,16 +434,6 @@ ST_FUNC void store(int r, SValue *v)
 	o(3 + (r << 3));
     } else
 #endif
-
-    if ((v->r & VT_SYM) && v->sym->type.t & VT_TLS) {
-        o(0x65); /* gs segment prefix */
-        o(opc);
-        o(0x04 | (REG_VALUE(r) << 3)); /* modrm: [sib] | srcreg */
-        o(0x25); /* sib: disp32 */
-        greloca(cur_text_section, v->sym, ind, R_386_TLS_LE, fc);
-        gen_le32(0);
-        return;
-    }
 
     if (fr == VT_CONST || fr == VT_LOCAL || (v->r & VT_LVAL)) {
         gen_modrm(opc, r, v->r, v->sym, fc);
