@@ -899,6 +899,9 @@ LIBTCCAPI TCCState *tcc_new(void)
 #ifdef TCC_ARM_HARDFLOAT
     s->float_abi = ARM_HARD_FLOAT;
 #endif
+#if defined TCC_TARGET_ARM64 && defined TCC_TARGET_PE
+    s->pe_dll_characteristics = 0x8160;
+#endif
 #ifdef CONFIG_NEW_DTAGS
     s->enable_new_dtags = 1;
 #endif
@@ -1365,7 +1368,7 @@ struct lopt {
 static int link_option(struct lopt *o, const char *q)
 {
     const char *p;
-    int c;
+    int c, r;
 redo:
     /* there should be 1 or 2 dashes */
     p = o->opt;
@@ -1373,6 +1376,16 @@ redo:
         return 0;
     if (*p == '-')
         p++;
+    r = 1;
+    if (q[0] == '?') { /* check for no-/disable- prefix */
+        ++q;
+        if (p[0] == 'n' && p[1] == 'o' && p[2] == '-')
+            p += 3, r = -1;
+#ifdef TCC_TARGET_PE
+        else if (0 == memcmp(p, "disable-", 8))
+            p += 8, r = -1;
+#endif
+    }
     while ((c = *q) == *p) {
         if (c == '\0')
             goto succ; /* -Wl,-opt */
@@ -1401,24 +1414,13 @@ redo:
 succ:
     o->arg = p;
     //printf("set %s '%s'\n", o->opt, o->arg);
-    return 1;
+    return r;
 }
 
 static void args_parser_add_file(TCCState *s, const char* filename, int filetype);
 
-#ifdef TCC_TARGET_PE
-static void tcc_pe_set_dll_characteristics(TCCState *s, unsigned flags)
-{
-    s->pe_dll_characteristics |= flags;
-    s->pe_dll_characteristics_clear &= ~flags;
-}
-
-static void tcc_pe_clear_dll_characteristics(TCCState *s, unsigned flags)
-{
-    s->pe_dll_characteristics &= ~flags;
-    s->pe_dll_characteristics_clear |= flags;
-}
-#endif
+#define SET_OR_CLEAR(v,f) (v = r > 0 ? v | f : v & ~f)
+#define SET_OR_CLEAR_2(v,f1,f2) (v = r > 0 ? v | f1 : v & ~f2)
 
 /* set linker options */
 static int tcc_set_linker(TCCState *s, const char *optarg)
@@ -1431,6 +1433,7 @@ static int tcc_set_linker(TCCState *s, const char *optarg)
         char *end = NULL;
         int ignoring = 0;
         struct lopt o = {0};
+        int r;
         o.s = s;
         o.opt = s->link_argv[s->link_optind];
 
@@ -1481,39 +1484,21 @@ static int tcc_set_linker(TCCState *s, const char *optarg)
             s->section_align = strtoul(o.arg, &end, 16);
         } else if (link_option(&o, "soname=|install_name=")) {
             tcc_set_str(&s->soname, o.arg);
-        } else if (link_option(&o, "whole-archive")) {
-            s->filetype |= AFF_WHOLE_ARCHIVE;
-        } else if (link_option(&o, "no-whole-archive")) {
-            s->filetype &= ~AFF_WHOLE_ARCHIVE;
+        } else if (!!(r = link_option(&o, "?whole-archive"))) {
+            SET_OR_CLEAR(s->filetype, AFF_WHOLE_ARCHIVE);
         } else if (link_option(&o, "znodelete")) {
             s->znodelete = 1;
 #ifdef TCC_TARGET_PE
         } else if (link_option(&o, "large-address-aware")) {
-            s->pe_characteristics |= PE_IMAGE_FILE_LARGE_ADDRESS_AWARE;
-        } else if (link_option(&o, "dynamicbase")) {
-            tcc_pe_set_dll_characteristics(s, PE_DLLCHARACTERISTICS_DYNAMIC_BASE);
-        } else if (link_option(&o, "disable-dynamicbase|no-dynamicbase")) {
-            tcc_pe_clear_dll_characteristics(s,
-                PE_DLLCHARACTERISTICS_DYNAMIC_BASE |
-                PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA);
-        } else if (link_option(&o, "nxcompat")) {
-            tcc_pe_set_dll_characteristics(s, PE_DLLCHARACTERISTICS_NX_COMPAT);
-        } else if (link_option(&o, "disable-nxcompat|no-nxcompat")) {
-            tcc_pe_clear_dll_characteristics(s, PE_DLLCHARACTERISTICS_NX_COMPAT);
-        } else if (link_option(&o, "high-entropy-va")) {
-# if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
-            tcc_pe_set_dll_characteristics(s,
-                PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
-                PE_DLLCHARACTERISTICS_DYNAMIC_BASE);
-# else
-            goto err;
-# endif
-        } else if (link_option(&o, "disable-high-entropy-va|no-high-entropy-va")) {
-            tcc_pe_clear_dll_characteristics(s, PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA);
-        } else if (link_option(&o, "tsaware")) {
-            tcc_pe_set_dll_characteristics(s, PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE);
-        } else if (link_option(&o, "disable-tsaware|no-tsaware")) {
-            tcc_pe_clear_dll_characteristics(s, PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE);
+            s->pe_characteristics |= 0x20;
+        } else if (!!(r = link_option(&o, "?dynamicbase"))) {
+            SET_OR_CLEAR_2(s1->pe_dll_characteristics, 0x40, 0x60);
+        } else if (!!(r = link_option(&o, "?high-entropy-va"))) {
+            SET_OR_CLEAR_2(s1->pe_dll_characteristics, 0x60, 0x20);
+        } else if (!!(r = link_option(&o, "?nxcompat"))) {
+            SET_OR_CLEAR(s1->pe_dll_characteristics, 0x100);
+        } else if (!!(r = link_option(&o, "?tsaware"))) {
+            SET_OR_CLEAR(s1->pe_dll_characteristics, 0x8000);
         } else if (link_option(&o, "file-alignment=")) {
             s->pe_file_align = strtoul(o.arg, &end, 16);
         } else if (link_option(&o, "stack=")) {

@@ -506,6 +506,17 @@ static void arm64_sym(int r, Sym *sym, unsigned long addend)
 
 static void arm64_load_cmp(int r, SValue *sv);
 
+static void arm64_tls_x30(SValue *sv)
+{
+    o(0xd53bd05e); /* mrs x30, tpidr_el0 */
+    greloca(cur_text_section, sv->sym, ind, R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
+    /* add x30, x30, #0, lsl #12 */
+    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) | ARM64_RN(30) | ARM64_RD(30));
+    greloca(cur_text_section, sv->sym, ind, R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
+    /* add x30, x30, #0 */
+    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(30) | ARM64_RD(30));
+}
+
 ST_FUNC void load(int r, SValue *sv)
 {
     int svtt = sv->type.t;
@@ -552,23 +563,9 @@ ST_FUNC void load(int r, SValue *sv)
     }
 
     if (svr == (VT_CONST | VT_LVAL | VT_SYM)) {
-        if (sv->sym->type.t & VT_TLS) {
-            o(0xd53bd05e); /* mrs x30, tpidr_el0 */
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) |
-              ARM64_RN(30) | ARM64_RD(30)); /* add x30, x30, #0, lsl #12 */
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) |
-              ARM64_RN(30) | ARM64_RD(30)); /* add x30, x30, #0 */
-            if (IS_FREG(r))
-                arm64_ldrv(arm64_type_size(svtt), fltr(r), 30, svcoff);
-            else
-                arm64_ldrx(!(svtt&VT_UNSIGNED), arm64_type_size(svtt),
-                           intr(r), 30, svcoff);
-            return;
-        }
+        if (sv->sym->type.t & VT_TLS)
+            arm64_tls_x30(sv);
+        else
         arm64_sym(30, sv->sym, // use x30 for address
 		  arm64_check_offset(0, arm64_type_size(svtt), svcoff));
         if (IS_FREG(r))
@@ -661,28 +658,15 @@ ST_FUNC void store(int r, SValue *sv)
 
     if (svr == (VT_CONST | VT_LVAL)) {
 	uint64_t i = sv->c.i;
-
-	if (sv->sym && (sv->sym->type.t & VT_TLS)) {
-            o(0xd53bd05e);
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) |
-              ARM64_RN(30) | ARM64_RD(30));
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) |
-              ARM64_RN(30) | ARM64_RD(30));
-            if (IS_FREG(r))
-                arm64_strv(arm64_type_size(svtt), fltr(r), 30, i);
-            else
-                arm64_strx(arm64_type_size(svtt), intr(r), 30, i);
-            return;
-        }
+	if (sv->sym && (sv->sym->type.t & VT_TLS))
+            arm64_tls_x30(sv);
+        else
 	if (sv->sym)
             arm64_sym(30, sv->sym, // use x30 for address
 		      arm64_check_offset(0, arm64_type_size(svtt), i));
 	else
 	    arm64_movimm (30, i), i = 0;
+
         if (IS_FREG(r))
             arm64_strv(arm64_type_size(svtt), fltr(r), 30,
 		       arm64_check_offset(1, arm64_type_size(svtt), i));

@@ -407,17 +407,7 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
 
     case R_RISCV_TPREL_HI20:
     case R_RISCV_TPREL_LO12_I: {
-        addr_t tls_start = 0;
-        int64_t tp_offset;
-        int i;
-        for (i = 1; i < s1->nb_sections; i++) {
-            Section *s = s1->sections[i];
-            if (s->sh_flags & SHF_TLS && s->sh_size) {
-                if (!tls_start || s->sh_addr < tls_start)
-                    tls_start = s->sh_addr;
-            }
-        }
-        tp_offset = val - tls_start;
+        int64_t tp_offset = val - s1->tls_start;
         if (type == R_RISCV_TPREL_HI20) {
             off64 = (int64_t)(tp_offset + 0x800) >> 12;
             if ((off64 + ((uint64_t)1 << 20)) >> 21)

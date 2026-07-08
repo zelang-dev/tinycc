@@ -386,9 +386,7 @@ Set type for PE (Windows) executables.
 @item -Wl,-[Ttext=# | section-alignment=# | file-alignment=# | image-base=# | stack=#]
 Modify executable layout.
 
-@item -Wl,-[dynamicbase | nxcompat | high-entropy-va | tsaware]
-@item -Wl,-[no-dynamicbase | no-nxcompat | no-high-entropy-va | no-tsaware]
-@item -Wl,-[disable-dynamicbase | disable-nxcompat | disable-high-entropy-va | disable-tsaware]
+@item -Wl,-(no-|disable-)[dynamicbase | nxcompat | high-entropy-va | tsaware]
 Set or clear PE (Windows) executable header hardening flags.  The
 @option{-Wl,-high-entropy-va} option is supported on x86-64 and ARM64 PE
 targets and implies @option{-Wl,-dynamicbase}.  Clearing dynamicbase also

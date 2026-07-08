@@ -34,16 +34,13 @@ jobs:
     timeout-minutes: 6
     steps:
     - uses: actions/checkout@v4
-    - name: build tcc (x86_64-win32)
+    - name: build & test (x86_64-win32)
       shell: cmd
       run: |
         cd win32
         for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" amd64
         call build-tcc.bat -c cl -t x86_64
-    - name: test (x86_64-win32)
-      shell: cmd
-      run: |
-        cd tests
+        cd ..\tests
         call test-win32.bat all -k
 
   test-i386-win32:
@@ -51,16 +48,13 @@ jobs:
     timeout-minutes: 6
     steps:
     - uses: actions/checkout@v4
-    - name: build tcc (i386-win32)
+    - name: build & test (i386-win32)
       shell: cmd
       run: |
         cd win32
         for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" x86
         call build-tcc.bat -c cl -t i386
-    - name: test (i386-win32)
-      shell: cmd
-      run: |
-        cd tests
+        cd ..\tests
         call test-win32.bat -p c:\mingw32\bin all -k
 
   test-arm64-win32:
@@ -72,9 +66,8 @@ jobs:
       shell: cmd
       run: |
         cd win32
-        for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" amd64_arm64
+        for /f "delims=" %%i in ('vswhere.exe -latest -property installationPath') do call "%%i\VC\Auxiliary\Build\vcvarsall.bat" arm64
         call build-tcc.bat -c cl -t arm64
-        set "PATH=C:\Program Files\LLVM\bin;%CD%;%PATH%"
         cd ..\tests
         call test-win32.bat -c clang all -k
 
@@ -151,12 +144,25 @@ jobs:
             echo "::endgroup::" # flatten 'run container'
             ./configure && make && make test -k
 
-  test-riscv64-linux-native:
-    runs-on: ubuntu-24.04-riscv
-    timeout-minutes: 8
+#  test-riscv64-linux-native:
+#    runs-on: ubuntu-24.04-riscv
+#    timeout-minutes: 8
+#    steps:
+#    - uses: actions/checkout@v4
+#    - name: make & test tcc (riscv64-linux native)
+#      run: |
+#        uname -m  # riscv64
+#        ./configure && make && make test -k
+
+  test-i386-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
     steps:
     - uses: actions/checkout@v4
-    - name: make & test tcc (riscv64-linux native)
+    - name: install i386-gcc
       run: |
-        uname -m  # riscv64
-        ./configure && make && make test -k
+        sudo dpkg --add-architecture i386
+        sudo apt-get update -q -y
+        sudo apt-get install -q -y gcc-multilib libc6-dev:i386
+    - name: make & test tcc (i386-linux)
+      run: ./configure --cpu=i386 --cc="gcc -m32" && make && make test -k

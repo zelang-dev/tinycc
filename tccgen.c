@@ -3280,6 +3280,8 @@ again:
         dbt_bt = dbt & VT_BTYPE;
         sbt_bt = sbt & VT_BTYPE;
         if (dbt_bt == VT_VOID) {
+            /* do not confuse backends with VT_VOID in registers */
+            vpop(), vpushi(0);
             goto done;
         }
         if (sbt_bt == VT_VOID) {
@@ -8398,10 +8400,9 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
             while ((tp->t & (VT_BTYPE|VT_ARRAY)) == (VT_PTR|VT_ARRAY))
                 tp = &tp->ref->type;
             if (type->t & VT_TLS) {
-                if (has_init)
-                    sec = tdata_section;
-                else
-                    sec = tbss_section;
+                sec = find_section(tcc_state, has_init ? ".tdata" : ".tbss");
+                sec->sh_flags = SHF_ALLOC | SHF_WRITE | SHF_TLS;
+                sec->sh_type = has_init ? SHT_PROGBITS : SHT_NOBITS;
             } else if (tp->t & VT_CONSTANT) {
 		sec = rodata_section;
             } else if (has_init) {

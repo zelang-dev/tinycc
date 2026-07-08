@@ -27,54 +27,78 @@
 #define stricmp strcasecmp
 #define strnicmp strncasecmp
 #include <sys/stat.h> /* chmod() */
-#else
-#include <process.h>
 #endif
 
-#ifdef TCC_TARGET_X86_64
-# define ADDR3264 ULONGLONG
-# define PE_IMAGE_REL IMAGE_REL_BASED_DIR64
+#if defined TCC_TARGET_X86_64
 # define REL_TYPE_DIRECT R_X86_64_64
 # define R_XXX_THUNKFIX R_X86_64_PC32
 # define R_XXX_RELATIVE R_X86_64_RELATIVE
 # define R_XXX_FUNCCALL R_X86_64_PLT32
-# define IMAGE_FILE_MACHINE 0x8664
 # define RSRC_RELTYPE 3
+# define IMAGE_FILE_MACHINE 0x8664
+# define CHARACTERISTICS_EXE 0x022F
+# define CHARACTERISTICS_DLL 0x222E
+# define IMAGE_BASE_EXE 0x00400000
+# define IMAGE_BASE_DLL 0x10000000
+# define DLLCHARACTERISTICS 0
+# define OS_VER 0x0400
 
 #elif defined TCC_TARGET_ARM
-# define ADDR3264 DWORD
-# define PE_IMAGE_REL IMAGE_REL_BASED_HIGHLOW
 # define REL_TYPE_DIRECT R_ARM_ABS32
 # define R_XXX_THUNKFIX R_ARM_ABS32
 # define R_XXX_RELATIVE R_ARM_RELATIVE
 # define R_XXX_FUNCCALL R_ARM_PC24
 # define R_XXX_FUNCCALL2 R_ARM_ABS32
-# define IMAGE_FILE_MACHINE 0x01C0
 # define RSRC_RELTYPE 7 /* ??? (not tested) */
+# define IMAGE_FILE_MACHINE 0x01C0
+# define CHARACTERISTICS_EXE 0x010F
+# define CHARACTERISTICS_DLL 0x230F
+# define IMAGE_BASE_EXE 0x00100000
+# define IMAGE_BASE_DLL 0x10000000
+# define DLLCHARACTERISTICS 0
+# define OS_VER 0x0400
 
 #elif defined TCC_TARGET_ARM64
-# define ADDR3264 ULONGLONG
-# define PE_IMAGE_REL IMAGE_REL_BASED_DIR64
 # define REL_TYPE_DIRECT R_AARCH64_ABS64
 # define R_XXX_THUNKFIX R_AARCH64_ABS64
 # define R_XXX_RELATIVE R_AARCH64_RELATIVE
 # define R_XXX_FUNCCALL R_AARCH64_CALL26
-# define IMAGE_FILE_MACHINE 0xAA64
 # define RSRC_RELTYPE 3
+# define IMAGE_FILE_MACHINE 0xAA64
+# define CHARACTERISTICS_EXE 0x0022
+# define CHARACTERISTICS_DLL 0x2022
+# define IMAGE_BASE_EXE 0x140000000ULL
+# define IMAGE_BASE_DLL 0x180000000ULL
+# define OS_VER 0x0602
+# define DLLCHARACTERISTICS 0x8160
 
 #elif defined TCC_TARGET_I386
-# define ADDR3264 DWORD
-# define PE_IMAGE_REL IMAGE_REL_BASED_HIGHLOW
 # define REL_TYPE_DIRECT R_386_32
 # define R_XXX_THUNKFIX R_386_32
 # define R_XXX_RELATIVE R_386_RELATIVE
 # define R_XXX_FUNCCALL R_386_PC32
-# define IMAGE_FILE_MACHINE 0x014C
 # define RSRC_RELTYPE 7 /* DIR32NB */
+# define IMAGE_FILE_MACHINE 0x014C
+# define CHARACTERISTICS_EXE 0x030F
+# define CHARACTERISTICS_DLL 0x230E
+# define IMAGE_BASE_EXE 0x00400000
+# define IMAGE_BASE_DLL 0x10000000
+# define OS_VER 0x0400
+# define DLLCHARACTERISTICS 0
+#endif
 
+#if PTR_SIZE == 8
+# define ADDR3264 ULONGLONG
+# define PE_MAGIC 0x020B
+# define PE_IMAGE_REL IMAGE_REL_BASED_DIR64
+#else
+# define ADDR3264 DWORD
+# define PE_MAGIC 0x010B
+# define PE_IMAGE_REL IMAGE_REL_BASED_HIGHLOW
 #endif
 
 #ifndef IMAGE_NT_SIGNATURE
+/* cross compiler: windows.h was not included */
 /* ----------------------------------------------------------- */
 /* definitions below are from winnt.h */
 
@@ -107,7 +131,6 @@ typedef struct _IMAGE_DOS_HEADER {  /* DOS .EXE header */
 } IMAGE_DOS_HEADER, *PIMAGE_DOS_HEADER;
 
 #define IMAGE_NT_SIGNATURE  0x00004550  /* PE00 */
-#define SIZE_OF_NT_SIGNATURE 4
 
 typedef struct _IMAGE_FILE_HEADER {
     WORD    Machine;
@@ -138,7 +161,7 @@ typedef struct _IMAGE_OPTIONAL_HEADER {
     DWORD   SizeOfUninitializedData;
     DWORD   AddressOfEntryPoint;
     DWORD   BaseOfCode;
-#if !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_ARM64)
+#if PTR_SIZE == 4
     DWORD   BaseOfData;
 #endif
     /* NT additional fields. */
@@ -237,19 +260,6 @@ typedef struct _IMAGE_BASE_RELOCATION {
 
 #define IMAGE_SIZEOF_BASE_RELOCATION     8
 
-#ifndef IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA
-#define IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA
-#endif
-#ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
-#define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE PE_DLLCHARACTERISTICS_DYNAMIC_BASE
-#endif
-#ifndef IMAGE_DLLCHARACTERISTICS_NX_COMPAT
-#define IMAGE_DLLCHARACTERISTICS_NX_COMPAT PE_DLLCHARACTERISTICS_NX_COMPAT
-#endif
-#ifndef IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE
-#define IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE
-#endif
-
 #define IMAGE_REL_BASED_ABSOLUTE         0
 #define IMAGE_REL_BASED_HIGH             1
 #define IMAGE_REL_BASED_LOW              2
@@ -269,33 +279,18 @@ typedef struct _IMAGE_BASE_RELOCATION {
 #define IMAGE_SCN_MEM_READ                  0x40000000
 #define IMAGE_SCN_MEM_WRITE                 0x80000000
 
+#define IMAGE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA 0x0020
+#define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE 0x0040
+#define IMAGE_DLLCHARACTERISTICS_NX_COMPAT 0x0100
+#define IMAGE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE 0x8000
+
+#define IMAGE_FILE_RELOCS_STRIPPED 0x0001
+
 #pragma pack(pop)
 
 /* ----------------------------------------------------------- */
 #endif /* ndef IMAGE_NT_SIGNATURE */
 /* ----------------------------------------------------------- */
-
-static WORD pe_get_dll_characteristics(TCCState *s1)
-{
-    unsigned v = 0;
-
-#ifdef TCC_TARGET_ARM64
-    v = PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA |
-        PE_DLLCHARACTERISTICS_DYNAMIC_BASE |
-        PE_DLLCHARACTERISTICS_NX_COMPAT |
-        PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE;
-#endif
-    v |= s1->pe_dll_characteristics;
-    v &= ~s1->pe_dll_characteristics_clear;
-    return v;
-}
-
-#ifndef IMAGE_FILE_MACHINE_ARM64
-#define IMAGE_FILE_MACHINE_ARM64 0xAA64
-#endif
-#ifndef IMAGE_REL_BASED_DIR64
-# define IMAGE_REL_BASED_DIR64 10
-#endif
 
 #pragma pack(push, 1)
 struct pe_header
@@ -304,7 +299,7 @@ struct pe_header
     BYTE dosstub[0x40];
     DWORD nt_sig;
     IMAGE_FILE_HEADER filehdr;
-#if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
+#if PTR_SIZE == 8
     IMAGE_OPTIONAL_HEADER64 opthdr;
 #else
 #ifdef _WIN64
@@ -580,55 +575,17 @@ static void pe_add_coffsym(struct pe_info *pe)
 
 /* Run cv2pdb, available at https://github.com/rainers/cv2pdb.  It reads
    and strips the dwarf info and creates a <exename>.pdb file instead */
-#ifndef _WIN32
-static void pe_shell_quote(CString *cmd, const char *arg)
-{
-    cstr_cat(cmd, "'", 1);
-    while (*arg) {
-        if (*arg == '\'')
-            cstr_cat(cmd, "'\\''", 4);
-        else
-            cstr_cat(cmd, arg, 1);
-        ++arg;
-    }
-    cstr_cat(cmd, "'", 1);
-}
-#endif
-
-static intptr_t pe_run_cv2pdb(const char *exename)
-{
-#ifdef _WIN32
-    const char *argv[] = { "cv2pdb.exe", exename, NULL };
-    return _spawnvp(_P_WAIT, "cv2pdb.exe", argv);
-#else
-    CString cmd;
-    intptr_t ret;
-
-    cstr_new(&cmd);
-    cstr_cat(&cmd, "cv2pdb.exe ", -1);
-    pe_shell_quote(&cmd, exename);
-    cstr_ccat(&cmd, 0);
-    ret = system(cmd.data);
-    cstr_free(&cmd);
-    return ret;
-#endif
-}
-
 static void pe_create_pdb(TCCState *s1, const char *exename)
 {
-    size_t len = strlen(exename);
-    char *pdbfile = tcc_malloc(len + sizeof(".pdb"));
-    intptr_t r;
-
-    strcpy(pdbfile, exename);
-    strcpy(tcc_fileextension(pdbfile), ".pdb");
-    r = pe_run_cv2pdb(exename);
+    char buf[300]; int r;
+    snprintf(buf, sizeof buf, "cv2pdb.exe \"%s\"", exename);
+    r = system(buf);
+    strcpy(tcc_fileextension(strcpy(buf, exename)), ".pdb");
     if (r) {
-        tcc_error_noabort("could not create '%s'\n(need working cv2pdb from https://github.com/rainers/cv2pdb)", pdbfile);
+        tcc_error_noabort("could not create '%s'\n(need working cv2pdb from https://github.com/rainers/cv2pdb)", buf);
     } else if (s1->verbose) {
-        printf("<- %s\n", pdbfile);
+        printf("<- %s\n", buf);
     }
-    tcc_free(pdbfile);
 }
 
 /*----------------------------------------------------------------------------*/
@@ -674,31 +631,12 @@ static int pe_write(struct pe_info *pe)
     0x00000000, /*DWORD   TimeDateStamp; */
     0x00000000, /*DWORD   PointerToSymbolTable; */
     0x00000000, /*DWORD   NumberOfSymbols; */
-#if defined(TCC_TARGET_X86_64)
-    0x00F0, /*WORD    SizeOfOptionalHeader; */
-    0x022F  /*WORD    Characteristics; */
-#define CHARACTERISTICS_DLL 0x222E
-#elif defined(TCC_TARGET_I386)
-    0x00E0, /*WORD    SizeOfOptionalHeader; */
-    0x030F  /*WORD    Characteristics; */
-#define CHARACTERISTICS_DLL 0x230E
-#elif defined(TCC_TARGET_ARM)
-    0x00E0, /*WORD    SizeOfOptionalHeader; */
-    0x010F, /*WORD    Characteristics; */
-#define CHARACTERISTICS_DLL 0x230F
-#elif defined(TCC_TARGET_ARM64)
-    0x00F0, /*WORD    SizeOfOptionalHeader; */
-    0x0022  /*WORD    Characteristics; */
-#define CHARACTERISTICS_DLL 0x2022
-#endif
-},{
+    0x00E0 + (PTR_SIZE-4)*4, /*WORD    SizeOfOptionalHeader; */
+    CHARACTERISTICS_EXE, /*WORD    Characteristics; */
+    },{
     /* IMAGE_OPTIONAL_HEADER opthdr */
     /* Standard fields. */
-#if defined(TCC_TARGET_X86_64) || defined(TCC_TARGET_ARM64)
-    0x020B, /*WORD    Magic; */
-#else
-    0x010B, /*WORD    Magic; */
-#endif
+    PE_MAGIC, /*WORD    Magic; */
     0x06, /*BYTE    MajorLinkerVersion; */
     0x00, /*BYTE    MinorLinkerVersion; */
     0x00000000, /*DWORD   SizeOfCode; */
@@ -706,45 +644,29 @@ static int pe_write(struct pe_info *pe)
     0x00000000, /*DWORD   SizeOfUninitializedData; */
     0x00000000, /*DWORD   AddressOfEntryPoint; */
     0x00000000, /*DWORD   BaseOfCode; */
-#if !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_ARM64)
+#if PTR_SIZE == 4
     0x00000000, /*DWORD   BaseOfData; */
 #endif
     /* NT additional fields. */
-#if defined(TCC_TARGET_ARM)
-    0x00100000,	    /*DWORD   ImageBase; */
-#elif defined(TCC_TARGET_ARM64)
-    0x140000000ULL, /*ULONGLONG ImageBase; */
-#else
-    0x00400000,	    /*DWORD   ImageBase; */
-#endif
+    0x00000000,	/*ADDR3264   ImageBase; */
     0x00001000, /*DWORD   SectionAlignment; */
     0x00000200, /*DWORD   FileAlignment; */
-#if defined(TCC_TARGET_ARM64)
-    0x0006, /*WORD    MajorOperatingSystemVersion; */
-    0x0002, /*WORD    MinorOperatingSystemVersion; */
-#else
-    0x0004, /*WORD    MajorOperatingSystemVersion; */
-    0x0000, /*WORD    MinorOperatingSystemVersion; */
-#endif
+    OS_VER >> 8, /*WORD    MajorOperatingSystemVersion; */
+    OS_VER & 255, /*WORD    MinorOperatingSystemVersion; */
     0x0000, /*WORD    MajorImageVersion; */
     0x0000, /*WORD    MinorImageVersion; */
-#if defined(TCC_TARGET_ARM64)
-    0x0006, /*WORD    MajorSubsystemVersion; */
-    0x0002, /*WORD    MinorSubsystemVersion; */
-#else
-    0x0004, /*WORD    MajorSubsystemVersion; */
-    0x0000, /*WORD    MinorSubsystemVersion; */
-#endif
+    OS_VER >> 8, /*WORD    MajorSubsystemVersion; */
+    OS_VER & 255, /*WORD    MinorSubsystemVersion; */
     0x00000000, /*DWORD   Win32VersionValue; */
     0x00000000, /*DWORD   SizeOfImage; */
     0x00000200, /*DWORD   SizeOfHeaders; */
     0x00000000, /*DWORD   CheckSum; */
     0x0002, /*WORD    Subsystem; */
-    0x0000, /*WORD    DllCharacteristics; */
-    0x00100000, /*DWORD   SizeOfStackReserve; */
-    0x00001000, /*DWORD   SizeOfStackCommit; */
-    0x00100000, /*DWORD   SizeOfHeapReserve; */
-    0x00001000, /*DWORD   SizeOfHeapCommit; */
+    DLLCHARACTERISTICS, /*WORD    DllCharacteristics; */
+    0x00100000, /*ADDR3264 SizeOfStackReserve; */
+    0x00001000, /*ADDR3264 SizeOfStackCommit; */
+    0x00100000, /*ADDR3264 SizeOfHeapReserve; */
+    0x00001000, /*ADDR3264 SizeOfHeapCommit; */
     0x00000000, /*DWORD   LoaderFlags; */
     0x00000010, /*DWORD   NumberOfRvaAndSizes; */
 
@@ -799,7 +721,7 @@ static int pe_write(struct pe_info *pe)
                 break;
 
             case sec_data:
-#if !defined(TCC_TARGET_X86_64) && !defined(TCC_TARGET_ARM64)
+#if PTR_SIZE == 4
                 if (!pe_header.opthdr.BaseOfData)
                     pe_header.opthdr.BaseOfData = addr;
 #endif
@@ -861,14 +783,14 @@ static int pe_write(struct pe_info *pe)
     pe_header.opthdr.SizeOfHeaders = pe->sizeofheaders;
     pe_header.opthdr.ImageBase = pe->imagebase;
     pe_header.opthdr.Subsystem = pe->subsystem;
-    pe_header.opthdr.DllCharacteristics = pe_get_dll_characteristics(s1);
+    pe_header.opthdr.DllCharacteristics = s1->pe_dll_characteristics;
     if (s1->pe_stack_size)
         pe_header.opthdr.SizeOfStackReserve = s1->pe_stack_size;
     if (PE_DLL == pe->type)
         pe_header.filehdr.Characteristics = CHARACTERISTICS_DLL;
     pe_header.filehdr.Characteristics |= s1->pe_characteristics;
     if (pe->reloc)
-        pe_header.filehdr.Characteristics &= ~PE_IMAGE_FILE_RELOCS_STRIPPED;
+        pe_header.filehdr.Characteristics &= ~IMAGE_FILE_RELOCS_STRIPPED;
 
     if (pe->coffsym) {
         pe_add_coffsym(pe);
@@ -1291,8 +1213,8 @@ static int pe_assign_addresses (struct pe_info *pe)
     Section *s;
     TCCState *s1 = pe->s1;
 
-    if (PE_DLL == pe->type ||
-        (pe_get_dll_characteristics(s1) & PE_DLLCHARACTERISTICS_DYNAMIC_BASE))
+    if (PE_DLL == pe->type
+        || (s1->pe_dll_characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE))
         pe->reloc = new_section(s1, ".reloc", SHT_PROGBITS, 0);
     //pe->thunk = new_section(s1, ".iedat", SHT_PROGBITS, SHF_ALLOC);
 
@@ -1483,14 +1405,10 @@ static int pe_check_symbols(struct pe_info *pe)
                         offset + 8, R_XXX_THUNKFIX, is->iat_index); // offset to IAT position
 #elif defined(TCC_TARGET_ARM64)
                     p = section_ptr_add(text_section, 24);
-                    /* ldr x16, [pc, #16] */
-                    write32le(p + 0, 0x58000090);
-                    /* ldr x16, [x16] */
-                    write32le(p + 4, 0xf9400210);
-                    /* br x16 */
-                    write32le(p + 8, 0xd61f0200);
-                    /* nop for 8-byte literal alignment */
-                    write32le(p + 12, 0xd503201f);
+                    write32le(p + 0, 0x58000090); /* ldr x16, [pc, #16] */
+                    write32le(p + 4, 0xf9400210); /* ldr x16, [x16] */
+                    write32le(p + 8, 0xd61f0200); /* br x16 */
+                    write32le(p + 12, 0xd503201f); /* nop for alignment */
                     put_elf_reloc(symtab_section, text_section,
                         offset + 16, R_XXX_THUNKFIX, is->iat_index);
 #else
@@ -1716,7 +1634,7 @@ static int get_dllexports(int fd, char **pp)
     if (!read_mem(fd, pef_hdroffset, &ih, sizeof ih))
         goto the_end;
     opt_hdroffset = pef_hdroffset + sizeof ih;
-    if (ih.Machine == 0x014C) {
+    if (ih.Machine == 0x014C || ih.Machine == 0x01C0) {
         IMAGE_OPTIONAL_HEADER32 oh;
         sec_hdroffset = opt_hdroffset + sizeof oh;
         if (!read_mem(fd, opt_hdroffset, &oh, sizeof oh))
@@ -1724,7 +1642,7 @@ static int get_dllexports(int fd, char **pp)
         if (IMAGE_DIRECTORY_ENTRY_EXPORT >= oh.NumberOfRvaAndSizes)
             goto the_end_0;
         addr = oh.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
-    } else if (ih.Machine == 0x8664 || ih.Machine == IMAGE_FILE_MACHINE_ARM64) {
+    } else if (ih.Machine == 0x8664 || ih.Machine == 0xAA64) {
         IMAGE_OPTIONAL_HEADER64 oh;
         sec_hdroffset = opt_hdroffset + sizeof oh;
         if (!read_mem(fd, opt_hdroffset, &oh, sizeof oh))
@@ -2209,19 +2127,9 @@ static void pe_set_options(TCCState * s1, struct pe_info *pe)
 {
     if (PE_DLL == pe->type) {
         /* XXX: check if is correct for arm-pe target */
-#if defined(TCC_TARGET_ARM64)
-        pe->imagebase = 0x180000000ULL;
-#else
-        pe->imagebase = 0x10000000;
-#endif
+        pe->imagebase = IMAGE_BASE_DLL;
     } else {
-#if defined(TCC_TARGET_ARM)
-        pe->imagebase = 0x00010000;
-#elif defined(TCC_TARGET_ARM64)
-        pe->imagebase = 0x140000000ULL;
-#else
-        pe->imagebase = 0x00400000;
-#endif
+        pe->imagebase = IMAGE_BASE_EXE;
     }
 
 #if defined(TCC_TARGET_ARM)

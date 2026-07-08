@@ -108,6 +108,11 @@ static void win64_del_function_table(void *);
 //#define CONFIG_SELINUX 1
 #endif
 
+/* use VirtualAlloc() instead of tcc_malloc() */
+#if defined _WIN32 && !defined CONFIG_RUNMEM_VIRTUALALLOC
+# define CONFIG_RUNMEM_VIRTUALALLOC 1
+#endif
+
 static int rt_mem(TCCState *s1, int size)
 {
     void *ptr;
@@ -129,16 +134,14 @@ static int rt_mem(TCCState *s1, int size)
     ptr_diff = (char*)prw - (char*)ptr; /* = size; */
     //printf("map %p %p %p\n", ptr, prw, (void*)ptr_diff);
     size *= 2;
-#else
-# ifdef _WIN32
-    /* Generated code is page-protected below; avoid changing CRT heap pages. */
+#elif CONFIG_RUNMEM_VIRTUALALLOC
+    /* always page-aligned */
     ptr = VirtualAlloc(NULL, size, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE);
-# else
-    ptr = tcc_malloc(size += PAGESIZE); /* one extra page to align malloc memory */
-# endif
-#endif
     if (!ptr)
         return tcc_error_noabort("tccrun: could not allocate memory");
+#else
+    ptr = tcc_malloc(size += PAGESIZE); /* one extra page to align malloc memory */
+#endif
     s1->run_ptr = ptr;
     s1->run_size = size;
     return ptr_diff;
@@ -191,24 +194,18 @@ ST_FUNC void tcc_run_free(TCCState *s1)
     if (NULL == ptr)
         return;
     st_unlink(s1);
+#ifdef _WIN64
+    win64_del_function_table(s1->run_function_table);
+#endif
     size = s1->run_size;
 #ifdef CONFIG_SELINUX
     munmap(ptr, size);
+#elif CONFIG_RUNMEM_VIRTUALALLOC
+    VirtualFree(ptr, size, MEM_RELEASE);
 #else
-# ifdef _WIN32
-    (void)size;
-#  ifdef _WIN64
-    win64_del_function_table(s1->run_function_table);
-#  endif
-    VirtualFree(ptr, 0, MEM_RELEASE);
-# else
     /* unprotect memory to make it usable for malloc again */
     protect_pages((void*)PAGEALIGN(ptr), size - PAGESIZE, 2 /*rw*/);
-# ifdef _WIN64
-    win64_del_function_table(s1->run_function_table);
-# endif
     tcc_free(ptr);
-# endif
 #endif
 }
 
@@ -312,7 +309,7 @@ static void cleanup_sections(TCCState *s1)
 }
 
 /* ------------------------------------------------------------- */
-/* 0 = .text rwx  other rw (memory >= 2 pages a 4096 bytes) */
+/* 0 = .text rwx  other rwx (memory >= 2 pages a 4096 bytes) */
 /* 1 = .text rx   other rw (memory >= 3 pages) */
 /* 2 = .text rx  .rdata ro  .data/.bss rw (memory >= 4 pages) */
 
@@ -506,14 +503,11 @@ static void *win64_add_function_table(TCCState *s1)
     void *p = NULL;
     if (s1->uw_pdata) {
         p = (void*)s1->uw_pdata->sh_addr;
-        if (!RtlAddFunctionTable(
+        RtlAddFunctionTable(
             (RUNTIME_FUNCTION*)p,
             s1->uw_pdata->data_offset / sizeof (RUNTIME_FUNCTION),
             s1->pe_imagebase
-            )) {
-            tcc_error_noabort("RtlAddFunctionTable failed");
-            p = NULL;
-        }
+            );
         s1->uw_pdata = NULL;
     }
     return p;
