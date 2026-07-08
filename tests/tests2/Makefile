@@ -57,8 +57,8 @@ endif
 ifeq ($(CONFIG_OSX),yes)
  SKIP += 144_tls.test # TLS runtime not supported on Mach-O
 endif
-ifeq (,$(filter i386 x86_64 riscv64 arm64,$(ARCH)))
- SKIP += 144_tls.test # TLS only implemented on these architectures so far
+ifeq (-$(ARCH)-,-arm-)
+ SKIP += 144_tls.test # doesn't work currently
 endif
 ifneq (-$(ARCH)-,-arm64-)
  SKIP += 138_arm64_encoding.test

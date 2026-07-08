@@ -318,31 +318,12 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
             return;
         case R_386_TLS_LE:
             {
-                ElfW(Sym) *sym;
-                Section *sec;
                 int32_t x;
-                addr_t tls_start = 0, tls_end = 0, tls_align = 1;
-                int i;
-
-                sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
-                sec = s1->sections[sym->st_shndx];
-
-                for (i = 1; i < s1->nb_sections; i++) {
-                    Section *s = s1->sections[i];
-                    if (s->sh_flags & SHF_TLS && s->sh_size) {
-                        if (!tls_start || s->sh_addr < tls_start)
-                            tls_start = s->sh_addr;
-                        if (s->sh_addr + s->sh_size > tls_end)
-                            tls_end = s->sh_addr + s->sh_size;
-                        if (s->sh_addralign > tls_align)
-                            tls_align = s->sh_addralign;
-                    }
-                }
-                if (tls_end > tls_start) {
-                    addr_t tls_size = tls_end - tls_start;
-                    addr_t aligned_size = (tls_size + tls_align - 1) & ~(tls_align - 1);
-                    x = val - (tls_start + aligned_size);
+                if (s1->tls_end) {
+                    x = val - s1->tls_end;
                 } else {
+                    ElfW(Sym) *sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
+                    Section *sec = s1->sections[sym->st_shndx];
                     x = val - sec->sh_addr - sec->data_offset;
                 }
                 add32le(ptr, x);

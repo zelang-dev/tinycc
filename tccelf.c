@@ -70,8 +70,6 @@ ST_FUNC void tccelf_new(TCCState *s)
     /* create ro data section (make ro after relocation done with GNU_RELRO) */
     rodata_section = new_section(s, rdata, SHT_PROGBITS, shf_RELRO);
     bss_section = new_section(s, ".bss", SHT_NOBITS, SHF_ALLOC | SHF_WRITE);
-    tdata_section = new_section(s, ".tdata", SHT_PROGBITS, SHF_ALLOC | SHF_WRITE | SHF_TLS);
-    tbss_section = new_section(s, ".tbss", SHT_NOBITS, SHF_ALLOC | SHF_WRITE | SHF_TLS);
     common_section = new_section(s, ".common", SHT_NOBITS, SHF_PRIVATE);
     common_section->sh_num = SHN_COMMON;
 
@@ -2198,12 +2196,11 @@ struct dyn_inf {
     ElfW(Phdr) *phdr;
     int phnum;
     int shnum;
+    int tls;
+    int relro;
     Section *interp;
     Section *note;
     Section *gnu_hash;
-
-    /* read only segment mapping for GNU_RELRO */
-    Section _roinf, *roinf;
 };
 
 /* Decide the layout of sections loaded in memory. This must be done before
@@ -2226,7 +2223,7 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             if (s->sh_flags & SHF_WRITE)
                 j = 0x200;
             if (s->sh_flags & SHF_TLS)
-                j += 0x200;
+                j = 0x300;
         } else {
             j = 0x700;
         }
@@ -2287,6 +2284,9 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
     sec_order[0] = 0;
     d->shnum = 1;
 
+#define SHFX_NEWPH (1 << 4)
+#define SHFX_RELRO (1 << 5)
+
     /* count PT_LOAD headers needed */
     n = f0 = 0;
     for (i = 1; i < nb_sections; i++) {
@@ -2297,18 +2297,21 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             ++d->shnum;
         if (k < 0x700) {
             f = s->sh_flags & (SHF_ALLOC|SHF_WRITE|SHF_EXECINSTR);
-#if TARGETOS_NetBSD
+#if TARGETOS_NetBSD || TARGETOS_FreeBSD
 	    /* NetBSD only supports 2 PT_LOAD sections.
 	       See: https://blog.netbsd.org/tnf/entry/the_first_report_on_lld */
 	    if ((f & SHF_WRITE) == 0)
                 f |= SHF_EXECINSTR;
 #else
             if ((k & 0xfff0) == 0x240) /* RELRO sections */
-                f |= 1<<4;
+                d->relro = 1, f |= SHFX_RELRO;
 #endif
             /* start new header when flags changed or relro, but avoid zero memsz */
             if (f != f0 && s->sh_size)
-                f0 = f, ++n, f |= 1<<8;
+                f0 = f, ++n, f |= SHFX_NEWPH;
+
+            if ((s->sh_flags & SHF_TLS) && s->sh_size)
+                d->tls = 1, f |= SHF_TLS;
         }
         sec_cls[i] = f;
         //printf("ph %d sec %02d : %3X %3X  %8.2X  %04X  %s\n", (f>0) * n, i, f, k, s->sh_type, (int)s->sh_size, s->name);
@@ -2331,13 +2334,24 @@ static ElfW(Phdr) *fill_phdr(ElfW(Phdr) *ph, int type, Section *s)
     return ph;
 }
 
+static ElfW(Phdr) *update_phdr(ElfW(Phdr) *ph, int type, Section *s, addr_t addr, int file_offset)
+{
+    if (ph->p_type == 0) {
+        fill_phdr(ph, type, s);
+        ph->p_flags |= PF_W;
+    }
+    ph->p_filesz = file_offset - ph->p_offset;
+    ph->p_memsz = addr - ph->p_vaddr;
+    return ph;
+}
+
 /* Assign sections to segments and decide how are sections laid out when loaded
    in memory. This function also fills corresponding program headers. */
 static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
 {
     Section *s;
     addr_t addr, tmp, align, s_align, base;
-    ElfW(Phdr) *ph = NULL;
+    ElfW(Phdr) *ph = NULL, *ph2;
     int i, f, n, phnum, phfill;
     int file_offset;
 
@@ -2347,26 +2361,16 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
     if (d->interp)
         phfill = 2;
     phnum += phfill;
+    if (d->tls)
+        d->tls = phnum, ++phnum;
+    if (d->relro)
+        d->relro = phnum, ++phnum;
     if (d->note)
         ++phnum;
     if (d->dynamic)
         ++phnum;
     if (eh_frame_hdr_section)
         ++phnum;
-    if (d->roinf)
-        ++phnum;
-    {
-        int has_tls = 0;
-        for (i = 1; i < s1->nb_sections; i++) {
-            s = s1->sections[i];
-            if (s->sh_flags & SHF_TLS) {
-                has_tls = 1;
-                break;
-            }
-        }
-        if (has_tls)
-            ++phnum;
-    }
     d->phnum = phnum;
     d->phdr = tcc_mallocz(phnum * sizeof(ElfW(Phdr)));
 
@@ -2415,7 +2419,7 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             continue;
         }
 
-        if ((f & 1<<8) && n) {
+        if ((f & SHFX_NEWPH) && n) {
             /* different rwx section flags */
             if (s1->output_format == TCC_OUTPUT_FORMAT_ELF) {
                 /* if in the middle of a page, w e duplicate the page in
@@ -2433,51 +2437,53 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         s->sh_offset = file_offset;
         s->sh_addr = addr;
 
-        if (f & 1<<8) {
+        addr += s->sh_size;
+        if (s->sh_type != SHT_NOBITS)
+            file_offset += s->sh_size;
+
+        if (f & SHFX_NEWPH) {
             /* set new program header */
             ph = &d->phdr[phfill + n];
-            ph->p_type = PT_LOAD;
+            fill_phdr(ph, PT_LOAD, s);
             ph->p_align = s_align;
-            ph->p_flags = PF_R;
             if (f & SHF_WRITE)
                 ph->p_flags |= PF_W;
             if (f & SHF_EXECINSTR)
                 ph->p_flags |= PF_X;
-
-            ph->p_offset = file_offset;
-            ph->p_vaddr = addr;
             if (n == 0) {
 		/* Make the first PT_LOAD segment include the program
 		   headers itself (and the ELF header as well), it'll
 		   come out with same memory use but will make various
 		   tools like binutils strip work better.  */
 		ph->p_offset = 0;
-		ph->p_vaddr = base;
+                ph->p_paddr = ph->p_vaddr = base;
             }
-            ph->p_paddr = ph->p_vaddr;
             ++n;
         }
 
-        if (f & 1<<4) {
-            Section *roinf = &d->_roinf;
-            if (roinf->sh_size == 0) {
-                roinf->sh_offset = s->sh_offset;
-                roinf->sh_addr = s->sh_addr;
-                roinf->sh_addralign = 1;
-	    }
-            roinf->sh_size = (addr - roinf->sh_addr) + s->sh_size;
+        if (ph)
+            update_phdr(ph, 0, 0, addr, file_offset);
+
+        if (f & SHFX_RELRO) {
+            ph2 = update_phdr(&d->phdr[d->relro], PT_GNU_RELRO, s, addr, file_offset);
+            ph2->p_align = 1;
         }
 
-        addr += s->sh_size;
-        if (s->sh_type != SHT_NOBITS)
-            file_offset += s->sh_size;
-
-        if (ph) {
-            ph->p_filesz = file_offset - ph->p_offset;
-            ph->p_memsz = addr - ph->p_vaddr;
+        if (f & SHF_TLS) {
+            ph2 = update_phdr(&d->phdr[d->tls], PT_TLS, s, addr, file_offset);
+            if (s->sh_addralign > ph2->p_align)
+                ph2->p_align = s->sh_addralign;
         }
     }
 
+    if (d->tls) {
+        ++ph;
+        /* for xxx-link.c:relocate() */
+        s1->tls_start = ph->p_vaddr;
+        s1->tls_end = s1->tls_start + ph->p_memsz + (-ph->p_memsz & (ph->p_align - 1));
+    }
+    if (d->relro)
+        ++ph;
     /* Fill other headers */
     if (d->note)
         fill_phdr(++ph, PT_NOTE, d->note);
@@ -2485,36 +2491,6 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         fill_phdr(++ph, PT_DYNAMIC, d->dynamic)->p_flags |= PF_W;
     if (eh_frame_hdr_section)
         fill_phdr(++ph, PT_GNU_EH_FRAME, eh_frame_hdr_section);
-    if (d->roinf)
-        fill_phdr(++ph, PT_GNU_RELRO, d->roinf)->p_flags |= PF_W;
-    {
-        /* Create PT_TLS segment covering all TLS sections */
-        Section *tls_start_sec = NULL;
-        addr_t tls_start = 0, tls_end = 0;
-        for (i = 1; i < s1->nb_sections; i++) {
-            s = s1->sections[i];
-            if (s->sh_flags & SHF_TLS && s->sh_size) {
-                if (!tls_start_sec) {
-                    tls_start_sec = s;
-                    tls_start = s->sh_addr;
-                    tls_end = s->sh_addr + s->sh_size;
-                } else {
-                    if (s->sh_addr < tls_start)
-                        tls_start = s->sh_addr;
-                    if (s->sh_addr + s->sh_size > tls_end)
-                        tls_end = s->sh_addr + s->sh_size;
-                }
-            }
-        }
-        if (tls_start_sec) {
-            ph = fill_phdr(++ph, PT_TLS, tls_start_sec);
-            ph->p_vaddr = tls_start;
-            ph->p_paddr = tls_start;
-            ph->p_filesz = tls_end - tls_start;
-            ph->p_memsz = ph->p_filesz;
-            ph->p_align = tls_start_sec->sh_addralign;
-        }
-    }
     if (d->interp)
         fill_phdr(&d->phdr[1], PT_INTERP, d->interp);
     if (phfill) {
@@ -2823,7 +2799,7 @@ static void reorder_sections(TCCState *s1, int *sec_order)
 
     backmap = tcc_malloc(s1->nb_sections * sizeof(backmap[0]));
     for (i = 0, nnew = 0, snew = NULL; i < s1->nb_sections; i++) {
-	k = sec_order[i];
+	k = sec_order ? sec_order[i] : i;
 	s = s1->sections[k];
 	if (!i || s->sh_name) {
 	    backmap[k] = nnew;
@@ -2986,7 +2962,6 @@ static int elf_output_file(TCCState *s1, const char *filename)
     ret = -1;
     interp = dynstr = dynamic = NULL;
     sec_order = NULL;
-    dyninf.roinf = &dyninf._roinf;
 
 #ifdef TCC_TARGET_ARM
     create_arm_attribute_section (s1);
@@ -3006,10 +2981,6 @@ static int elf_output_file(TCCState *s1, const char *filename)
 
 #if TARGETOS_FreeBSD
     dyninf.note = create_bsd_note_section (s1, ".note.tag", "FreeBSD");
-#endif
-
-#if TARGETOS_FreeBSD || TARGETOS_NetBSD
-    dyninf.roinf = NULL;
 #endif
 
         /* if linking, also link in runtime libraries (libc, libgcc, etc.) */

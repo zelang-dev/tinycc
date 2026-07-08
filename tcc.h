@@ -889,7 +889,6 @@ struct TCCState {
 
     /* predefined sections */
     Section *text_section, *data_section, *rodata_section, *bss_section;
-    Section *tdata_section, *tbss_section;
     Section *common_section;
     Section *cur_text_section; /* current section where function code is generated */
 #ifdef CONFIG_TCC_BCHECK
@@ -929,6 +928,8 @@ struct TCCState {
     /* ptr to next reloc entry reused */
     ElfW_Rel *qrel;
     #define qrel s1->qrel
+
+    addr_t tls_start, tls_end;
 
 #ifdef TCC_TARGET_RISCV64
     struct pcrel_hi { addr_t addr, val; } **pcrel_hi_entries;
@@ -1979,8 +1980,6 @@ static inline void post_sem(TCCSem *p) {
 #define data_section        TCC_STATE_VAR(data_section)
 #define rodata_section      TCC_STATE_VAR(rodata_section)
 #define bss_section         TCC_STATE_VAR(bss_section)
-#define tdata_section       TCC_STATE_VAR(tdata_section)
-#define tbss_section        TCC_STATE_VAR(tbss_section)
 #define common_section      TCC_STATE_VAR(common_section)
 #define cur_text_section    TCC_STATE_VAR(cur_text_section)
 #define bounds_section      TCC_STATE_VAR(bounds_section)
