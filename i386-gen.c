@@ -242,6 +242,8 @@ static void gen_modrm(int opc, int op_r2, int r, Sym *sym, int c)
     int op_reg = REG_VALUE(op_r2) << 3;
 
     if ((r & VT_SYM) && (sym->type.t & VT_TLS)) {
+	if (opc == 0xdbc0d9) // VT_LDOUBLE
+	    o(0xc0d9), opc = 0xdb;
         o(0x65); /* gs segment prefix */
         o(opc);
         oad(0x05 | op_reg, c);

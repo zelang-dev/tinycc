@@ -3487,7 +3487,7 @@ error:
     }
 done:
     vtop->type = *type;
-    vtop->type.t &= ~ ( VT_CONSTANT | VT_VOLATILE | VT_ARRAY );
+    vtop->type.t &= ~ ( VT_CONSTANT | VT_VOLATILE | VT_ARRAY | VT_TLS );
 }
 
 /* return type size as known at compile time. Put alignment at 'a' */

@@ -1932,6 +1932,9 @@ void gen_opf(int op)
             }
             assert(!(vtop[-1].r & VT_LVAL));
             
+	    if ((vtop->r & VT_SYM) && (vtop->sym->type.t & VT_TLS))
+                o(0x64); /* fs segment prefix */
+
             if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE)
                 o(0x66);
             if (op == TOK_EQ || op == TOK_NE)

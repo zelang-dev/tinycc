@@ -53,6 +53,7 @@ ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
  SKIP += 106_versym.test # no pthread_condattr_setpshared
  SKIP += 114_bound_signal.test # libc problem signal/fork
  SKIP += 116_bound_setjmp2.test # No TLS_FUNC/TLS_VAR in bcheck.c
+ SKIP += 144_tls.test # No tls support
 endif
 ifeq ($(CONFIG_OSX),yes)
  SKIP += 144_tls.test # TLS runtime not supported on Mach-O

@@ -194,7 +194,7 @@ ST_FUNC char *pstrncpy(char *out, size_t buf_size, const char *s, size_t num)
 /* extract the basename of a file */
 PUB_FUNC char *tcc_basename(const char *name)
 {
-    char *p = strchr(name, 0);
+    char *p = (char *)strchr(name, 0);
     while (p > name && !IS_DIRSEP(p[-1]))
         --p;
     return p;

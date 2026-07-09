@@ -188,6 +188,8 @@ static int load_symofs(int r, SValue *sv, int forstore, int *new_fc)
             greloca(cur_text_section, sv->sym, ind,
                     R_RISCV_TPREL_LO12_I, 0);
             EI(0x13, 0, rr, rr, 0); // addi RR, RR, 0 %tprel_lo(sym)
+	    if (fc)
+                EI(0x13, 0, rr, rr, fc); // addi RR, RR, fc
             ER(0x33, 0, rr, rr, 4, 0); // add RR, RR, tp
             *new_fc = 0;
             return rr;
