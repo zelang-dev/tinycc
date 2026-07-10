@@ -15,6 +15,9 @@ endif
 ifeq (,$(filter i386,$(ARCH)))
  SKIP += 98_al_ax_extend.test 99_fastcall.test
 endif
+ifeq (,$(filter x86_64 riscv64 arm64 i386,$(ARCH)))
+ SKIP += 146_tls_extern.test # TLS only implemented on these architectures
+endif
 ifeq (,$(filter i386 x86_64,$(ARCH)))
  SKIP += 85_asm-outside-function.test # x86 asm
  SKIP += 127_asm_goto.test    # hardcodes x86 asm
@@ -39,6 +42,9 @@ endif
 ifeq (-$(findstring gcc,$(CC))-,--)
  SKIP += $(patsubst %.expect,%.test,$(GEN-ALWAYS))
 endif
+ifeq ($(CC_NAME),tcc)
+ SKIP += 146_tls_extern.test # needs an external system linker
+endif
 ifeq (-$(CONFIG_WIN32)-$(CONFIG_i386)$(CONFIG_arm)-,--yes-)
  SKIP += 95_bitfields%.test # type_align is different on 32bit-non-windows
 endif
@@ -47,19 +53,22 @@ ifeq (-$(CONFIG_WIN32)-,-yes-)
  SKIP += 114_bound_signal.test # No pthread support
  SKIP += 117_builtins.test # win32 port doesn't define __builtins
  SKIP += 124_atomic_counter.test # No pthread support
- SKIP += 144_tls.test # No pthread support
+ SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported
 endif
 ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
  SKIP += 106_versym.test # no pthread_condattr_setpshared
  SKIP += 114_bound_signal.test # libc problem signal/fork
  SKIP += 116_bound_setjmp2.test # No TLS_FUNC/TLS_VAR in bcheck.c
- SKIP += 144_tls.test # No tls support
+ SKIP += 144_tls.test 146_tls_extern.test # No tls support
+endif
+ifeq ($(TARGETOS),DragonFly)
+ SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported
 endif
 ifeq ($(CONFIG_OSX),yes)
- SKIP += 144_tls.test # TLS runtime not supported on Mach-O
+ SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported on Mach-O
 endif
 ifeq (-$(ARCH)-,-arm-)
- SKIP += 144_tls.test # doesn't work currently
+ SKIP += 144_tls.test 146_tls_extern.test # doesn't work currently
 endif
 ifneq (-$(ARCH)-,-arm64-)
  SKIP += 138_arm64_encoding.test
@@ -121,6 +130,15 @@ GEN-ALWAYS =
 # TLS needs executable and pthread, not -run
 144_tls.test: FLAGS += -pthread
 144_tls.test: NORUN = true
+
+# Verify that undefined TLS symbols in TCC objects work with the system linker.
+146_tls_extern.test: NORUN = true
+146_tls_extern.test: T1 = \
+	$(TCC) -c $1 -o 146_tls_extern-main.o && \
+	$(TCC) -c $(subst 146,146+,$1) -o 146_tls_extern-def.o && \
+	$(CC) -no-pie -Wl,-z,noexecstack 146_tls_extern-main.o \
+		146_tls_extern-def.o -o $(basename $@).exe && \
+	./$(basename $@).exe
 
 112_backtrace.test: FLAGS += -dt -b
 112_backtrace.test 113_btdll.test 126_bound_global.test: FILTER += \
@@ -204,4 +222,4 @@ $(sort $(GEN-ALWAYS) $(UPDATE)) : force
 force:
 
 clean :
-	rm -f fred.txt *.output *.exe *.dll *.so *.def $(GEN-ALWAYS)
+	rm -f fred.txt *.output *.o *.exe *.dll *.so *.def $(GEN-ALWAYS)

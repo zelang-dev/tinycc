@@ -468,20 +468,8 @@ static void arm64_strv(int sz_, int dst, int bas, uint64_t off)
     }
 }
 
-static void arm64_sym(int r, Sym *sym, unsigned long addend)
+static void arm64_add_offset(int r, unsigned long addend)
 {
-#ifdef TCC_TARGET_PE
-    /* PE links symbol addresses directly; there is no ELF-style GOT here. */
-    greloca(cur_text_section, sym, ind, R_AARCH64_ADR_PREL_PG_HI21, 0);
-    o(ARM64_ADRP | r);            // adrp xr, #sym
-    greloca(cur_text_section, sym, ind, R_AARCH64_ADD_ABS_LO12_NC, 0);
-    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | r); // add xr, xr, #sym
-#else
-    greloca(cur_text_section, sym, ind, R_AARCH64_ADR_GOT_PAGE, 0);
-    o(ARM64_ADRP | r);            // adrp xr, #sym
-    greloca(cur_text_section, sym, ind, R_AARCH64_LD64_GOT_LO12_NC, 0);
-    o(ARM64_LDR_X | ARM64_RN(r) | r); // ld xr,[xr, #sym]
-#endif
     if (addend) {
         // add xr, xr, #addend
 	if (addend & 0xffful)
@@ -504,17 +492,35 @@ static void arm64_sym(int r, Sym *sym, unsigned long addend)
     }
 }
 
+static void arm64_sym(int r, Sym *sym, unsigned long addend)
+{
+#ifdef TCC_TARGET_PE
+    /* PE links symbol addresses directly; there is no ELF-style GOT here. */
+    greloca(cur_text_section, sym, ind, R_AARCH64_ADR_PREL_PG_HI21, 0);
+    o(ARM64_ADRP | r);            // adrp xr, #sym
+    greloca(cur_text_section, sym, ind, R_AARCH64_ADD_ABS_LO12_NC, 0);
+    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | r); // add xr, xr, #sym
+#else
+    greloca(cur_text_section, sym, ind, R_AARCH64_ADR_GOT_PAGE, 0);
+    o(ARM64_ADRP | r);            // adrp xr, #sym
+    greloca(cur_text_section, sym, ind, R_AARCH64_LD64_GOT_LO12_NC, 0);
+    o(ARM64_LDR_X | ARM64_RN(r) | r); // ld xr,[xr, #sym]
+#endif
+    arm64_add_offset(r, addend);
+}
+
 static void arm64_load_cmp(int r, SValue *sv);
 
-static void arm64_tls_x30(SValue *sv)
+static void arm64_tls_sym(int r, Sym *sym, unsigned long addend)
 {
-    o(0xd53bd05e); /* mrs x30, tpidr_el0 */
-    greloca(cur_text_section, sv->sym, ind, R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
-    /* add x30, x30, #0, lsl #12 */
-    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) | ARM64_RN(30) | ARM64_RD(30));
-    greloca(cur_text_section, sv->sym, ind, R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
-    /* add x30, x30, #0 */
-    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(30) | ARM64_RD(30));
+    o(0xd53bd040 | r); /* mrs xr, tpidr_el0 */
+    greloca(cur_text_section, sym, ind, R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
+    /* add xr, xr, #0, lsl #12 */
+    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) | ARM64_RN(r) | ARM64_RD(r));
+    greloca(cur_text_section, sym, ind, R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
+    /* add xr, xr, #0 */
+    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | ARM64_RD(r));
+    arm64_add_offset(r, addend);
 }
 
 ST_FUNC void load(int r, SValue *sv)
@@ -537,7 +543,9 @@ ST_FUNC void load(int r, SValue *sv)
     if (svr == (VT_CONST | VT_LVAL)) {
 	uint64_t i = sv->c.i;
 
-	if (sv->sym)
+	if (sv->sym && (sv->sym->type.t & VT_TLS))
+            arm64_tls_sym(30, sv->sym, 0);
+        else if (sv->sym)
             arm64_sym(30, sv->sym, // use x30 for address
 	              arm64_check_offset(0, arm64_type_size(svtt), i));
 	else
@@ -564,7 +572,7 @@ ST_FUNC void load(int r, SValue *sv)
 
     if (svr == (VT_CONST | VT_LVAL | VT_SYM)) {
         if (sv->sym->type.t & VT_TLS)
-            arm64_tls_x30(sv);
+            arm64_tls_sym(30, sv->sym, 0);
         else
         arm64_sym(30, sv->sym, // use x30 for address
 		  arm64_check_offset(0, arm64_type_size(svtt), svcoff));
@@ -578,7 +586,10 @@ ST_FUNC void load(int r, SValue *sv)
     }
 
     if (svr == (VT_CONST | VT_SYM)) {
-        arm64_sym(intr(r), sv->sym, svcul);
+        if (sv->sym->type.t & VT_TLS)
+            arm64_tls_sym(intr(r), sv->sym, svcul);
+        else
+            arm64_sym(intr(r), sv->sym, svcul);
         return;
     }
 
@@ -659,7 +670,7 @@ ST_FUNC void store(int r, SValue *sv)
     if (svr == (VT_CONST | VT_LVAL)) {
 	uint64_t i = sv->c.i;
 	if (sv->sym && (sv->sym->type.t & VT_TLS))
-            arm64_tls_x30(sv);
+            arm64_tls_sym(30, sv->sym, 0);
         else
 	if (sv->sym)
             arm64_sym(30, sv->sym, // use x30 for address
@@ -686,15 +697,7 @@ ST_FUNC void store(int r, SValue *sv)
 
     if (svr == (VT_CONST | VT_LVAL | VT_SYM)) {
         if (sv->sym->type.t & VT_TLS) {
-            o(0xd53bd05e); /* mrs x30, tpidr_el0 */
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) |
-              ARM64_RN(30) | ARM64_RD(30)); /* add x30, x30, #0, lsl #12 */
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) |
-              ARM64_RN(30) | ARM64_RD(30)); /* add x30, x30, #0 */
+            arm64_tls_sym(30, sv->sym, 0);
             if (IS_FREG(r))
                 arm64_strv(arm64_type_size(svtt), fltr(r), 30, svcoff);
             else

@@ -354,7 +354,7 @@ ST_FUNC void load(int r, SValue *sv)
     } else {
         if ((fr & VT_SYM) && (sv->sym->type.t & VT_TLS)) {
             oad(0x058b65 | REG_VALUE(r) << 19, 0); /* mov gs:0,r */
-            oad(0xC081 | REG_VALUE(r) << 8, 0); /* add tpoffs,r */
+            oad(0xC081 | REG_VALUE(r) << 8, fc); /* add tpoffs,r */
             greloc(cur_text_section, sv->sym, ind - 4, R_386_TLS_LE);
 #if defined CONFIG_TCC_PIC
         } else if ((fr & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
