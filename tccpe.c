@@ -293,7 +293,7 @@ typedef struct _IMAGE_BASE_RELOCATION {
 /* ----------------------------------------------------------- */
 
 #ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
-  /* allow self-host build with tcc 0.97 - doesn't have this in winnt.h */
+  /* allow self-host build with tcc 0.9.27 - doesn't have this in winnt.h */
   #define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE 0x0040
 #endif
 

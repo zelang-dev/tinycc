@@ -22,7 +22,7 @@
 #include "tcc.h"
 
 #if defined(_WIN32) && defined (__TINYC__)
-  /* allow self-host build with tcc 0.97 - doesn't have ldexpl in tcc_libm.h .
+  /* allow self-host build with tcc 0.9.27 - doesn't have ldexpl in tcc_libm.h .
    *
    * we can't feature-test whether we have ldexpl, and our ./configure also
    * can't perform such tests (and it's also not used by win32/build-tcc.bat),
