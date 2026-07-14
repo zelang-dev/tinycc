@@ -292,6 +292,11 @@ typedef struct _IMAGE_BASE_RELOCATION {
 #endif /* ndef IMAGE_NT_SIGNATURE */
 /* ----------------------------------------------------------- */
 
+#ifndef IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE
+  /* allow self-host build with tcc 0.97 - doesn't have this in winnt.h */
+  #define IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE 0x0040
+#endif
+
 #pragma pack(push, 1)
 struct pe_header
 {
