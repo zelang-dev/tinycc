@@ -21,47 +21,19 @@
 #define USING_GLOBALS
 #include "tcc.h"
 
-#if defined(_WIN32) && defined (__TINYC__)
+#if defined(_WIN32) && defined(__TINYC__)
   /* allow self-host build with tcc 0.9.27 - doesn't have ldexpl in tcc_libm.h .
    *
-   * we can't feature-test whether we have ldexpl, and our ./configure also
-   * can't perform such tests (and it's also not used by win32/build-tcc.bat),
-   * so define it unconditionally if we're compiling using tcc on windows
-   * (otherwise the platform's math.h should already have ldexpl).
+   * in tcc 0.9.27 both ldexp and ldexpl are declared in win32/include/math.h,
+   * but only ldexp can be linked - via win32/lib/msvcrt.def. we can't test
+   * whether we have ldexpl or not, so map ldexpl to ldexp unconditionally.
    *
-   * we could instead include win32/include/math.h (specifically tcc_libm.h),
-   * but this requires working around include guards and redefinitions,
-   * so KISS - copy the tcc_libm.h definitions here with a different name.
+   * note that ldexpl takes long double while ldexp takes double, however, on
+   * windows these types are identical, and current ldexpl in tcc_libm.h also
+   * uses the "normal" double scalbn - just like ldexp, so do the same here.
    */
-
   #undef ldexpl
-  #define ldexpl ldexpl_local
-
-  /* MUSL scalbn - (renamed) copied from win32/include/tcc/tcc_libm.h */
-  static double scalbn_local(double x, int n) {
-    union {double f; uint64_t i;} u;
-    if (n > 1023) {
-      x *= 0x1p1023, n -= 1023;
-      if (n > 1023) {
-        x *= 0x1p1023, n -= 1023;
-        if (n > 1023) n = 1023;
-      }
-    } else if (n < -1022) {
-      x *= 0x1p-1022 * 0x1p53, n += 1022 - 53;
-      if (n < -1022) {
-        x *= 0x1p-1022 * 0x1p53, n += 1022 - 53;
-        if (n < -1022) n = -1022;
-      }
-    }
-    u.i = (0x3ffull + n) << 52;
-    return x * u.f;
-  }
-
-  /* (windows long double is the same type as double - 64bit) */
-  /* (renamed) copied from win32/include/tcc/tcc_libm.h */
-  static long double ldexpl_local(long double x, int exp) {
-    return scalbn_local(x, exp);
-  }
+  #define ldexpl ldexp
 #endif
 
 /* #define to 1 to enable (see parse_pp_string()) */
