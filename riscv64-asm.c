@@ -2158,10 +2158,10 @@ ST_FUNC void subst_asm_operand(CString *add_str, SValue *sv, int modifier)
         val = sv->c.i;
         if (modifier == 'n')
             val = -val;
-        if (modifier == 'z' && sv->c.i == 0) {
+        if (modifier == 'z' && val == 0) {
             cstr_cat(add_str, "zero", -1);
         } else {
-            cstr_printf(add_str, "%d", (int) sv->c.i);
+            cstr_printf(add_str, "%d", val);
         }
       no_offset:;
     } else if ((r & VT_VALMASK) == VT_LOCAL) {
