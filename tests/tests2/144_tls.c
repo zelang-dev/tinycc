@@ -1,5 +1,11 @@
 #include <stdio.h>
-#include <pthread.h>
+#include "threads.h"
+
+#if __SIZEOF_POINTER__ == 8
+# define pFMT "0x%llx"
+#else
+# define pFMT "0x%x"
+#endif
 
 #define	CHECK(var,fmt,val)	printf(fmt "\n",var); if (var != val) errors = 1
 
@@ -70,7 +76,7 @@ static int check(void)
     CHECK(tls_float, "%g", 46.0);
     CHECK(tls_double, "%g", 47.0);
     CHECK(tls_long_double, "%Lg", 48.0);
-    CHECK(tls_ptr, "%p", (int *)49);
+    CHECK(tls_ptr, pFMT, (int *)49);
     CHECK(tls_enum, "%d", tls_b);
     CHECK(tls_struct.tls_d, "%d", 50);
     CHECK(tls_struct.tls_e, "%d", 51);
@@ -121,7 +127,7 @@ static void *thread_func(void *arg)
     CHECK(tls_double, "%g", 70.0);
     CHECK(tls_long_double, "%Lg", 80.0);
     CHECK(tls_enum, "%d", tls_c);
-    CHECK(tls_ptr, "%p", (int *)90);
+    CHECK(tls_ptr, pFMT, (int *)90);
     CHECK(tls_struct.tls_d, "%d", 100);
     CHECK(tls_struct.tls_e, "%d", 110);
     CHECK(tls_struct.tls_f, "%d", 120);
@@ -130,7 +136,7 @@ static void *thread_func(void *arg)
         || tls_array[index] != -3333 || check_extra(1))
         errors = 1;
 
-    return (void *)errors;
+    return (void *)(size_t)errors;
 }
 
 int main()

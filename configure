@@ -363,8 +363,10 @@ case $targetos in
     default_conf "codesign"
     DLLSUF=".dylib"
     if test -z "$build_cross"; then
-      cc=`command -v cc`
-      cc=`readlink $cc || echo clang`
+      if test "$cc" = "gcc"; then
+        cc=`command -v cc`
+        cc=`readlink $cc || echo clang`
+      fi
       tcc_usrinclude="`xcrun --show-sdk-path`/usr/include"
       default tcc_sysincludepaths "{B}/include:$tcc_usrinclude"
       if test "${confvars%new_macho*}" = "${confvars}"; then

@@ -241,6 +241,15 @@ typedef struct _IMAGE_EXPORT_DIRECTORY {
     DWORD AddressOfNameOrdinals;
 } IMAGE_EXPORT_DIRECTORY,*PIMAGE_EXPORT_DIRECTORY;
 
+typedef struct _IMAGE_TLS_DIRECTORY {
+    ADDR3264 StartAddressOfRawData;
+    ADDR3264 EndAddressOfRawData;
+    ADDR3264 AddressOfIndex;
+    ADDR3264 AddressOfCallBacks;
+    DWORD SizeOfZeroFill;
+    DWORD Characteristics;
+} IMAGE_TLS_DIRECTORY;
+
 typedef struct _IMAGE_IMPORT_DESCRIPTOR {
     union {
         DWORD Characteristics;
@@ -342,6 +351,7 @@ enum {
     sec_bss ,
     sec_idata ,
     sec_pdata ,
+    sec_tls ,
     sec_other ,
     sec_rsrc ,
     sec_debug ,
@@ -404,6 +414,9 @@ struct pe_info {
     DWORD iat_size;
     DWORD exp_offs;
     DWORD exp_size;
+    DWORD tls_dir;
+    DWORD tls_data;
+    DWORD tls_size;
     int subsystem;
     DWORD section_align;
     DWORD file_align;
@@ -757,6 +770,10 @@ static int pe_write(struct pe_info *pe)
         if (pe->exp_size) {
             pe_set_datadir(&pe_header, IMAGE_DIRECTORY_ENTRY_EXPORT,
                 pe->exp_offs, pe->exp_size);
+        }
+        if (pe->tls_size) {
+            pe_set_datadir(&pe_header, IMAGE_DIRECTORY_ENTRY_TLS,
+                pe->tls_dir + (pe->thunk->sh_addr - pe->imagebase), pe->tls_size);
         }
 
         memcpy(psh->Name, sh_name, umin(strlen(sh_name), sizeof psh->Name));
@@ -1173,6 +1190,39 @@ static void pe_build_reloc (struct pe_info *pe)
 }
 
 /* ------------------------------------------------------------- */
+static void pe_build_tls(struct pe_info *pe, Section *s)
+{
+    TCCState *s1 = pe->s1;
+    IMAGE_TLS_DIRECTORY *d;
+    int c, n;
+
+    if (0 == s) {
+        pe->tls_dir = section_add(pe->thunk, pe->tls_size, 16);
+        pe->tls_data = section_add(data_section, PTR_SIZE * (1+3), 16);
+        /* put relocations on entries */
+        c = put_elf_sym(symtab_section, 0, 0, 0, 0, data_section->sh_num, 0);
+        for (n = 0; n < 4; ++n)
+            put_elf_reloc(symtab_section, pe->thunk, pe->tls_dir + PTR_SIZE*n, REL_TYPE_DIRECT, c);
+        /* for generators */
+        set_elf_sym(symtab_section, pe->tls_data, PTR_SIZE * 4,
+                ELFW(ST_INFO)(STB_GLOBAL, STT_OBJECT),
+                0, data_section->sh_num, "__tls_index");
+        return;
+    }
+    if (0 == s1->tls_start)
+        s1->tls_start = s->sh_addr;
+    d = (void*)(pe->thunk->data + pe->tls_dir);
+    d->StartAddressOfRawData = s1->tls_start - data_section->sh_addr;
+    d->EndAddressOfRawData = s->sh_addr + s->data_offset - data_section->sh_addr;
+    d->AddressOfIndex = pe->tls_data;
+    d->AddressOfCallBacks = pe->tls_data + PTR_SIZE;
+    d->SizeOfZeroFill = 0;
+    d->Characteristics = 0;
+    /* to reuse logic from linux in xxx-link.c */
+    s1->tls_end = s1->tls_start;
+}
+
+/* ------------------------------------------------------------- */
 static int pe_section_class(Section *s)
 {
     int type, flags;
@@ -1184,6 +1234,8 @@ static int pe_section_class(Section *s)
     if (0 == memcmp(name, ".stab", 5) || 0 == memcmp(name, ".debug_", 7)) {
         return sec_debug;
     } else if (flags & SHF_ALLOC) {
+        if (flags & SHF_TLS)
+            return sec_tls;
         if (type == SHT_PROGBITS
          || type == SHT_INIT_ARRAY
          || type == SHT_FINI_ARRAY) {
@@ -1232,6 +1284,8 @@ static int pe_assign_addresses (struct pe_info *pe)
         for (n = i; n > 1 && k < (c = sec_cls[n - 1]); --n)
             sec_cls[n] = c, sec_order[n] = sec_order[n - 1];
         sec_cls[n] = k, sec_order[n] = i;
+        if (k == sec_tls)
+            pe->tls_size = sizeof (IMAGE_TLS_DIRECTORY);
     }
     si = NULL;
     addr = pe->imagebase + 1;
@@ -1257,7 +1311,10 @@ static int pe_assign_addresses (struct pe_info *pe)
         if (s == pe->thunk) {
             pe_build_imports(pe);
             pe_build_exports(pe);
+            if (pe->tls_size)
+                pe_build_tls(pe, NULL);
         }
+
         if (s == pe->reloc)
             pe_build_reloc (pe);
 
@@ -1277,7 +1334,7 @@ static int pe_assign_addresses (struct pe_info *pe)
         si->pe_flags = IMAGE_SCN_MEM_READ;
         if (s->sh_flags & SHF_EXECINSTR)
             si->pe_flags |= IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_CNT_CODE;
-        else if (s->sh_type == SHT_NOBITS)
+        else if (s->sh_type == SHT_NOBITS && !(s->sh_flags & SHF_TLS))
             si->pe_flags |= IMAGE_SCN_CNT_UNINITIALIZED_DATA;
         else
             si->pe_flags |= IMAGE_SCN_CNT_INITIALIZED_DATA;
@@ -1297,6 +1354,12 @@ add_section:
             *ps = s, s->prev = NULL;
             si->data_size = si->sh_size;
         }
+
+        if (s->sh_flags & SHF_TLS) {
+            strcpy(si->name, ".tls");
+            pe_build_tls(pe, s);
+        }
+
         //printf("%08x %05x %08x %s\n", si->sh_addr, si->sh_size, si->pe_flags, s->name);
     }
 #if 0
@@ -1766,35 +1829,28 @@ static char *trimback(char *a, char *e)
 
 static char *get_token(char **s, char *f)
 {
-    char *p = *s, *e;
-    p = e = trimfront(p);
-    while ((unsigned char)*e > ' ')
-        ++e;
-    *s = trimfront(e);
-    *f = **s; *e = 0;
-    return p;
-}
+    char *p, *e;
+    int q;
 
-/* Read a LIBRARY argument whose quotes may protect whitespace. */
-static char *get_libname(char **s, char *f)
-{
-    char *p = trimfront(*s), *e;
-    if (*p != '"')
-        return get_token(s, f);
-    for (e = ++p; *e && *e != '"' && *e != '\r' && *e != '\n'; ++e)
+    p = trimfront(*s);
+    q = *p;
+    if (q == '"') /* support quoted LIBRARY "xyz.dll" */
+        ++p;
+    else
+        q = ' ';
+    for (e = p; (unsigned char)*e >= ' ' && *e != q; ++e)
         ;
-    if (*e != '"' || (unsigned char)e[1] > ' ')
-        return NULL;
-    *s = trimfront(e + 1);
-    *f = **s;
-    *e = 0;
+    if (*e == '"')
+        *e++ = 0;
+    *s = trimfront(e);
+    *f = **s, *e = 0;
     return p;
 }
 
 static int pe_load_def(TCCState *s1, int fd)
 {
     int state = 0, ret = -1, dllindex = 0, ord;
-    char *dllname = NULL, *buf, *line, *p, *x, next;
+    char dllname[80], *buf, *line, *p, *x, next;
 
     buf = tcc_load_text(fd);
     if (!buf)
@@ -1808,13 +1864,9 @@ static int pe_load_def(TCCState *s1, int fd)
         case 0:
             if (0 != stricmp(p, "LIBRARY") || next == '\n')
                 goto quit;
-            p = get_libname(&line, &next);
-            if (!p || !*p)
-                goto quit;
-            dllname = tcc_malloc(strlen(p) + 5);
-            strcpy(dllname, p);
+            pstrcpy(dllname, sizeof dllname, get_token(&line, &next));
             if (!*tcc_fileextension(dllname))
-                strcat(dllname, ".dll");
+                pstrcat(dllname, sizeof dllname, ".dll");
             ++state;
             break;
         case 1:
@@ -1845,7 +1897,6 @@ skip:
     }
     ret = 0;
 quit:
-    tcc_free(dllname);
     tcc_free(buf);
     return ret;
 }

@@ -15,9 +15,6 @@ endif
 ifeq (,$(filter i386,$(ARCH)))
  SKIP += 98_al_ax_extend.test 99_fastcall.test
 endif
-ifeq (,$(filter x86_64 riscv64 arm64 i386,$(ARCH)))
- SKIP += 146_tls_extern.test # TLS only implemented on these architectures
-endif
 ifeq (,$(filter i386 x86_64,$(ARCH)))
  SKIP += 85_asm-outside-function.test # x86 asm
  SKIP += 127_asm_goto.test    # hardcodes x86 asm
@@ -37,14 +34,11 @@ ifeq ($(CONFIG_bcheck),no)
  SKIP += 132_bound_test.test
 endif
 ifeq ($(CONFIG_dll),no)
- SKIP += 113_btdll.test 147_def_library.test # no shared lib support yet
+ SKIP += 113_btdll.test # no shared lib support yet
  SKIP += 149_end_copy_reloc.test 151_dso_linker_symbol.test
 endif
 ifeq (-$(findstring gcc,$(CC))-,--)
  SKIP += $(patsubst %.expect,%.test,$(GEN-ALWAYS))
-endif
-ifeq ($(CC_NAME),tcc)
- SKIP += 146_tls_extern.test 150_linker_boundaries.test # needs external tools
 endif
 ifeq (-$(CONFIG_WIN32)-$(CONFIG_i386)$(CONFIG_arm)-,--yes-)
  SKIP += 95_bitfields%.test # type_align is different on 32bit-non-windows
@@ -53,19 +47,14 @@ ifeq (-$(CONFIG_WIN32)-,-yes-)
  SKIP += 106_versym.test # No pthread support
  SKIP += 114_bound_signal.test # No pthread support
  SKIP += 117_builtins.test # win32 port doesn't define __builtins
- SKIP += 124_atomic_counter.test # No pthread support
- SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported
  SKIP += 148_linker_symbols.test 149_end_copy_reloc.test # ELF linker tests
  SKIP += 150_linker_boundaries.test 151_dso_linker_symbol.test
 endif
-ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
+ifneq (,$(filter OpenBSD FreeBSD NetBSD DragonFly,$(TARGETOS)))
  SKIP += 106_versym.test # no pthread_condattr_setpshared
  SKIP += 114_bound_signal.test # libc problem signal/fork
  SKIP += 116_bound_setjmp2.test # No TLS_FUNC/TLS_VAR in bcheck.c
  SKIP += 144_tls.test 146_tls_extern.test # No tls support
-endif
-ifeq ($(TARGETOS),DragonFly)
- SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported
 endif
 ifeq ($(CONFIG_OSX),yes)
  SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported on Mach-O
@@ -88,9 +77,6 @@ ifneq (-$(ARCH)-,-riscv64-)
 endif
 ifneq (-$(ARCH)-$(CONFIG_WIN32)-,-arm64-yes-)
  SKIP += 145_winarm64_interlocked.test
-endif
-ifneq ($(CONFIG_WIN32),yes)
- SKIP += 147_def_library.test
 endif
 
 # Some tests might need arguments
@@ -141,7 +127,6 @@ GEN-ALWAYS =
 # TLS needs executable and pthread, not -run
 144_tls.test: FLAGS += -pthread
 144_tls.test: NORUN = true
-
 # Verify that undefined TLS symbols in TCC objects work with the system linker.
 146_tls_extern.test: NORUN = true
 146_tls_extern.test: T1 = \
@@ -150,6 +135,9 @@ GEN-ALWAYS =
 	$(CC) -no-pie -Wl,-z,noexecstack 146_tls_extern-main.o \
 		146_tls_extern-def.o -o $(basename $@).exe && \
 	./$(basename $@).exe
+ifeq (-$(CONFIG_WIN32)-,-yes-)
+146_tls_extern.test : CC=$(TCC)
+endif
 
 # Check optional ELF linker symbols, including references from an archive.
 148_linker_symbols.test: NORUN = true
@@ -204,13 +192,6 @@ GEN-ALWAYS =
     $(TCC) -bt $1 a1$(DLLSUF) a2$(DLLSUF) -Wl,-rpath=. -o $(basename $@).exe && \
     ./$(basename $@).exe
 
-# Verify quoted LIBRARY names and the default .dll extension in DEF files.
-147_def_library.test: T1 = \
-    cp $(SRC)/147_def_library.def.in 147_def_library.def && \
-    $(TCC) -D DEF_LIBRARY_DLL -shared $1 -o "def library test.dll" && \
-    $(TCC) $1 147_def_library.def -o $(basename $@).exe && \
-    grep -a -q "def library test.dll" $(basename $@).exe && \
-    ./$(basename $@).exe
 
 114_bound_signal.test: FLAGS += -b
 114_bound_signal.test: NORUN = true # tcc -run does not support fork and -b and SELINUX

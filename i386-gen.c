@@ -242,12 +242,20 @@ static void gen_modrm(int opc, int op_r2, int r, Sym *sym, int c)
     int op_reg = REG_VALUE(op_r2) << 3;
 
     if ((r & VT_SYM) && (sym->type.t & VT_TLS)) {
-	if (opc == 0xdbc0d9) // VT_LDOUBLE
-	    o(0xc0d9), opc = 0xdb;
-        o(0x65); /* gs segment prefix */
-        o(opc);
-        oad(0x05 | op_reg, c);
+#ifdef TCC_TARGET_PE
+        Sym *s2 = external_global_sym(TOK___tls_index, &int_type);
+        r = get_reg(RC_INT);
+        gen_modrm(0x8b, r, VT_SYM|VT_CONST, s2, 0); /* mov __tls_index, r */
+        o(0x02e0c1 | r << 8); /* shl 2,r */
+        oad(0x050364 | r << 19, 11*PTR_SIZE); /* add fs:0x2c,r */
+        gen_modrm(0x8b, r, r | VT_LVAL, 0, 0); /* mov (r),r */
+        o(opc), oad(0x80 | op_reg | r, c); /* mov #c(r),op_reg */
         greloc(cur_text_section, sym, ind - 4, R_386_TLS_LE);
+#else
+        o(0x65); /* gs segment prefix */
+        o(opc), oad(0x05 | op_reg, c);
+        greloc(cur_text_section, sym, ind - 4, R_386_TLS_LE);
+#endif
 #if defined CONFIG_TCC_PIC
     } else if ((r & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
         int is_got = (op_r2 & TREG_MEM) && !(sym->type.t & VT_STATIC);
@@ -353,9 +361,13 @@ ST_FUNC void load(int r, SValue *sv)
         gen_modrm(opc, r, fr, sv->sym, fc);
     } else {
         if ((fr & VT_SYM) && (sv->sym->type.t & VT_TLS)) {
+#ifdef TCC_TARGET_PE
+            gen_modrm(0x8d, r, fr, sv->sym, fc);
+#else
             oad(0x058b65 | REG_VALUE(r) << 19, 0); /* mov gs:0,r */
             oad(0xC081 | REG_VALUE(r) << 8, fc); /* add tpoffs,r */
             greloc(cur_text_section, sv->sym, ind - 4, R_386_TLS_LE);
+#endif
 #if defined CONFIG_TCC_PIC
         } else if ((fr & (VT_VALMASK|VT_SYM)) == (VT_CONST|VT_SYM)) {
             if (sv->sym->type.t & VT_STATIC) {
@@ -412,7 +424,8 @@ ST_FUNC void store(int r, SValue *v)
         opc = 0xdd; /* fstpl */
         r = 2;
     } else if (bt == VT_LDOUBLE) {
-        opc = 0xdbc0d9; /* fld %st(0), fstpt */
+        o(0xc0d9); /* fld %st(0), fstpt */
+        opc = 0xdb;
         r = 7;
     } else if (bt == VT_SHORT) {
         opc = 0x8966;

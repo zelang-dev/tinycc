@@ -842,7 +842,7 @@ ST_FUNC void label_pop(Sym **ptop, Sym *slast, int keep)
             if (s->c) {
                 /* define corresponding symbol. A size of
                    1 is put. */
-                put_extern_sym(s, cur_text_section, s->jnext, 1);
+                put_extern_sym(s, cur_text_section, s->jind, 1);
             }
         }
         /* remove label */

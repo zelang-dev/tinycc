@@ -71,6 +71,9 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define strtoll _strtoi64
 #  define strtoull _strtoui64
 # endif
+  /* some compilers don't know ldexpl and windows doesn't have long doubles anyway */
+# undef ldexpl
+# define ldexpl ldexp
 # ifdef LIBTCC_AS_DLL
 #  define LIBTCCAPI __declspec(dllexport)
 #  define PUB_FUNC LIBTCCAPI

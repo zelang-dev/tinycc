@@ -21,21 +21,6 @@
 #define USING_GLOBALS
 #include "tcc.h"
 
-#if defined(_WIN32) && defined(__TINYC__)
-  /* allow self-host build with tcc 0.9.27 - doesn't have ldexpl in tcc_libm.h .
-   *
-   * in tcc 0.9.27 both ldexp and ldexpl are declared in win32/include/math.h,
-   * but only ldexp can be linked - via win32/lib/msvcrt.def. we can't test
-   * whether we have ldexpl or not, so map ldexpl to ldexp unconditionally.
-   *
-   * note that ldexpl takes long double while ldexp takes double, however, on
-   * windows these types are identical, and current ldexpl in tcc_libm.h also
-   * uses the "normal" double scalbn - just like ldexp, so do the same here.
-   */
-  #undef ldexpl
-  #define ldexpl ldexp
-#endif
-
 /* #define to 1 to enable (see parse_pp_string()) */
 #define ACCEPT_LF_IN_STRINGS 0
 
