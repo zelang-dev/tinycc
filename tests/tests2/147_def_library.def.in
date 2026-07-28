@@ -1,0 +1,3 @@
+LIBRARY "def library test"
+EXPORTS
+    def_library_value

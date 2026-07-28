@@ -1775,10 +1775,26 @@ static char *get_token(char **s, char *f)
     return p;
 }
 
+/* Read a LIBRARY argument whose quotes may protect whitespace. */
+static char *get_libname(char **s, char *f)
+{
+    char *p = trimfront(*s), *e;
+    if (*p != '"')
+        return get_token(s, f);
+    for (e = ++p; *e && *e != '"' && *e != '\r' && *e != '\n'; ++e)
+        ;
+    if (*e != '"' || (unsigned char)e[1] > ' ')
+        return NULL;
+    *s = trimfront(e + 1);
+    *f = **s;
+    *e = 0;
+    return p;
+}
+
 static int pe_load_def(TCCState *s1, int fd)
 {
     int state = 0, ret = -1, dllindex = 0, ord;
-    char dllname[80], *buf, *line, *p, *x, next;
+    char *dllname = NULL, *buf, *line, *p, *x, next;
 
     buf = tcc_load_text(fd);
     if (!buf)
@@ -1792,7 +1808,13 @@ static int pe_load_def(TCCState *s1, int fd)
         case 0:
             if (0 != stricmp(p, "LIBRARY") || next == '\n')
                 goto quit;
-            pstrcpy(dllname, sizeof dllname, get_token(&line, &next));
+            p = get_libname(&line, &next);
+            if (!p || !*p)
+                goto quit;
+            dllname = tcc_malloc(strlen(p) + 5);
+            strcpy(dllname, p);
+            if (!*tcc_fileextension(dllname))
+                strcat(dllname, ".dll");
             ++state;
             break;
         case 1:
@@ -1823,6 +1845,7 @@ skip:
     }
     ret = 0;
 quit:
+    tcc_free(dllname);
     tcc_free(buf);
     return ret;
 }

@@ -37,7 +37,7 @@ ifeq ($(CONFIG_bcheck),no)
  SKIP += 132_bound_test.test
 endif
 ifeq ($(CONFIG_dll),no)
- SKIP += 113_btdll.test # no shared lib support yet
+ SKIP += 113_btdll.test 147_def_library.test # no shared lib support yet
 endif
 ifeq (-$(findstring gcc,$(CC))-,--)
  SKIP += $(patsubst %.expect,%.test,$(GEN-ALWAYS))
@@ -80,6 +80,9 @@ ifneq (-$(ARCH)-,-riscv64-)
 endif
 ifneq (-$(ARCH)-$(CONFIG_WIN32)-,-arm64-yes-)
  SKIP += 145_winarm64_interlocked.test
+endif
+ifneq ($(CONFIG_WIN32),yes)
+ SKIP += 147_def_library.test
 endif
 
 # Some tests might need arguments
@@ -150,6 +153,14 @@ GEN-ALWAYS =
     $(TCC) -bt $1 -shared -D DLL=1 -o a1$(DLLSUF) && \
     $(TCC) -bt $1 -shared -D DLL=2 -o a2$(DLLSUF) && \
     $(TCC) -bt $1 a1$(DLLSUF) a2$(DLLSUF) -Wl,-rpath=. -o $(basename $@).exe && \
+    ./$(basename $@).exe
+
+# Verify quoted LIBRARY names and the default .dll extension in DEF files.
+147_def_library.test: T1 = \
+    cp $(SRC)/147_def_library.def.in 147_def_library.def && \
+    $(TCC) -D DEF_LIBRARY_DLL -shared $1 -o "def library test.dll" && \
+    $(TCC) $1 147_def_library.def -o $(basename $@).exe && \
+    grep -a -q "def library test.dll" $(basename $@).exe && \
     ./$(basename $@).exe
 
 114_bound_signal.test: FLAGS += -b
