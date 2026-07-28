@@ -1586,9 +1586,13 @@ static void provide_linker_sym(TCCState *s1, const char *name,
 {
     int sym_index = find_elf_sym(symtab_section, name);
 
-    if (!sym_index
-        || ((ElfW(Sym) *)symtab_section->data)[sym_index].st_shndx != SHN_UNDEF)
+    if (sym_index) {
+        if (((ElfW(Sym) *)symtab_section->data)[sym_index].st_shndx != SHN_UNDEF)
+            return;
+    } else if (!s1->dynsymtab_section
+               || !find_elf_sym(s1->dynsymtab_section, name)) {
         return;
+    }
     set_linker_sym(s1, name, sec, offs);
 }
 

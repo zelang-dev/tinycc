@@ -38,7 +38,7 @@ ifeq ($(CONFIG_bcheck),no)
 endif
 ifeq ($(CONFIG_dll),no)
  SKIP += 113_btdll.test 147_def_library.test # no shared lib support yet
- SKIP += 149_end_copy_reloc.test
+ SKIP += 149_end_copy_reloc.test 151_dso_linker_symbol.test
 endif
 ifeq (-$(findstring gcc,$(CC))-,--)
  SKIP += $(patsubst %.expect,%.test,$(GEN-ALWAYS))
@@ -56,7 +56,7 @@ ifeq (-$(CONFIG_WIN32)-,-yes-)
  SKIP += 124_atomic_counter.test # No pthread support
  SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported
  SKIP += 148_linker_symbols.test 149_end_copy_reloc.test # ELF linker tests
- SKIP += 150_linker_boundaries.test
+ SKIP += 150_linker_boundaries.test 151_dso_linker_symbol.test
 endif
 ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
  SKIP += 106_versym.test # no pthread_condattr_setpshared
@@ -70,7 +70,7 @@ endif
 ifeq ($(CONFIG_OSX),yes)
  SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported on Mach-O
  SKIP += 148_linker_symbols.test 149_end_copy_reloc.test # ELF linker tests
- SKIP += 150_linker_boundaries.test
+ SKIP += 150_linker_boundaries.test 151_dso_linker_symbol.test
 endif
 ifeq ($(CONFIG_pie),yes)
  SKIP += 149_end_copy_reloc.test # PIE executables do not use copy relocations
@@ -180,6 +180,15 @@ GEN-ALWAYS =
 	$(CC) -fno-pic -fno-pie -c $(subst 150,150+,$1) \
 		-o 150_linker_boundaries.o && \
 	$(TCC) $1 150_linker_boundaries.o -o $(basename $@).exe && \
+	./$(basename $@).exe \
+    )
+
+# A linker symbol needed only by a DSO must be provided by the executable.
+151_dso_linker_symbol.test: NORUN = true
+151_dso_linker_symbol.test: T1 = ( \
+	$(TCC) -shared $(subst 151,151+,$1) -o 151_dso_linker_symbol$(DLLSUF) && \
+	$(TCC) $1 ./151_dso_linker_symbol$(DLLSUF) -Wl,-rpath=. \
+		-o $(basename $@).exe && \
 	./$(basename $@).exe \
     )
 
