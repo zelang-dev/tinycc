@@ -1560,6 +1560,90 @@ ST_FUNC int set_global_sym(TCCState *s1, const char *name, Section *sec, addr_t 
         ELFW(ST_INFO)(name ? STB_GLOBAL : STB_LOCAL, STT_NOTYPE), 0, shn, name);
 }
 
+#ifndef ELF_OBJ_ONLY
+static int set_linker_sym(TCCState *s1, const char *name,
+                          Section *sec, addr_t offs)
+{
+    int sym_index = find_elf_sym(symtab_section, name);
+    ElfW(Sym) *sym = sym_index
+        ? &((ElfW(Sym) *)symtab_section->data)[sym_index] : NULL;
+    /* Mirror the set_elf_sym cases where the new definition wins. */
+    int is_linker_sym = !sym || sym->st_shndx == SHN_UNDEF
+        || ELFW(ST_BIND)(sym->st_info) == STB_WEAK
+        || (sec && sec != bss_section
+            && ((sym->st_other & ST_ASM_SET)
+                || sym->st_shndx == SHN_COMMON
+                || sym->st_shndx == bss_section->sh_num));
+
+    sym_index = set_global_sym(s1, name, sec, offs);
+    if (is_linker_sym)
+        get_sym_attr(s1, sym_index, 1)->linker_sym = 1;
+    return sym_index;
+}
+
+static void provide_linker_sym(TCCState *s1, const char *name,
+                               Section *sec, addr_t offs)
+{
+    int sym_index = find_elf_sym(symtab_section, name);
+
+    if (!sym_index
+        || ((ElfW(Sym) *)symtab_section->data)[sym_index].st_shndx != SHN_UNDEF)
+        return;
+    set_linker_sym(s1, name, sec, offs);
+}
+
+static void update_linker_sym(TCCState *s1, const char *name,
+                              Section *sec, addr_t offs)
+{
+    int sym_index = find_elf_sym(symtab_section, name);
+
+    if (sym_index && sym_index < s1->nb_sym_attrs
+        && s1->sym_attrs[sym_index].linker_sym) {
+        ElfW(Sym) *sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
+
+        sym->st_value = offs;
+        sym->st_shndx = sec->sh_num;
+        if (s1->dynsym) {
+            sym_index = find_elf_sym(s1->dynsym, name);
+            if (sym_index) {
+                sym = &((ElfW(Sym) *)s1->dynsym->data)[sym_index];
+                sym->st_value = offs;
+                sym->st_shndx = sec->sh_num;
+            }
+        }
+    }
+}
+
+static void finalize_linker_symbols(TCCState *s1, int *sec_order)
+{
+    Section *etext = text_section;
+    Section *edata = data_section;
+    Section *end = bss_section;
+    Section *s;
+    int i;
+
+    /* Follow the final loadable-section order rather than assuming that
+       .text, .data and .bss are the last sections of their regions. */
+    for (i = 1; i < s1->nb_sections; ++i) {
+        s = s1->sections[sec_order[i]];
+        if (!(s->sh_flags & SHF_ALLOC))
+            continue;
+        end = s;
+        if (!(s->sh_flags & SHF_WRITE))
+            etext = s;
+        if (s->sh_type != SHT_NOBITS)
+            edata = s;
+    }
+
+    update_linker_sym(s1, "_etext", etext, etext->sh_size);
+    update_linker_sym(s1, "etext", etext, etext->sh_size);
+    update_linker_sym(s1, "_edata", edata, edata->sh_size);
+    update_linker_sym(s1, "edata", edata, edata->sh_size);
+    update_linker_sym(s1, "_end", end, end->sh_size);
+    update_linker_sym(s1, "end", end, end->sh_size);
+}
+#endif
+
 static void add_init_array_defines(TCCState *s1, const char *section_name)
 {
     Section *s;
@@ -1884,9 +1968,19 @@ static void tcc_add_linker_symbols(TCCState *s1)
     int i;
     Section *s;
 
+#ifndef ELF_OBJ_ONLY
+    set_linker_sym(s1, "_etext", text_section, -1);
+    set_linker_sym(s1, "_edata", data_section, -1);
+    set_linker_sym(s1, "_end", bss_section, -1);
+    /* These conventional ELF symbols have PROVIDE semantics. */
+    provide_linker_sym(s1, "etext", text_section, -1);
+    provide_linker_sym(s1, "edata", data_section, -1);
+    provide_linker_sym(s1, "end", bss_section, -1);
+#else
     set_global_sym(s1, "_etext", text_section, -1);
     set_global_sym(s1, "_edata", data_section, -1);
     set_global_sym(s1, "_end", bss_section, -1);
+#endif
 #if TARGETOS_OpenBSD
     set_global_sym(s1, "__executable_start", NULL, ELF_START_ADDR);
 #endif
@@ -3081,6 +3175,7 @@ static int elf_output_file(TCCState *s1, const char *filename)
     sec_order = tcc_malloc(sizeof(int) * 2 * s1->nb_sections);
     /* compute section to program header mapping */
     layout_sections(s1, sec_order, &dyninf);
+    finalize_linker_symbols(s1, sec_order);
 
         if (dynamic) {
             /* put in GOT the dynamic section address and relocate PLT */

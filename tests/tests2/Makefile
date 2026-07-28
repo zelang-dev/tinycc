@@ -38,12 +38,13 @@ ifeq ($(CONFIG_bcheck),no)
 endif
 ifeq ($(CONFIG_dll),no)
  SKIP += 113_btdll.test 147_def_library.test # no shared lib support yet
+ SKIP += 149_end_copy_reloc.test
 endif
 ifeq (-$(findstring gcc,$(CC))-,--)
  SKIP += $(patsubst %.expect,%.test,$(GEN-ALWAYS))
 endif
 ifeq ($(CC_NAME),tcc)
- SKIP += 146_tls_extern.test # needs an external system linker
+ SKIP += 146_tls_extern.test 150_linker_boundaries.test # needs external tools
 endif
 ifeq (-$(CONFIG_WIN32)-$(CONFIG_i386)$(CONFIG_arm)-,--yes-)
  SKIP += 95_bitfields%.test # type_align is different on 32bit-non-windows
@@ -54,6 +55,8 @@ ifeq (-$(CONFIG_WIN32)-,-yes-)
  SKIP += 117_builtins.test # win32 port doesn't define __builtins
  SKIP += 124_atomic_counter.test # No pthread support
  SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported
+ SKIP += 148_linker_symbols.test 149_end_copy_reloc.test # ELF linker tests
+ SKIP += 150_linker_boundaries.test
 endif
 ifneq (,$(filter OpenBSD FreeBSD NetBSD,$(TARGETOS)))
  SKIP += 106_versym.test # no pthread_condattr_setpshared
@@ -66,6 +69,11 @@ ifeq ($(TARGETOS),DragonFly)
 endif
 ifeq ($(CONFIG_OSX),yes)
  SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported on Mach-O
+ SKIP += 148_linker_symbols.test 149_end_copy_reloc.test # ELF linker tests
+ SKIP += 150_linker_boundaries.test
+endif
+ifeq ($(CONFIG_pie),yes)
+ SKIP += 149_end_copy_reloc.test # PIE executables do not use copy relocations
 endif
 ifeq (-$(ARCH)-,-arm-)
  SKIP += 144_tls.test 146_tls_extern.test # doesn't work currently
@@ -142,6 +150,38 @@ GEN-ALWAYS =
 	$(CC) -no-pie -Wl,-z,noexecstack 146_tls_extern-main.o \
 		146_tls_extern-def.o -o $(basename $@).exe && \
 	./$(basename $@).exe
+
+# Check optional ELF linker symbols, including references from an archive.
+148_linker_symbols.test: NORUN = true
+148_linker_symbols.test: T1 = ( \
+	$(TCC) -c $(subst 148,148+,$1) -o 148_linker_symbols.o && \
+	$(AR) rcs 148_linker_symbols.a 148_linker_symbols.o && \
+	$(TCC) $1 148_linker_symbols.a -o $(basename $@).exe && \
+	./$(basename $@).exe && \
+	$(TCC) $(subst 148,148+override,$1) -o 148_linker_symbols-override.exe && \
+	./148_linker_symbols-override.exe \
+    )
+
+# Copy relocations must be included in the final end symbols.
+149_end_copy_reloc.test: NORUN = true
+149_end_copy_reloc.test: T1 = ( \
+	$(TCC) -shared $(subst 149,149+,$1) -o 149_end_copy_reloc$(DLLSUF) && \
+	$(TCC) $1 ./149_end_copy_reloc$(DLLSUF) -Wl,-rpath=. \
+		-o $(basename $@).exe && \
+	./$(basename $@).exe && \
+	$(TCC) $(subst 149,149+override,$1) ./149_end_copy_reloc$(DLLSUF) \
+		-Wl,-rpath=. -o 149_end_copy_reloc-override.exe && \
+	./149_end_copy_reloc-override.exe \
+    )
+
+# Boundary symbols must cover separately named sections from external objects.
+150_linker_boundaries.test: NORUN = true
+150_linker_boundaries.test: T1 = ( \
+	$(CC) -fno-pic -fno-pie -c $(subst 150,150+,$1) \
+		-o 150_linker_boundaries.o && \
+	$(TCC) $1 150_linker_boundaries.o -o $(basename $@).exe && \
+	./$(basename $@).exe \
+    )
 
 112_backtrace.test: FLAGS += -dt -b
 112_backtrace.test 113_btdll.test 126_bound_global.test: FILTER += \
@@ -233,4 +273,4 @@ $(sort $(GEN-ALWAYS) $(UPDATE)) : force
 force:
 
 clean :
-	rm -f fred.txt *.output *.o *.exe *.dll *.so *.def $(GEN-ALWAYS)
+	rm -f fred.txt *.output *.o *.a *.exe *.dll *.so *.def $(GEN-ALWAYS)
