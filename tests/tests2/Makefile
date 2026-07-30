@@ -165,7 +165,7 @@ endif
 # Boundary symbols must cover separately named sections from external objects.
 150_linker_boundaries.test: NORUN = true
 150_linker_boundaries.test: T1 = ( \
-	$(CC) -fno-pic -fno-pie -c $(subst 150,150+,$1) \
+	$(CC) -fcommon -fno-pic -fno-pie -c $(subst 150,150+,$1) \
 		-o 150_linker_boundaries.o && \
 	$(TCC) $1 150_linker_boundaries.o -o $(basename $@).exe && \
 	./$(basename $@).exe \
