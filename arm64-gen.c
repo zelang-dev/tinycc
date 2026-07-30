@@ -463,7 +463,7 @@ static void arm64_strv(int sz_, int dst, int bas, uint64_t off)
     }
 }
 
-static void arm64_sym(int r, Sym *sym, unsigned long addend)
+static void arm64_sym(int r, Sym *sym, addr_t addend)
 {
     if (sym->type.t & VT_TLS) {
 #if TCC_TARGET_PE
