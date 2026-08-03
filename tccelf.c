@@ -2286,6 +2286,9 @@ static int set_sec_sizes(TCCState *s1)
 struct dyn_inf {
     Section *dynamic;
     Section *dynstr;
+    Section *interp;
+    Section *note;
+    Section *gnu_hash;
     struct {
         /* Info to be copied in dynamic section */
         unsigned long data_offset;
@@ -2298,9 +2301,9 @@ struct dyn_inf {
     int shnum;
     int tls;
     int relro;
-    Section *interp;
-    Section *note;
-    Section *gnu_hash;
+    int notes;
+    int ehfr;
+    int dyna;
 };
 
 /* Decide the layout of sections loaded in memory. This must be done before
@@ -2320,10 +2323,8 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             j = 0x900; /* no sh_name: won't go to file */
         } else if (s->sh_flags & SHF_ALLOC) {
             j = 0x100;
-            if (s->sh_flags & SHF_WRITE)
+            if ((s->sh_flags & (SHF_WRITE|SHF_TLS)) == SHF_WRITE)
                 j = 0x200;
-            if (s->sh_flags & SHF_TLS)
-                j = 0x300;
         } else {
             j = 0x700;
         }
@@ -2347,23 +2348,25 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             if (s1->plt && s == s1->plt->reloc)
                 k = 0x21;
         } else if (s->sh_flags & SHF_EXECINSTR) {
-            k = 0x30;
+            k = 0x60;
         /* RELRO sections --> */
+        } else if (s->sh_flags & SHF_TLS) {
+            k = 0x40 + (s->sh_type == SHT_NOBITS);
         } else if (s->sh_type == SHT_PREINIT_ARRAY) {
-            k = 0x41;
-        } else if (s->sh_type == SHT_INIT_ARRAY) {
             k = 0x42;
-        } else if (s->sh_type == SHT_FINI_ARRAY) {
+        } else if (s->sh_type == SHT_INIT_ARRAY) {
             k = 0x43;
+        } else if (s->sh_type == SHT_FINI_ARRAY) {
+            k = 0x44;
         } else if (s->sh_type == SHT_DYNAMIC) {
             k = 0x46;
         } else if (s == s1->got) {
             k = 0x47; /* .got as RELRO needs BIND_NOW in DT_FLAGS */
         } else if (s->reloc && (s->reloc->sh_flags & SHF_ALLOC) && j == 0x100) {
-            k = 0x44;
+            k = 0x45;
         /* <-- */
         } else if (s->sh_type == SHT_NOTE) {
-            k = 0x60;
+            k = 0x08, d->notes = 1;
         } else if (s->sh_type == SHT_NOBITS) {
             k = 0x70; /* bss */
         } else if (s == d->interp) {
@@ -2372,11 +2375,13 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             k = 0x50; /* data */
         }
         k += j;
-
-        if ((k & 0xfff0) == 0x140) {
-            /* make RELRO section writable */
+        /* make our standard sections come last to have _etext/_edata correct values */
+        if (s->sh_num <= bss_section->sh_num)
+            ++k;
+        /* make RELRO section writable */
+        if ((k & 0xfff0) == 0x140)
             k += 0x100, s->sh_flags |= SHF_WRITE;
-        }
+        /* sort by insert */
         for (n = i; n > 1 && k < (f = sec_cls[n - 1]); --n)
             sec_cls[n] = f, sec_order[n] = sec_order[n - 1];
         sec_cls[n] = k, sec_order[n] = i;
@@ -2401,17 +2406,15 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
 	    /* NetBSD only supports 2 PT_LOAD sections.
 	       See: https://blog.netbsd.org/tnf/entry/the_first_report_on_lld */
 	    if ((f & SHF_WRITE) == 0)
-                f |= SHF_EXECINSTR;
-#else
-            if ((k & 0xfff0) == 0x240) /* RELRO sections */
-                d->relro = 1, f |= SHFX_RELRO;
+                f |= SHF_EXECINSTR, k = 0; /* no relro */
 #endif
-            /* start new header when flags changed or relro, but avoid zero memsz */
+            /* start new header when flags changed, but avoid zero memsz */
             if (f != f0 && s->sh_size)
                 f0 = f, ++n, f |= SHFX_NEWPH;
-
             if ((s->sh_flags & SHF_TLS) && s->sh_size)
                 d->tls = 1, f |= SHF_TLS;
+            if ((k & 0xfff0) == 0x240) /* RELRO sections */
+                d->relro = 1, f |= SHFX_RELRO;
         }
         sec_cls[i] = f;
         //printf("ph %d sec %02d : %3X %3X  %8.2X  %04X  %s\n", (f>0) * n, i, f, k, s->sh_type, (int)s->sh_size, s->name);
@@ -2421,14 +2424,16 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
 
 static ElfW(Phdr) *fill_phdr(ElfW(Phdr) *ph, int type, Section *s)
 {
+    ph->p_type = type;
+    ph->p_flags = PF_R;
     if (s) {
+        if (s->sh_flags & SHF_WRITE)
+            ph->p_flags |= PF_W;
         ph->p_offset = s->sh_offset;
         ph->p_vaddr = s->sh_addr;
         ph->p_filesz = s->sh_size;
         ph->p_align = s->sh_addralign;
     }
-    ph->p_type = type;
-    ph->p_flags = PF_R;
     ph->p_paddr = ph->p_vaddr;
     ph->p_memsz = ph->p_filesz;
     return ph;
@@ -2438,7 +2443,6 @@ static ElfW(Phdr) *update_phdr(ElfW(Phdr) *ph, int type, Section *s, addr_t addr
 {
     if (ph->p_type == 0) {
         fill_phdr(ph, type, s);
-        ph->p_flags |= PF_W;
     }
     ph->p_filesz = file_offset - ph->p_offset;
     ph->p_memsz = addr - ph->p_vaddr;
@@ -2461,16 +2465,16 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
     if (d->interp)
         phfill = 2;
     phnum += phfill;
-    if (d->tls)
-        d->tls = phnum, ++phnum;
-    if (d->relro)
-        d->relro = phnum, ++phnum;
-    if (d->note)
-        ++phnum;
     if (d->dynamic)
-        ++phnum;
+        d->dyna = phnum++;
+    if (d->notes)
+        d->notes = phnum++;
+    if (d->tls)
+        d->tls = phnum++;
     if (eh_frame_hdr_section)
-        ++phnum;
+        d->ehfr = phnum++;
+    if (d->relro)
+        d->relro = phnum++;
     d->phnum = phnum;
     d->phdr = tcc_mallocz(phnum * sizeof(ElfW(Phdr)));
 
@@ -2537,6 +2541,7 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         s->sh_offset = file_offset;
         s->sh_addr = addr;
 
+        //printf("%d : %08x %08x %04x %03x %s\n", (int)(ph - d->phdr), (int)file_offset, (int)addr, (int)s->sh_size, s->sh_type, s->name);
         addr += s->sh_size;
         if (s->sh_type != SHT_NOBITS)
             file_offset += s->sh_size;
@@ -2546,8 +2551,6 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             ph = &d->phdr[phfill + n];
             fill_phdr(ph, PT_LOAD, s);
             ph->p_align = s_align;
-            if (f & SHF_WRITE)
-                ph->p_flags |= PF_W;
             if (f & SHF_EXECINSTR)
                 ph->p_flags |= PF_X;
             if (n == 0) {
@@ -2568,29 +2571,26 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             ph2 = update_phdr(&d->phdr[d->relro], PT_GNU_RELRO, s, addr, file_offset);
             ph2->p_align = 1;
         }
-
         if (f & SHF_TLS) {
             ph2 = update_phdr(&d->phdr[d->tls], PT_TLS, s, addr, file_offset);
             if (s->sh_addralign > ph2->p_align)
                 ph2->p_align = s->sh_addralign;
+            if (s->sh_type == SHT_NOBITS)
+                addr -= s->sh_size;
+            /* for xxx-link.c:relocate() */
+            s1->tls_start = ph2->p_vaddr;
+            s1->tls_end = s1->tls_start + ph2->p_memsz + (-ph2->p_memsz & (ph2->p_align - 1));
+        }
+        if (s->sh_type == SHT_NOTE) {
+            update_phdr(&d->phdr[d->notes], PT_NOTE, s, addr, file_offset);
         }
     }
 
-    if (d->tls) {
-        ++ph;
-        /* for xxx-link.c:relocate() */
-        s1->tls_start = ph->p_vaddr;
-        s1->tls_end = s1->tls_start + ph->p_memsz + (-ph->p_memsz & (ph->p_align - 1));
-    }
-    if (d->relro)
-        ++ph;
     /* Fill other headers */
-    if (d->note)
-        fill_phdr(++ph, PT_NOTE, d->note);
-    if (d->dynamic)
-        fill_phdr(++ph, PT_DYNAMIC, d->dynamic)->p_flags |= PF_W;
-    if (eh_frame_hdr_section)
-        fill_phdr(++ph, PT_GNU_EH_FRAME, eh_frame_hdr_section);
+    if (d->dyna)
+        fill_phdr(&d->phdr[d->dyna], PT_DYNAMIC, d->dynamic);
+    if (d->ehfr)
+        fill_phdr(&d->phdr[d->ehfr], PT_GNU_EH_FRAME, eh_frame_hdr_section);
     if (d->interp)
         fill_phdr(&d->phdr[1], PT_INTERP, d->interp);
     if (phfill) {
