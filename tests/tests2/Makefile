@@ -35,7 +35,7 @@ ifeq ($(CONFIG_bcheck),no)
 endif
 ifeq ($(CONFIG_dll),no)
  SKIP += 113_btdll.test # no shared lib support yet
- SKIP += 149_end_copy_reloc.test 151_dso_linker_symbol.test
+ SKIP += 148_linker_symbols.test
 endif
 ifeq (-$(findstring gcc,$(CC))-,--)
  SKIP += $(patsubst %.expect,%.test,$(GEN-ALWAYS))
@@ -47,8 +47,7 @@ ifeq (-$(CONFIG_WIN32)-,-yes-)
  SKIP += 106_versym.test # No pthread support
  SKIP += 114_bound_signal.test # No pthread support
  SKIP += 117_builtins.test # win32 port doesn't define __builtins
- SKIP += 148_linker_symbols.test 149_end_copy_reloc.test # ELF linker tests
- SKIP += 150_linker_boundaries.test 151_dso_linker_symbol.test
+ SKIP += 148_linker_symbols.test # ELF linker tests
 endif
 ifneq (,$(filter OpenBSD FreeBSD NetBSD DragonFly,$(TARGETOS)))
  SKIP += 106_versym.test # no pthread_condattr_setpshared
@@ -58,11 +57,10 @@ ifneq (,$(filter OpenBSD FreeBSD NetBSD DragonFly,$(TARGETOS)))
 endif
 ifeq ($(CONFIG_OSX),yes)
  SKIP += 144_tls.test 146_tls_extern.test # TLS runtime not supported on Mach-O
- SKIP += 148_linker_symbols.test 149_end_copy_reloc.test # ELF linker tests
- SKIP += 150_linker_boundaries.test 151_dso_linker_symbol.test
+ SKIP += 148_linker_symbols.test # ELF linker tests
 endif
 ifeq ($(CONFIG_pie),yes)
- SKIP += 149_end_copy_reloc.test # PIE executables do not use copy relocations
+ SKIP += 148_linker_symbols.test # PIE executables do not use copy relocations
 endif
 ifeq (-$(ARCH)-,-arm-)
  SKIP += 144_tls.test 146_tls_extern.test # doesn't work currently
@@ -124,62 +122,6 @@ GEN-ALWAYS =
 # constructor/destructor
 108_constructor.test: NORUN = true
 
-# TLS needs executable and pthread, not -run
-144_tls.test: FLAGS += -pthread
-144_tls.test: NORUN = true
-# Verify that undefined TLS symbols in TCC objects work with the system linker.
-146_tls_extern.test: NORUN = true
-146_tls_extern.test: T1 = \
-	$(TCC) -c $1 -o 146_tls_extern-main.o && \
-	$(TCC) -c $(subst 146,146+,$1) -o 146_tls_extern-def.o && \
-	$(CC) -no-pie -Wl,-z,noexecstack 146_tls_extern-main.o \
-		146_tls_extern-def.o -o $(basename $@).exe && \
-	./$(basename $@).exe
-ifeq (-$(CONFIG_WIN32)-,-yes-)
-146_tls_extern.test : CC=$(TCC)
-endif
-
-# Check optional ELF linker symbols, including references from an archive.
-148_linker_symbols.test: NORUN = true
-148_linker_symbols.test: T1 = ( \
-	$(TCC) -c $(subst 148,148+,$1) -o 148_linker_symbols.o && \
-	$(AR) rcs 148_linker_symbols.a 148_linker_symbols.o && \
-	$(TCC) $1 148_linker_symbols.a -o $(basename $@).exe && \
-	./$(basename $@).exe && \
-	$(TCC) $(subst 148,148+override,$1) -o 148_linker_symbols-override.exe && \
-	./148_linker_symbols-override.exe \
-    )
-
-# Copy relocations must be included in the final end symbols.
-149_end_copy_reloc.test: NORUN = true
-149_end_copy_reloc.test: T1 = ( \
-	$(TCC) -shared $(subst 149,149+,$1) -o 149_end_copy_reloc$(DLLSUF) && \
-	$(TCC) $1 ./149_end_copy_reloc$(DLLSUF) -Wl,-rpath=. \
-		-o $(basename $@).exe && \
-	./$(basename $@).exe && \
-	$(TCC) $(subst 149,149+override,$1) ./149_end_copy_reloc$(DLLSUF) \
-		-Wl,-rpath=. -o 149_end_copy_reloc-override.exe && \
-	./149_end_copy_reloc-override.exe \
-    )
-
-# Boundary symbols must cover separately named sections from external objects.
-150_linker_boundaries.test: NORUN = true
-150_linker_boundaries.test: T1 = ( \
-	$(CC) -fcommon -fno-pic -fno-pie -c $(subst 150,150+,$1) \
-		-o 150_linker_boundaries.o && \
-	$(TCC) $1 150_linker_boundaries.o -o $(basename $@).exe && \
-	./$(basename $@).exe \
-    )
-
-# A linker symbol needed only by a DSO must be provided by the executable.
-151_dso_linker_symbol.test: NORUN = true
-151_dso_linker_symbol.test: T1 = ( \
-	$(TCC) -shared $(subst 151,151+,$1) -o 151_dso_linker_symbol$(DLLSUF) && \
-	$(TCC) $1 ./151_dso_linker_symbol$(DLLSUF) -Wl,-rpath=. \
-		-o $(basename $@).exe && \
-	./$(basename $@).exe \
-    )
-
 112_backtrace.test: FLAGS += -dt -b
 112_backtrace.test 113_btdll.test 126_bound_global.test: FILTER += \
     -e 's;[0-9A-Fa-fx]\{5,\};........;g' \
@@ -189,9 +131,8 @@ endif
 113_btdll.test: T1 = \
     $(TCC) -bt $1 -shared -D DLL=1 -o a1$(DLLSUF) && \
     $(TCC) -bt $1 -shared -D DLL=2 -o a2$(DLLSUF) && \
-    $(TCC) -bt $1 a1$(DLLSUF) a2$(DLLSUF) -Wl,-rpath=. -o $(basename $@).exe && \
-    ./$(basename $@).exe
-
+    $(TCC) -bt $1 a1$(DLLSUF) a2$(DLLSUF) -Wl,-rpath=. -o $*.exe && \
+    ./$*.exe
 
 114_bound_signal.test: FLAGS += -b
 114_bound_signal.test: NORUN = true # tcc -run does not support fork and -b and SELINUX
@@ -211,6 +152,32 @@ endif
 140_arm64_extasm.test: GEN = $(GEN-TCC)
 141_riscv_asm.test: GEN = $(GEN-TCC)
 
+# TLS needs executable and pthread, not -run
+144_tls.test: FLAGS += -pthread
+144_tls.test: NORUN = true
+
+# Verify that undefined TLS symbols in TCC objects work with the system linker.
+# (note: '$*' is '146_tls_extern' here)
+146_tls_extern.test: T1 = \
+	$(TCC) -c $1 -o $*-main.o && \
+	$(TCC) -c $1 -DDEFS -o $*-defs.o && \
+	$(CC) -no-pie -Wl,-z,noexecstack $*-main.o $*-defs.o -o $*.exe && \
+	./$*.exe
+ifeq (-$(CONFIG_WIN32)-,-yes-)
+146_tls_extern.test : CC=$(TCC)
+endif
+
+# Check ELF linker symbols
+148_linker_symbols.test: T1 = \
+	for T in 1 2 3 4 5 6; do \
+	  echo; echo "--- TEST $$T ---"; F=$*-$$T; \
+	  $(TCC) $1 -DTEST=$$T+100 -c -fcommon -o $$F.o && \
+	  $(TCC) $1 -DTEST=$$T+200 -shared -o $$F.so -fPIC && \
+	  $(TCC) $1 -DTEST=$$T -Wl,-rpath=. -o $$F.exe $$F.o $$F.so -no-pie && \
+	  ./$$F.exe; \
+	done
+148_linker_symbols.test: GEN=$(T1)
+
 # Filter source directory in warnings/errors (out-of-tree builds)
 FILTER = 2>&1 | sed -e 's,$(SRC)/,,g'
 
@@ -222,7 +189,7 @@ all test tests2.all: $(filter-out $(SKIP),$(TESTS))
 	@$(call T1,$<) $(T3)
 
 T1 = $(TCC) $(FLAGS) $(T2) $(ARGS)
-T2 = $(if $(NORUN),$1 -o $(basename $@).exe && ./$(basename $@).exe,-run $1)
+T2 = $(if $(NORUN),$1 -o $*.exe && ./$*.exe,-run $1)
 T3 = $(FILTER) >$*.output 2>&1 || true \
      && diff -Nbu $(filter %.expect,$^) $*.output \
      && rm -f $*.output $(filter $*.expect,$(GEN-ALWAYS))
@@ -250,9 +217,9 @@ F2 = $1 UPDATE="$(patsubst %.test,%.expect,$1)"
 
 # using TCC for .expect if -dt in FLAGS
 GEN = $(if $(filter -dt -bt -b,$(FLAGS)),$(GEN-TCC),$(GEN-CC))
-GEN-CC = $(CC) -w -std=gnu99 $(FLAGS) $1 -o $(basename $@).exe && ./$(basename $@).exe $(ARGS)
+GEN-CC = $(CC) -w -std=gnu99 $(FLAGS) $1 -o $*.exe && ./$*.exe $(ARGS)
 GEN-TCC = $(T1)
-GEN-MSC = $(MS-CC) $1 && ./$(basename $@).exe
+GEN-MSC = $(MS-CC) $1 && ./$*.exe
 MS-CC = cl
 
 # tell make not to delete

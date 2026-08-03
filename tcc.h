@@ -675,6 +675,7 @@ typedef struct AttributeDef {
     int alias_target; /* token */
     int asm_label; /* associated asm label */
     char attr_mode; /* __attribute__((__mode__(...))) */
+    char new_section; /* section is new */
 } AttributeDef;
 
 /* inline functions */

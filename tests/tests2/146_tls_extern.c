@@ -1,7 +1,10 @@
-#include <stdio.h>
-
+#ifdef DEFS
+__thread signed short extern_tls_short = 1234;
+__thread float extern_tls_float = 1.5f;
+#else
 extern __thread signed short extern_tls_short;
 extern __thread float extern_tls_float;
+int printf(const char *, ...);
 
 int main(void)
 {
@@ -20,3 +23,4 @@ int main(void)
     printf("extern tls errors: %d\n", errors);
     return errors;
 }
+#endif

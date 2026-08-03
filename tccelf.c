@@ -742,6 +742,8 @@ ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size,
                 /* keep first-found weak definition, ignore subsequents */
             } else if (sym_vis == STV_HIDDEN || sym_vis == STV_INTERNAL) {
                 /* ignore hidden symbols after */
+            } else if (s->sh_flags & SHF_DYNSYM) {
+                /* we accept that two DLL define the same symbol */
             } else if ((esym->st_shndx == SHN_COMMON
                             || esym->st_shndx == bss_section->sh_num)
                         && (shndx < SHN_LORESERVE
@@ -750,8 +752,6 @@ ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size,
                 goto do_patch;
             } else if (shndx == SHN_COMMON || shndx == bss_section->sh_num) {
                 /* data symbol keeps precedence over common/bss */
-            } else if (s->sh_flags & SHF_DYNSYM) {
-                /* we accept that two DLL define the same symbol */
 	    } else if (esym->st_other & ST_ASM_SET) {
 		/* If the existing symbol came from an asm .set
 		   we can override.  */
@@ -761,7 +761,7 @@ ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size,
                 printf("new_bind=%x new_shndx=%x new_vis=%x old_bind=%x old_shndx=%x old_vis=%x\n",
                        sym_bind, shndx, new_vis, esym_bind, esym->st_shndx, esym_vis);
 #endif
-                tcc_error_noabort("'%s' defined twice", name);
+                tcc_error_noabort("link symbol '%s' defined twice", name);
             }
         } else {
             esym->st_other = other;
@@ -1560,94 +1560,6 @@ ST_FUNC int set_global_sym(TCCState *s1, const char *name, Section *sec, addr_t 
         ELFW(ST_INFO)(name ? STB_GLOBAL : STB_LOCAL, STT_NOTYPE), 0, shn, name);
 }
 
-#ifndef ELF_OBJ_ONLY
-static int set_linker_sym(TCCState *s1, const char *name,
-                          Section *sec, addr_t offs)
-{
-    int sym_index = find_elf_sym(symtab_section, name);
-    ElfW(Sym) *sym = sym_index
-        ? &((ElfW(Sym) *)symtab_section->data)[sym_index] : NULL;
-    /* Mirror the set_elf_sym cases where the new definition wins. */
-    int is_linker_sym = !sym || sym->st_shndx == SHN_UNDEF
-        || ELFW(ST_BIND)(sym->st_info) == STB_WEAK
-        || (sec && sec != bss_section
-            && ((sym->st_other & ST_ASM_SET)
-                || sym->st_shndx == SHN_COMMON
-                || sym->st_shndx == bss_section->sh_num));
-
-    sym_index = set_global_sym(s1, name, sec, offs);
-    if (is_linker_sym)
-        get_sym_attr(s1, sym_index, 1)->linker_sym = 1;
-    return sym_index;
-}
-
-static void provide_linker_sym(TCCState *s1, const char *name,
-                               Section *sec, addr_t offs)
-{
-    int sym_index = find_elf_sym(symtab_section, name);
-
-    if (sym_index) {
-        if (((ElfW(Sym) *)symtab_section->data)[sym_index].st_shndx != SHN_UNDEF)
-            return;
-    } else if (!s1->dynsymtab_section
-               || !find_elf_sym(s1->dynsymtab_section, name)) {
-        return;
-    }
-    set_linker_sym(s1, name, sec, offs);
-}
-
-static void update_linker_sym(TCCState *s1, const char *name,
-                              Section *sec, addr_t offs)
-{
-    int sym_index = find_elf_sym(symtab_section, name);
-
-    if (sym_index && sym_index < s1->nb_sym_attrs
-        && s1->sym_attrs[sym_index].linker_sym) {
-        ElfW(Sym) *sym = &((ElfW(Sym) *)symtab_section->data)[sym_index];
-
-        sym->st_value = offs;
-        sym->st_shndx = sec->sh_num;
-        if (s1->dynsym) {
-            sym_index = find_elf_sym(s1->dynsym, name);
-            if (sym_index) {
-                sym = &((ElfW(Sym) *)s1->dynsym->data)[sym_index];
-                sym->st_value = offs;
-                sym->st_shndx = sec->sh_num;
-            }
-        }
-    }
-}
-
-static void finalize_linker_symbols(TCCState *s1, int *sec_order)
-{
-    Section *etext = text_section;
-    Section *edata = data_section;
-    Section *end = bss_section;
-    Section *s;
-    int i;
-
-    /* Follow the final loadable-section order rather than assuming that
-       .text, .data and .bss are the last sections of their regions. */
-    for (i = 1; i < s1->nb_sections; ++i) {
-        s = s1->sections[sec_order[i]];
-        if (!(s->sh_flags & SHF_ALLOC))
-            continue;
-        end = s;
-        if (!(s->sh_flags & SHF_WRITE))
-            etext = s;
-        if (s->sh_type != SHT_NOBITS)
-            edata = s;
-    }
-
-    update_linker_sym(s1, "_etext", etext, etext->sh_size);
-    update_linker_sym(s1, "etext", etext, etext->sh_size);
-    update_linker_sym(s1, "_edata", edata, edata->sh_size);
-    update_linker_sym(s1, "edata", edata, edata->sh_size);
-    update_linker_sym(s1, "_end", end, end->sh_size);
-    update_linker_sym(s1, "end", end, end->sh_size);
-}
-#endif
-
 static void add_init_array_defines(TCCState *s1, const char *section_name)
 {
     Section *s;
@@ -1963,6 +1875,39 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
 }
 #endif /* ndef TCC_TARGET_PE */
 
+/* set _etext/_edata/_end  f=0:set  f=1:when_needed  f=2,3:just_update */
+static void set_linker_sym(TCCState *s1, const char *name, Section *sec, int f)
+{
+    int sym_index, esym_index, defined;
+    ElfW(Sym) *sym, *esym;
+    sym_index = find_elf_sym(symtab_section, name);
+    sym = (ElfW(Sym) *)symtab_section->data + sym_index;
+    esym_index = find_elf_sym(s1->dynsymtab_section, name);
+    esym = (ElfW(Sym) *)s1->dynsymtab_section->data + esym_index;
+    defined = sym->st_shndx != SHN_UNDEF
+        || (esym->st_shndx != SHN_UNDEF && esym->st_size);
+    switch (f) {
+    case 1: /* old symbols w/o '_' */
+        if (!(sym_index || esym_index) || defined)
+            break;
+    case 0:
+        if (defined) {
+            tcc_warning("linker symbol '%s' already defined", name);
+            break;
+        }
+        sym_index = set_global_sym(s1, name, sec, -1);
+        get_sym_attr(s1, sym_index, 1)->linker_sym = 1;
+        break;
+    default: /* update (bss only) */
+        if (get_sym_attr(s1, sym_index, 0)->linker_sym)
+            sym->st_value = sec->data_offset;
+    }
+#ifndef ELF_OBJ_ONLY
+    if (name[0] == '_')
+        set_linker_sym(s1, name + 1, sec, f + 1);
+#endif
+}
+
 /* add various standard linker symbols (must be done after the
    sections are filled (for example after allocating common
    symbols)) */
@@ -1972,22 +1917,13 @@ static void tcc_add_linker_symbols(TCCState *s1)
     int i;
     Section *s;
 
-#ifndef ELF_OBJ_ONLY
-    set_linker_sym(s1, "_etext", text_section, -1);
-    set_linker_sym(s1, "_edata", data_section, -1);
-    set_linker_sym(s1, "_end", bss_section, -1);
-    /* These conventional ELF symbols have PROVIDE semantics. */
-    provide_linker_sym(s1, "etext", text_section, -1);
-    provide_linker_sym(s1, "edata", data_section, -1);
-    provide_linker_sym(s1, "end", bss_section, -1);
-#else
-    set_global_sym(s1, "_etext", text_section, -1);
-    set_global_sym(s1, "_edata", data_section, -1);
-    set_global_sym(s1, "_end", bss_section, -1);
-#endif
+    set_linker_sym(s1, "_etext", text_section, 0);
+    set_linker_sym(s1, "_edata", data_section, 0);
+    set_linker_sym(s1, "_end", bss_section, 0);
 #if TARGETOS_OpenBSD
     set_global_sym(s1, "__executable_start", NULL, ELF_START_ADDR);
 #endif
+
 #ifdef TCC_TARGET_RISCV64
     /* XXX should be .sdata+0x800, not .data+0x800 */
     set_global_sym(s1, "__global_pointer$", data_section, 0x800);
@@ -2032,7 +1968,7 @@ ST_FUNC void resolve_common_syms(TCCState *s1)
 
     /* Allocate common symbols in BSS.  */
     for_each_elem(symtab_section, 1, sym, ElfW(Sym)) {
-        if (sym->st_shndx == SHN_COMMON) {
+        if (sym->st_shndx == SHN_COMMON && sym->st_size) {
             /* symbol alignment is in st_value for SHN_COMMONs */
 	    sym->st_value = section_add(bss_section, sym->st_size,
 					sym->st_value);
@@ -2041,7 +1977,8 @@ ST_FUNC void resolve_common_syms(TCCState *s1)
     }
 
     /* Now assign linker provided symbols their value.  */
-    tcc_add_linker_symbols(s1);
+    if (s1->output_type != TCC_OUTPUT_DLL)
+        tcc_add_linker_symbols(s1);
 }
 
 #ifndef ELF_OBJ_ONLY
@@ -2129,13 +2066,16 @@ static void bind_exe_dynsyms(TCCState *s1, int is_PIE)
        - if STT_FUNC or STT_GNU_IFUNC symbol -> add it in PLT
        - if STT_OBJECT symbol -> add it in .bss section with suitable reloc */
     for_each_elem(symtab_section, 1, sym, ElfW(Sym)) {
-        if (sym->st_shndx == SHN_UNDEF) {
+        if (sym->st_shndx == SHN_UNDEF
+            /* bss symbols may be initialized in the shared library */
+            || sym->st_shndx == SHN_COMMON
+            || sym->st_shndx == bss_section->sh_num) {
             name = (char *) symtab_section->link->data + sym->st_name;
             sym_index = find_elf_sym(s1->dynsymtab_section, name);
-            if (sym_index) {
+            esym = &((ElfW(Sym) *)s1->dynsymtab_section->data)[sym_index];
+            if (sym_index && esym->st_shndx != SHN_UNDEF) {
                 if (is_PIE)
                     continue;
-                esym = &((ElfW(Sym) *)s1->dynsymtab_section->data)[sym_index];
                 type = ELFW(ST_TYPE)(esym->st_info);
                 if ((type == STT_FUNC) || (type == STT_GNU_IFUNC)) {
                     /* Indirect functions shall have STT_FUNC type in executable
@@ -2154,15 +2094,19 @@ static void bind_exe_dynsyms(TCCState *s1, int is_PIE)
                 } else if (type == STT_OBJECT) {
                     unsigned long offset;
                     ElfW(Sym) *dynsym;
-                    offset = bss_section->data_offset;
-                    /* XXX: which alignment ? */
-                    offset = (offset + 16 - 1) & -16;
+                    if (sym->st_shndx == bss_section->sh_num) {
+                        offset = sym->st_value;
+                    } else {
+                        offset = bss_section->data_offset;
+                        /* XXX: which alignment ? */
+                        offset = (offset + 16 - 1) & -16;
+                        bss_section->data_offset = offset + esym->st_size;
+                    }
                     set_elf_sym (s1->symtab, offset, esym->st_size,
                                  esym->st_info, 0, bss_section->sh_num, name);
                     index = put_elf_sym(s1->dynsym, offset, esym->st_size,
                                         esym->st_info, 0, bss_section->sh_num,
                                         name);
-
                     /* Ensure R_COPY works for weak symbol aliases */
                     if (ELFW(ST_BIND)(esym->st_info) == STB_WEAK) {
                         for_each_elem(s1->dynsymtab_section, 1, dynsym, ElfW(Sym)) {
@@ -2177,13 +2121,10 @@ static void bind_exe_dynsyms(TCCState *s1, int is_PIE)
                             }
                         }
                     }
-
                     put_elf_reloc(s1->dynsym, bss_section,
                                   offset, R_COPY, index);
-                    offset += esym->st_size;
-                    bss_section->data_offset = offset;
                 }
-            } else {
+            } else if (sym->st_shndx == SHN_UNDEF) {
                 /* STB_WEAK undefined symbols are accepted */
                 /* XXX: _fp_hw seems to be part of the ABI, so we ignore it */
                 if (ELFW(ST_BIND)(sym->st_info) == STB_WEAK ||
@@ -2194,6 +2135,8 @@ static void bind_exe_dynsyms(TCCState *s1, int is_PIE)
             }
         }
     }
+    /* update _end symbol with new bss length */
+    set_linker_sym(s1, "_end", bss_section, 2);
 }
 
 /* Bind symbols of libraries: export all non local symbols of executable that
@@ -3179,7 +3122,6 @@ static int elf_output_file(TCCState *s1, const char *filename)
     sec_order = tcc_malloc(sizeof(int) * 2 * s1->nb_sections);
     /* compute section to program header mapping */
     layout_sections(s1, sec_order, &dyninf);
-    finalize_linker_symbols(s1, sec_order);
 
         if (dynamic) {
             /* put in GOT the dynamic section address and relocate PLT */
@@ -3627,7 +3569,7 @@ invalid:
         }
     }
  done:
-    ret = 0;
+    ret = !s1->nb_errors - 1; /* errors possibly from set_elf_sym() */
  the_end:
     tcc_free(symtab);
     tcc_free(strtab);

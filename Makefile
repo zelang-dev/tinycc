@@ -336,7 +336,7 @@ FORCE:
 # some versions of gnu-make do not recognize 'command' as a shell builtin
 WHICH = sh -c 'command -v $1'
 
-run-if = $(if $(shell $(call WHICH,$1)),$S $1 $2,echo "(skipping $@ - no $1)")
+run-if = $(if $(shell $(call WHICH,$1)),$S $1 $2,@echo "(skipping $@ - no $1)")
 S = $(if $(findstring yes,$(SILENT)),@$(info * $@))
 
 # --------------------------------------------------------------------------
