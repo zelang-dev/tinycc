@@ -77,14 +77,10 @@ ST_DATA const int reg_classes[NB_REGS] = {
   RC_INT | RC_R(13),
   RC_INT | RC_R(14),
   RC_INT | RC_R(15),
-  RC_INT | RC_R(16),
-  RC_INT | RC_R(17),
-#ifdef TCC_TARGET_PE
-  RC_R(18), /* (x18 reserved on Windows) */
-#else
-  RC_INT | RC_R(18),
-#endif
-  RC_R30, // not in RC_INT as we make special use of x30
+  RC_R(16), /* reserved for generator (arm64_sym()) */
+  RC_R(17), /* reserved for generator (arm64_sym()) */
+  RC_R(18), /* reserved on Windows/OSX */
+  RC_R30,   /* not in RC_INT as we make special use of x30 */
   RC_FLOAT | RC_F(0),
   RC_FLOAT | RC_F(1),
   RC_FLOAT | RC_F(2),
@@ -298,6 +294,7 @@ static void arm64_spoff(int reg, uint64_t off)
 
 static uint64_t arm64_check_offset(int sz_, uint64_t off)
 {
+#ifndef TCC_TARGET_PE
     uint32_t sz = sz_;
     uint64_t scaled_mask = 0xffful << sz;
     if (!(off & ~scaled_mask) || (off < 256 || -off <= 256))
@@ -306,6 +303,7 @@ static uint64_t arm64_check_offset(int sz_, uint64_t off)
         return scaled_mask;
     if (off & 0x1fful)
         return 0x1fful;
+#endif
     return 0;
 }
 
@@ -463,12 +461,17 @@ static void arm64_strv(int sz_, int dst, int bas, uint64_t off)
     }
 }
 
+static void arm64_reloca(Sym *sym, int reloc_type, uint64_t addend)
+{
+    greloca(cur_text_section, sym, ind, reloc_type, addend);
+}
+
 static void arm64_sym(int r, Sym *sym, addr_t addend)
 {
     if (sym->type.t & VT_TLS) {
-#if TCC_TARGET_PE
+#ifdef TCC_TARGET_PE
         Sym *s2 = external_global_sym(TOK___tls_index, &int_type);
-        int r2 = get_reg(RC_INT);
+        int r2 = get_reg(RC_R(16));
         arm64_sym(30, s2, 0);
         o(0xb94003de); // ldr w30, [x30]
         o(0xf9402e40 | r2); // ldr r2, [x18, #88]
@@ -477,46 +480,35 @@ static void arm64_sym(int r, Sym *sym, addr_t addend)
 #else
         o(0xd53bd040 | r); /* mrs xr, tpidr_el0 */
 #endif
-        greloca(cur_text_section, sym, ind, R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
-        /* add xr, xr, #0, lsl #12 */
-        o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) | ARM64_RN(r) | ARM64_RD(r));
-        greloca(cur_text_section, sym, ind, R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
-        /* add xr, xr, #0 */
-        o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | ARM64_RD(r));
-        goto add_addend;
-    }
-#ifdef TCC_TARGET_PE
-    /* PE links symbol addresses directly; there is no ELF-style GOT here. */
-    greloca(cur_text_section, sym, ind, R_AARCH64_ADR_PREL_PG_HI21, 0);
-    o(ARM64_ADRP | r);            // adrp xr, #sym
-    greloca(cur_text_section, sym, ind, R_AARCH64_ADD_ABS_LO12_NC, 0);
-    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | r); // add xr, xr, #sym
-#else
-    greloca(cur_text_section, sym, ind, R_AARCH64_ADR_GOT_PAGE, 0);
-    o(ARM64_ADRP | r);            // adrp xr, #sym
-    greloca(cur_text_section, sym, ind, R_AARCH64_LD64_GOT_LO12_NC, 0);
-    o(ARM64_LDR_X | ARM64_RN(r) | r); // ld xr,[xr, #sym]
-#endif
-add_addend:
-    if (addend) {
-        // add xr, xr, #addend
-	if (addend & 0xffful)
-           o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | r |
-             (addend & 0xfff) << 10);
-        if (addend > 0xffful) {
-            // add xr, xr, #addend, lsl #12
-	    if (addend & 0xfff000ul)
-                o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) |
-                  ARM64_RN(r) | r | ((addend >> 12) & 0xfff) << 10);
-            if (addend > 0xfffffful) {
-		/* very unlikely */
-		int t = r ? 0 : 1;
-		o(ARM64_STR_X_PRE | 0x001F0FE0U | t); /* str xt, [sp, #-16]! */
-		arm64_movimm(t, addend & ~0xffffffull); // use xt for addent
-		o(ARM64_ADD_REG | ARM64_SF(1) | ARM64_RM(t) | ARM64_RN(r) | r); /* add xr, xr, xt */
-		o(ARM64_LDR_X_POST | 0x000107E0U | t); /* ldr xt, [sp], #16 */
-	    }
+        arm64_reloca(sym, R_AARCH64_TLSLE_ADD_TPREL_HI12, addend);
+        o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) | ARM64_RN(r) | ARM64_RD(r)); /* add xr, xr, #0, lsl #12 */
+        arm64_reloca(sym, R_AARCH64_TLSLE_ADD_TPREL_LO12, addend);
+        o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | ARM64_RD(r)); /* add xr, xr, #0 */
+#ifndef TCC_TARGET_PE /* no elf-style GOT on Windows */
+    } else if (!(sym->type.t & VT_STATIC)) {
+        arm64_reloca(sym, R_AARCH64_ADR_GOT_PAGE, 0);
+        o(ARM64_ADRP | r); /* adrp xr, #sym */
+        arm64_reloca(sym, R_AARCH64_LD64_GOT_LO12_NC, 0);
+        o(ARM64_LDR_X | ARM64_RN(r) | r); /* ld xr,[xr, #sym] */
+        if (addend > 0xffffff) {
+            int t = get_reg(RC_R(16));
+            arm64_movimm(t, addend); // use xt for addent
+            o(ARM64_ADD_REG | ARM64_SF(1) | ARM64_RM(t) | ARM64_RN(r) | r); /* add xr, xr, xt */
+        } else {
+           if (addend & 0xfff) /* add xr, xr, #addend */
+                o(ARM64_ADD_IMM | ARM64_SF(1)
+                    | ARM64_RN(r) | r | (addend & 0xfff) << 10);
+            addend >>= 12;
+            if (addend & 0xfff) /* add xr, xr, #addend, lsl #12 */
+                o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1)
+                    | ARM64_RN(r) | r | (addend & 0xfff) << 10);
         }
+#endif
+    } else {
+        arm64_reloca(sym, R_AARCH64_ADR_PREL_PG_HI21, addend);
+        o(ARM64_ADRP | r); /* adrp xr, #sym */
+        arm64_reloca(sym, R_AARCH64_ADD_ABS_LO12_NC, addend);
+        o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | r); /* add xr, xr, #sym */
     }
 }
 
@@ -678,8 +670,8 @@ ST_FUNC void store(int r, SValue *sv)
 
 static void arm64_gen_bl_or_b(int b)
 {
-    if ((vtop->r & (VT_VALMASK | VT_LVAL)) == VT_CONST && (vtop->r & VT_SYM)) {
-	greloca(cur_text_section, vtop->sym, ind,
+    if ((vtop->r & (VT_VALMASK | VT_LVAL | VT_SYM)) == (VT_CONST | VT_SYM)) {
+	arm64_reloca(vtop->sym,
                 b ? R_AARCH64_JUMP26 :  R_AARCH64_CALL26, 0);
 	o(b ? ARM64_B : ARM64_BL); // b/bl .
     }
@@ -691,16 +683,16 @@ static void arm64_gen_bl_or_b(int b)
     }
 }
 
-#if defined(CONFIG_TCC_BCHECK)
-
-static void gen_bounds_call(int v)
+#if defined CONFIG_TCC_BCHECK || defined TCC_TARGET_PE
+static void gen_static_call(int v)
 {
     Sym *sym = external_helper_sym(v);
-
-    greloca(cur_text_section, sym, ind, R_AARCH64_CALL26, 0);
+    arm64_reloca(sym, R_AARCH64_CALL26, 0);
     o(ARM64_BL); // bl
 }
+#endif
 
+#if defined(CONFIG_TCC_BCHECK)
 static void gen_bounds_prolog(void)
 {
     /* leave some room for bound checking code */
@@ -735,7 +727,7 @@ static void gen_bounds_epilog(void)
         saved_ind = ind;
         ind = func_bound_ind;
         arm64_sym(0, sym_data, 0);
-        gen_bounds_call(TOK___bound_local_new);
+        gen_static_call(TOK___bound_local_new);
         ind = saved_ind;
     }
 
@@ -743,7 +735,7 @@ static void gen_bounds_epilog(void)
     o(0xa9bf07e0); /* stp x0, x1, [sp, #-16]! */
     o(0x3c9f0fe0); /* str q0, [sp, #-16]! */
     arm64_sym(0, sym_data, 0);
-    gen_bounds_call(TOK___bound_local_delete);
+    gen_static_call(TOK___bound_local_delete);
     o(0x3cc107e0); /* ldr q0, [sp], #16 */
     o(0xa8c107e0); /* ldp x0, x1, [sp], #16 */
 }
@@ -1004,11 +996,8 @@ static void arm64_sub_sp(uint64_t diff)
         return;
 #ifdef TCC_TARGET_PE
     if (diff >= 4096) {
-        Sym *sym = external_helper_sym(TOK___chkstk);
-
         arm64_movimm(15, diff >> 4);
-        greloca(cur_text_section, sym, ind, R_AARCH64_CALL26, 0);
-        o(ARM64_BL); // bl __chkstk
+        gen_static_call(TOK___chkstk);
         o(0xcb2f73ff); // sub sp,sp,x15,lsl #4
         return;
     }

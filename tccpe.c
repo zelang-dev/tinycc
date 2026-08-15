@@ -351,7 +351,8 @@ enum {
     sec_bss ,
     sec_idata ,
     sec_pdata ,
-    sec_tls ,
+    sec_tdata ,
+    sec_tbss ,
     sec_other ,
     sec_rsrc ,
     sec_debug ,
@@ -1197,6 +1198,7 @@ static void pe_build_tls(struct pe_info *pe, Section *s)
     int c, n;
 
     if (0 == s) {
+        pe->tls_size = sizeof (IMAGE_TLS_DIRECTORY);
         pe->tls_dir = section_add(pe->thunk, pe->tls_size, 16);
         pe->tls_data = section_add(data_section, PTR_SIZE * (1+3), 16);
         /* put relocations on entries */
@@ -1209,6 +1211,7 @@ static void pe_build_tls(struct pe_info *pe, Section *s)
                 0, data_section->sh_num, "__tls_index");
         return;
     }
+
     if (0 == s1->tls_start)
         s1->tls_start = s->sh_addr;
     d = (void*)(pe->thunk->data + pe->tls_dir);
@@ -1235,7 +1238,7 @@ static int pe_section_class(Section *s)
         return sec_debug;
     } else if (flags & SHF_ALLOC) {
         if (flags & SHF_TLS)
-            return sec_tls;
+            return sec_tdata + (type == SHT_NOBITS);
         if (type == SHT_PROGBITS
          || type == SHT_INIT_ARRAY
          || type == SHT_FINI_ARRAY) {
@@ -1273,6 +1276,7 @@ static int pe_assign_addresses (struct pe_info *pe)
     if (PE_DLL == pe->type
         || (s1->pe_dll_characteristics & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE))
         pe->reloc = new_section(s1, ".reloc", SHT_PROGBITS, 0);
+    pe->thunk = rodata_section;
     //pe->thunk = new_section(s1, ".iedat", SHT_PROGBITS, SHF_ALLOC);
 
     nbs = s1->nb_sections;
@@ -1284,35 +1288,30 @@ static int pe_assign_addresses (struct pe_info *pe)
         for (n = i; n > 1 && k < (c = sec_cls[n - 1]); --n)
             sec_cls[n] = c, sec_order[n] = sec_order[n - 1];
         sec_cls[n] = k, sec_order[n] = i;
-        if (k == sec_tls)
-            pe->tls_size = sizeof (IMAGE_TLS_DIRECTORY);
+        if ((s->sh_flags & SHF_TLS) && 0 == pe->tls_size)
+            pe_build_tls(pe, NULL);
     }
     si = NULL;
     addr = pe->imagebase + 1;
-
     for (i = 1; (c = sec_cls[i]) < sec_last; ++i) {
         s = s1->sections[sec_order[i]];
 
         if (PE_MERGE_DATA && c == sec_bss)
             c = sec_data;
+        if (c == sec_tbss)
+            c = sec_tdata;
 
         if (si && c == si->cls && c != sec_debug) {
             /* merge with previous section */
-            s->sh_addr = addr = ((addr - 1) | (16 - 1)) + 1;
+            s->sh_addr = addr = ((addr - 1) | (s->sh_addralign - 1)) + 1;
         } else {
             si = NULL;
             s->sh_addr = addr = pe_virtual_align(pe, addr);
         }
 
-        if (NULL == pe->thunk
-            && c == (data_section == rodata_section ? sec_data : sec_rdata))
-            pe->thunk = s;
-
         if (s == pe->thunk) {
             pe_build_imports(pe);
             pe_build_exports(pe);
-            if (pe->tls_size)
-                pe_build_tls(pe, NULL);
         }
 
         if (s == pe->reloc)
@@ -1367,7 +1366,7 @@ add_section:
         Section *s = s1->sections[sec_order[i]];
         int type = s->sh_type;
         int flags = s->sh_flags;
-        printf("section %-16s %-10s %p %04x %s,%s,%s\n",
+        printf("section %-16s %-10s %p %04x %2d %s,%s,%s\n",
             s->name,
             type == SHT_PROGBITS ? "progbits" :
             type == SHT_INIT_ARRAY ? "initarr" :
@@ -1378,6 +1377,7 @@ add_section:
             type == SHT_RELX ? "rel" : "???",
             s->sh_addr,
             (unsigned)s->data_offset,
+            s->sh_addralign,
             flags & SHF_ALLOC ? "alloc" : "",
             flags & SHF_WRITE ? "write" : "",
             flags & SHF_EXECINSTR ? "exec" : ""
