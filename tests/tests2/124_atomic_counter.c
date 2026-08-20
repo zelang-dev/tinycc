@@ -2,11 +2,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <pthread.h>
+#include "threads.h"
 #include <stdatomic.h>
 
 #define NR_THREADS 16
-#define NR_STEPS   ((uint32_t)UINT16_MAX)
+#define NR_STEPS 10000
 
 #define BUG_ON(COND) \
     do { \

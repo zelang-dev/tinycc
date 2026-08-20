@@ -71,6 +71,9 @@ extern long double strtold (const char *__nptr, char **__endptr);
 #  define strtoll _strtoi64
 #  define strtoull _strtoui64
 # endif
+  /* some compilers don't know ldexpl and windows doesn't have long doubles anyway */
+# undef ldexpl
+# define ldexpl ldexp
 # ifdef LIBTCC_AS_DLL
 #  define LIBTCCAPI __declspec(dllexport)
 #  define PUB_FUNC LIBTCCAPI
@@ -672,6 +675,7 @@ typedef struct AttributeDef {
     int alias_target; /* token */
     int asm_label; /* associated asm label */
     char attr_mode; /* __attribute__((__mode__(...))) */
+    char new_section; /* section is new */
 } AttributeDef;
 
 /* inline functions */
@@ -722,6 +726,7 @@ struct sym_attr {
     unsigned plt_offset;
     int plt_sym;
     int dyn_index;
+    unsigned char linker_sym:1;
 #ifdef TCC_TARGET_ARM
     unsigned char plt_thumb_stub:1;
 #endif

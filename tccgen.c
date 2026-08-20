@@ -842,7 +842,7 @@ ST_FUNC void label_pop(Sym **ptop, Sym *slast, int keep)
             if (s->c) {
                 /* define corresponding symbol. A size of
                    1 is put. */
-                put_extern_sym(s, cur_text_section, s->jnext, 1);
+                put_extern_sym(s, cur_text_section, s->jind, 1);
             }
         }
         /* remove label */
@@ -3487,7 +3487,7 @@ error:
     }
 done:
     vtop->type = *type;
-    vtop->type.t &= ~ ( VT_CONSTANT | VT_VOLATILE | VT_ARRAY );
+    vtop->type.t &= ~ ( VT_CONSTANT | VT_VOLATILE | VT_ARRAY | VT_TLS );
 }
 
 /* return type size as known at compile time. Put alignment at 'a' */
@@ -3966,7 +3966,9 @@ redo:
         case TOK_SECTION2:
             skip('(');
 	    astr = parse_mult_str("section name")->data;
+            n = tcc_state->nb_sections;
             ad->section = find_section(tcc_state, astr);
+            ad->new_section = n < tcc_state->nb_sections;
             skip(')');
             break;
         case TOK_ALIAS1:
@@ -8393,17 +8395,21 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
             vset(type, r, addr);
         }
     } else {
+        CType *tp = type;
+        int is_const;
+
+        while ((tp->t & (VT_BTYPE|VT_ARRAY)) == (VT_PTR|VT_ARRAY))
+            tp = &tp->ref->type;
+        is_const = tp->t & VT_CONSTANT;
+
         /* allocate symbol in corresponding section */
         sec = ad->section;
         if (!sec) {
-            CType *tp = type;
-            while ((tp->t & (VT_BTYPE|VT_ARRAY)) == (VT_PTR|VT_ARRAY))
-                tp = &tp->ref->type;
             if (type->t & VT_TLS) {
                 sec = find_section(tcc_state, has_init ? ".tdata" : ".tbss");
                 sec->sh_flags = SHF_ALLOC | SHF_WRITE | SHF_TLS;
                 sec->sh_type = has_init ? SHT_PROGBITS : SHT_NOBITS;
-            } else if (tp->t & VT_CONSTANT) {
+            } else if (is_const) {
 		sec = rodata_section;
             } else if (has_init) {
 		sec = data_section;
@@ -8411,15 +8417,21 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
                     tcc_warning("rw data: %s", get_tok_str(v, 0));*/
             } else if (tcc_state->nocommon)
                 sec = bss_section;
+        } else if (ad->new_section) {
+            /* XXX: DWIM logic: set section flags according to first usage */
+            if (!is_const) {
+                sec->sh_flags |= SHF_WRITE;
+                if (!has_init)
+                    sec->sh_type = SHT_NOBITS;
+            }
         }
 
+#ifdef CONFIG_TCC_BCHECK
+        if (bcheck)
+            size = size + 1; /* add padding */
+#endif
         if (sec) {
 	    addr = section_add(sec, size, align);
-#ifdef CONFIG_TCC_BCHECK
-            /* add padding if bound check */
-            if (bcheck)
-                section_add(sec, 1, 1);
-#endif
         } else {
             addr = align; /* SHN_COMMON is special, symbol value is align */
 	    sec = common_section;
@@ -8449,7 +8461,7 @@ static void decl_initializer_alloc(CType *type, AttributeDef *ad, int r,
             /* then add global bound info */
             bounds_ptr = section_ptr_add(bounds_section, 2 * sizeof(addr_t));
             bounds_ptr[0] = 0; /* relocated */
-            bounds_ptr[1] = size;
+            bounds_ptr[1] = size - 1;
         }
 #endif
     }
@@ -8871,11 +8883,12 @@ static int decl(int l)
                     skip_or_save_block(&fn->func_str);
                 } else {
                     /* compute text section */
-                    cur_text_section = ad.section;
-                    if (!cur_text_section)
-                        cur_text_section = text_section;
-                    else if (cur_text_section->sh_num > bss_section->sh_num)
-                        cur_text_section->sh_flags = text_section->sh_flags;
+                    cur_text_section = text_section;
+                    if (ad.section) {
+                        cur_text_section = ad.section;
+                        if (ad.new_section)
+                            ad.section->sh_flags = text_section->sh_flags;
+                    }
                     gen_function(sym);
                 }
                 break;

@@ -306,6 +306,7 @@
 
 #if defined TCC_TARGET_PE
      DEF(TOK___chkstk, "__chkstk")
+     DEF(TOK___tls_index, "__tls_index")
 #endif
 #ifdef TCC_TARGET_ARM64
      DEF(TOK___arm64_clear_cache, "__arm64_clear_cache")

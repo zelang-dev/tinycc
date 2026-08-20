@@ -296,22 +296,17 @@ static void arm64_spoff(int reg, uint64_t off)
     }
 }
 
-/* invert 0: return value to use for store/load */
-/* invert 1: return value to use for arm64_sym */
-static uint64_t arm64_check_offset(int invert, int sz_, uint64_t off)
+static uint64_t arm64_check_offset(int sz_, uint64_t off)
 {
     uint32_t sz = sz_;
     uint64_t scaled_mask = 0xffful << sz;
-
-    if (!(off & ~scaled_mask) ||
-        (off < 256 || -off <= 256))
-        return invert ? off : 0ul;
-    else if (off & scaled_mask)
-        return invert ? off & scaled_mask : off & ~scaled_mask;
-    else if (off & 0x1fful)
-        return invert ? off & 0x1fful : off & ~0x1fful;
-    else
-        return invert ? 0ul : off;
+    if (!(off & ~scaled_mask) || (off < 256 || -off <= 256))
+        return ~0ull;
+    if (off & scaled_mask)
+        return scaled_mask;
+    if (off & 0x1fful)
+        return 0x1fful;
+    return 0;
 }
 
 static void arm64_ldrx(int sg, int sz_, int dst, int bas, uint64_t off)
@@ -468,8 +463,28 @@ static void arm64_strv(int sz_, int dst, int bas, uint64_t off)
     }
 }
 
-static void arm64_sym(int r, Sym *sym, unsigned long addend)
+static void arm64_sym(int r, Sym *sym, addr_t addend)
 {
+    if (sym->type.t & VT_TLS) {
+#if TCC_TARGET_PE
+        Sym *s2 = external_global_sym(TOK___tls_index, &int_type);
+        int r2 = get_reg(RC_INT);
+        arm64_sym(30, s2, 0);
+        o(0xb94003de); // ldr w30, [x30]
+        o(0xf9402e40 | r2); // ldr r2, [x18, #88]
+        o(0x8b1e0c1e | r2 << 5); // add x30, r2, x30, lsl #3
+        o(0xf94003c0 | r); // ldr xr, [x30]
+#else
+        o(0xd53bd040 | r); /* mrs xr, tpidr_el0 */
+#endif
+        greloca(cur_text_section, sym, ind, R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
+        /* add xr, xr, #0, lsl #12 */
+        o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) | ARM64_RN(r) | ARM64_RD(r));
+        greloca(cur_text_section, sym, ind, R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
+        /* add xr, xr, #0 */
+        o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(r) | ARM64_RD(r));
+        goto add_addend;
+    }
 #ifdef TCC_TARGET_PE
     /* PE links symbol addresses directly; there is no ELF-style GOT here. */
     greloca(cur_text_section, sym, ind, R_AARCH64_ADR_PREL_PG_HI21, 0);
@@ -482,6 +497,7 @@ static void arm64_sym(int r, Sym *sym, unsigned long addend)
     greloca(cur_text_section, sym, ind, R_AARCH64_LD64_GOT_LO12_NC, 0);
     o(ARM64_LDR_X | ARM64_RN(r) | r); // ld xr,[xr, #sym]
 #endif
+add_addend:
     if (addend) {
         // add xr, xr, #addend
 	if (addend & 0xffful)
@@ -496,7 +512,7 @@ static void arm64_sym(int r, Sym *sym, unsigned long addend)
 		/* very unlikely */
 		int t = r ? 0 : 1;
 		o(ARM64_STR_X_PRE | 0x001F0FE0U | t); /* str xt, [sp, #-16]! */
-		arm64_movimm(t, addend & ~0xfffffful); // use xt for addent
+		arm64_movimm(t, addend & ~0xffffffull); // use xt for addent
 		o(ARM64_ADD_REG | ARM64_SF(1) | ARM64_RM(t) | ARM64_RN(r) | r); /* add xr, xr, xt */
 		o(ARM64_LDR_X_POST | 0x000107E0U | t); /* ldr xt, [sp], #16 */
 	    }
@@ -506,74 +522,48 @@ static void arm64_sym(int r, Sym *sym, unsigned long addend)
 
 static void arm64_load_cmp(int r, SValue *sv);
 
-static void arm64_tls_x30(SValue *sv)
-{
-    o(0xd53bd05e); /* mrs x30, tpidr_el0 */
-    greloca(cur_text_section, sv->sym, ind, R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
-    /* add x30, x30, #0, lsl #12 */
-    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) | ARM64_RN(30) | ARM64_RD(30));
-    greloca(cur_text_section, sv->sym, ind, R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
-    /* add x30, x30, #0 */
-    o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_RN(30) | ARM64_RD(30));
-}
-
 ST_FUNC void load(int r, SValue *sv)
 {
     int svtt = sv->type.t;
-    int svr = sv->r & ~(VT_BOUNDED | VT_NONCONST);
+    int svr = sv->r & (VT_VALMASK | VT_LVAL | VT_SYM);
     int svrv = svr & VT_VALMASK;
     uint64_t svcul = sv->c.i;
-    uint64_t svcoff = (uint64_t)(int64_t)(int32_t)sv->c.i;
+    uint64_t svcoff = (int32_t)sv->c.i;
+    int sb = !(svtt & VT_UNSIGNED);
+    int sz = arm64_type_size(svtt);
 
     if (svr == (VT_LOCAL | VT_LVAL)) {
         if (IS_FREG(r))
-            arm64_ldrv(arm64_type_size(svtt), fltr(r), 29, svcoff);
+            arm64_ldrv(sz, fltr(r), 29, svcoff);
         else
-            arm64_ldrx(!(svtt & VT_UNSIGNED), arm64_type_size(svtt),
-                       intr(r), 29, svcoff);
+            arm64_ldrx(sb, sz, intr(r), 29, svcoff);
         return;
     }
 
     if (svr == (VT_CONST | VT_LVAL)) {
-	uint64_t i = sv->c.i;
-
-	if (sv->sym)
-            arm64_sym(30, sv->sym, // use x30 for address
-	              arm64_check_offset(0, arm64_type_size(svtt), i));
-	else
-	    arm64_movimm (30, i), i = 0;
+	arm64_movimm (30, svcul);
         if (IS_FREG(r))
-            arm64_ldrv(arm64_type_size(svtt), fltr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), i));
+            arm64_ldrv(sz, fltr(r), 30, 0);
         else
-            arm64_ldrx(!(svtt&VT_UNSIGNED), arm64_type_size(svtt), intr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), i));
+            arm64_ldrx(sb, sz, intr(r), 30, 0);
         return;
     }
 
-    if ((svr & ~VT_VALMASK) == VT_LVAL && svrv < VT_CONST) {
-        if ((svtt & VT_BTYPE) != VT_VOID) {
-            if (IS_FREG(r))
-                arm64_ldrv(arm64_type_size(svtt), fltr(r), intr(svrv), 0);
-            else
-                arm64_ldrx(!(svtt & VT_UNSIGNED), arm64_type_size(svtt),
-                           intr(r), intr(svrv), 0);
-        }
+    if (svrv < VT_CONST && (svr & VT_LVAL)) {
+        if (IS_FREG(r))
+            arm64_ldrv(sz, fltr(r), intr(svrv), 0);
+        else
+            arm64_ldrx(sb, sz, intr(r), intr(svrv), 0);
         return;
     }
 
     if (svr == (VT_CONST | VT_LVAL | VT_SYM)) {
-        if (sv->sym->type.t & VT_TLS)
-            arm64_tls_x30(sv);
-        else
-        arm64_sym(30, sv->sym, // use x30 for address
-		  arm64_check_offset(0, arm64_type_size(svtt), svcoff));
+        uint64_t mask = arm64_check_offset(sz, svcoff);
+        arm64_sym(30, sv->sym, svcoff & ~mask);
         if (IS_FREG(r))
-            arm64_ldrv(arm64_type_size(svtt), fltr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), svcoff));
+            arm64_ldrv(sz, fltr(r), 30, svcoff & mask);
         else
-            arm64_ldrx(!(svtt&VT_UNSIGNED), arm64_type_size(svtt), intr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), svcoff));
+            arm64_ldrx(sb, sz, intr(r), 30, svcoff & mask);
         return;
     }
 
@@ -583,9 +573,7 @@ ST_FUNC void load(int r, SValue *sv)
     }
 
     if (svr == VT_CONST) {
-        if ((svtt & VT_BTYPE) != VT_VOID)
-            arm64_movimm(intr(r), arm64_type_size(svtt) == 3 ?
-                         sv->c.i : (uint32_t)svcul);
+        arm64_movimm(intr(r), sz == 3 ? svcul : (uint32_t)svcul);
         return;
     }
 
@@ -625,9 +613,9 @@ ST_FUNC void load(int r, SValue *sv)
     if (svr == (VT_LLOCAL | VT_LVAL)) {
         arm64_ldrx(0, 3, 30, 29, svcoff); // use x30 for offset
         if (IS_FREG(r))
-            arm64_ldrv(arm64_type_size(svtt), fltr(r), 30, 0);
+            arm64_ldrv(sz, fltr(r), 30, 0);
         else
-            arm64_ldrx(!(svtt & VT_UNSIGNED), arm64_type_size(svtt),
+            arm64_ldrx(sb, sz,
                        intr(r), 30, 0);
         return;
     }
@@ -644,71 +632,43 @@ ST_FUNC void load(int r, SValue *sv)
 ST_FUNC void store(int r, SValue *sv)
 {
     int svtt = sv->type.t;
-    int svr = sv->r & ~VT_BOUNDED;
+    int svr = sv->r & (VT_VALMASK | VT_LVAL | VT_SYM);
     int svrv = svr & VT_VALMASK;
-    uint64_t svcoff = (uint64_t)(int64_t)(int32_t)sv->c.i;
+    uint64_t svcoff = (int32_t)sv->c.i;
+    int sz = arm64_type_size(svtt);
 
     if (svr == (VT_LOCAL | VT_LVAL)) {
         if (IS_FREG(r))
-            arm64_strv(arm64_type_size(svtt), fltr(r), 29, svcoff);
+            arm64_strv(sz, fltr(r), 29, svcoff);
         else
-            arm64_strx(arm64_type_size(svtt), intr(r), 29, svcoff);
+            arm64_strx(sz, intr(r), 29, svcoff);
         return;
     }
 
     if (svr == (VT_CONST | VT_LVAL)) {
-	uint64_t i = sv->c.i;
-	if (sv->sym && (sv->sym->type.t & VT_TLS))
-            arm64_tls_x30(sv);
-        else
-	if (sv->sym)
-            arm64_sym(30, sv->sym, // use x30 for address
-		      arm64_check_offset(0, arm64_type_size(svtt), i));
-	else
-	    arm64_movimm (30, i), i = 0;
-
+	arm64_movimm (30, sv->c.i);
         if (IS_FREG(r))
-            arm64_strv(arm64_type_size(svtt), fltr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), i));
+            arm64_strv(sz, fltr(r), 30, 0);
         else
-            arm64_strx(arm64_type_size(svtt), intr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), i));
+            arm64_strx(sz, intr(r), 30, 0);
         return;
     }
 
-    if ((svr & ~VT_VALMASK) == VT_LVAL && svrv < VT_CONST) {
+    if (svrv < VT_CONST && (svr & VT_LVAL)) {
         if (IS_FREG(r))
-            arm64_strv(arm64_type_size(svtt), fltr(r), intr(svrv), 0);
+            arm64_strv(sz, fltr(r), intr(svrv), 0);
         else
-            arm64_strx(arm64_type_size(svtt), intr(r), intr(svrv), 0);
+            arm64_strx(sz, intr(r), intr(svrv), 0);
         return;
     }
 
     if (svr == (VT_CONST | VT_LVAL | VT_SYM)) {
-        if (sv->sym->type.t & VT_TLS) {
-            o(0xd53bd05e); /* mrs x30, tpidr_el0 */
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_HI12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) | ARM64_SH(1) |
-              ARM64_RN(30) | ARM64_RD(30)); /* add x30, x30, #0, lsl #12 */
-            greloca(cur_text_section, sv->sym, ind,
-                    R_AARCH64_TLSLE_ADD_TPREL_LO12, 0);
-            o(ARM64_ADD_IMM | ARM64_SF(1) |
-              ARM64_RN(30) | ARM64_RD(30)); /* add x30, x30, #0 */
-            if (IS_FREG(r))
-                arm64_strv(arm64_type_size(svtt), fltr(r), 30, svcoff);
-            else
-                arm64_strx(arm64_type_size(svtt), intr(r), 30, svcoff);
-            return;
-        }
-        arm64_sym(30, sv->sym, // use x30 for address
-		  arm64_check_offset(0, arm64_type_size(svtt), svcoff));
+        uint64_t mask = arm64_check_offset(sz, svcoff);
+        arm64_sym(30, sv->sym, svcoff & ~mask);
         if (IS_FREG(r))
-            arm64_strv(arm64_type_size(svtt), fltr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), svcoff));
+            arm64_strv(sz, fltr(r), 30, svcoff & mask);
         else
-            arm64_strx(arm64_type_size(svtt), intr(r), 30,
-		       arm64_check_offset(1, arm64_type_size(svtt), svcoff));
+            arm64_strx(sz, intr(r), 30, svcoff & mask);
         return;
     }
 
@@ -1786,9 +1746,9 @@ static int arm64_gen_opic(int op, uint32_t l, int rev, uint64_t val,
         uint32_t s = l ? val >> 63 : val >> 31;
         val = s ? -val : val;
         val = l ? val : (uint32_t)val;
-        if (!(val & ~0xffful))
+        if (!(val & ~0xfffull))
             o(0x11000000 | l << 31 | s << 30 | x | a << 5 | val << 10);
-        else if (!(val & ~0xfff000ul))
+        else if (!(val & ~0xfff000ull))
             o(0x11400000 | l << 31 | s << 30 | x | a << 5 | val >> 12 << 10);
         else {
             arm64_movimm(30, val); // use x30

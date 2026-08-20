@@ -221,8 +221,11 @@ static void orex(int ll, int r, int r2, int b)
         r = 0;
     if ((r2 & VT_VALMASK) >= VT_CONST)
         r2 = 0;
-    if (ll || REX_BASE(r) || REX_BASE(r2))
+    if (ll || REX_BASE(r) || REX_BASE(r2)) {
+        if ((b & 0xff) == 0x66) /* output prefix before rex byte */
+            o(0x66), b >>= 8;
         o(0x40 | REX_BASE(r) | (REX_BASE(r2) << 2) | (ll << 3));
+    }
     o(b);
 }
 
@@ -301,6 +304,26 @@ static void gen_modrm_impl(int opcode, int ll, int op_reg_0, int r, Sym *sym, in
 {
     int op_reg = REG_VALUE(op_reg_0) << 3;
 
+    if ((r & VT_SYM) && (sym->type.t & VT_TLS)) {
+#ifdef TCC_TARGET_PE
+        Sym *s2 = external_global_sym(TOK___tls_index, &int_type);
+        r = get_reg(RC_INT);
+        gen_modrm_impl(0x8B, 0,  r, VT_SYM|VT_CONST, s2, 0);
+        o(0x03e0c148 | r << 16); /* shl 2,r */
+        o(0x4865), oad(0x250403 | r << 11, 11*PTR_SIZE); /* add gs:0x58,r */
+        gen_modrm_impl(0x8B, 1, r, r | VT_LVAL, 0, 0); /* mov (r),r */
+        orex(ll, r, op_reg_0, opcode), oad(0x80 | op_reg | r, 0);
+        greloca(cur_text_section, sym, ind - 4, R_X86_64_TPOFF32, c);
+#else
+        o(0x64); /* fs segment prefix */
+        orex(ll, r, op_reg_0, opcode);
+	o(0x04 | op_reg); /* [sib] | destreg */
+	oad(0x25, 0);     /* disp32 (relocated) */
+	greloca(cur_text_section, sym, ind - 4, R_X86_64_TPOFF32, c);
+#endif
+        return;
+    }
+
     orex(ll, r, op_reg_0, opcode);
 
     if ((r & VT_VALMASK) == VT_CONST) {
@@ -309,10 +332,6 @@ static void gen_modrm_impl(int opcode, int ll, int op_reg_0, int r, Sym *sym, in
 	    /* Absolute memory reference */
 	    o(0x04 | op_reg); /* [sib] | destreg */
 	    oad(0x25, c);     /* disp32 */
-	} else if (sym->type.t & VT_TLS) {
-	    o(0x04 | op_reg); /* [sib] | destreg */
-	    oad(0x25, 0);     /* disp32 (relocated) */
-	    greloca(cur_text_section, sym, ind - 4, R_X86_64_TPOFF32, c);
 	} else {
 	    o(0x05 | op_reg); /* (%rip)+disp32 | destreg */
 	    if (op_reg_0 & TREG_MEM) {
@@ -454,16 +473,12 @@ void load(int r, SValue *sv)
             ll = is64_type(ft);
             b = 0x8b;
         }
-        if ((sv->r & VT_SYM) && (sv->sym->type.t & VT_TLS))
-            o(0x64); /* fs segment prefix */
         gen_modrm_impl(b, ll, r, fr, sv->sym, fc);
     } else {
         if (v == VT_CONST) {
             if (fr & VT_SYM) {
 #ifdef TCC_TARGET_PE
-                orex(1,0,r,0x8d);
-                o(0x05 + REG_VALUE(r) * 8); /* lea xx(%rip), r */
-                gen_addrpc32(fr, sv->sym, fc);
+                gen_modrm64(0x8d, r, fr, sv->sym, fc);
 #else
                 if (sv->sym->type.t & VT_TLS) {
                     /* mov fs:0, r */
@@ -563,7 +578,7 @@ void store(int r, SValue *v)
 {
     int fr, bt, fc;
     /* store the REX prefix in this variable when PIC is enabled */
-    int prefix = 0, opc = 0, seg = 0, ll = 0;
+    int opc = 0, ll = 0;
 
     fr = v->r;
     fc = v->c.i;
@@ -584,12 +599,10 @@ void store(int r, SValue *v)
 
     /* XXX: incorrect if float reg to reg */
     if (bt == VT_FLOAT) {
-        prefix = 0x66;
-        opc = 0x7e0f;
+        opc = 0x7e0f66;
         r = REG_VALUE(r);
     } else if (bt == VT_DOUBLE) {
-        prefix = 0x66;
-        opc = 0xd60f;
+        opc = 0xd60f66;
         r = REG_VALUE(r);
     } else if (bt == VT_LDOUBLE) {
         o(0xc0d9); /* fld %st(0) */
@@ -600,15 +613,11 @@ void store(int r, SValue *v)
     } else {
         opc = 0x89;
         if (bt == VT_SHORT)
-            prefix = 0x66;
+            opc = 0x8966;
         else if (is64_type(bt))
             ll = 1;
     }
-
-    if ((fr & VT_SYM) && (v->sym->type.t & VT_TLS))
-        seg = 0x64; /* fs segment prefix */
-
-    o(seg), o(prefix), gen_modrm_impl(opc, ll, r, fr, v->sym, fc);
+    gen_modrm_impl(opc, ll, r, fr, v->sym, fc);
 }
 
 /* 'is_jmp' is '1' if it is a jump */
@@ -1932,12 +1941,12 @@ void gen_opf(int op)
             }
             assert(!(vtop[-1].r & VT_LVAL));
             
-            if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE)
-                o(0x66);
             if (op == TOK_EQ || op == TOK_NE)
                 opc = 0x2e0f; /* ucomisd */
             else
                 opc = 0x2f0f; /* comisd */
+            if ((vtop->type.t & VT_BTYPE) == VT_DOUBLE)
+                opc = opc << 8 | 0x66;
 
             gen_modrm32(opc, vtop[-1].r, vtop->r, vtop->sym, fc);
             vtop--;

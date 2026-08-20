@@ -70,5 +70,5 @@ echo>>%CFG_MAK% TOPSRC = $(TOP)
 echo>>%CFG_MAK% SHELL = sh
 echo>>%CFG_MAK% test.ref: CFLAGS += %REF_LINK%
 
-set GMAKE=make
+if "%GMAKE%"=="" set GMAKE=make
 %GMAKE% TCC_LOCAL=tcc.exe LIBTCC=win32/%LIBTCC% %TESTS%

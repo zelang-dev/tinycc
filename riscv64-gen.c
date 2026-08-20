@@ -186,7 +186,7 @@ static int load_symofs(int r, SValue *sv, int forstore, int *new_fc)
                     R_RISCV_TPREL_HI20, sv->c.i);
             o(0x37 | (rr << 7));  // lui RR, 0 %tprel_hi(sym)
             greloca(cur_text_section, sv->sym, ind,
-                    R_RISCV_TPREL_LO12_I, 0);
+                    R_RISCV_TPREL_LO12_I, sv->c.i);
             EI(0x13, 0, rr, rr, 0); // addi RR, RR, 0 %tprel_lo(sym)
             ER(0x33, 0, rr, rr, 4, 0); // add RR, RR, tp
             *new_fc = 0;

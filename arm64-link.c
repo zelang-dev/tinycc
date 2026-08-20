@@ -371,8 +371,12 @@ ST_FUNC void relocate(TCCState *s1, ElfW_Rel *rel, int type, unsigned char *ptr,
             return;
         case R_AARCH64_TLSLE_ADD_TPREL_HI12:
         case R_AARCH64_TLSLE_ADD_TPREL_LO12: {
+#if TCC_TARGET_PE
+            int64_t tp_offset = val - s1->tls_start;
+#else
             /* glibc arm64: tp points to tcbhead_t (DTV), TLS data starts after it */
             int64_t tp_offset = val - s1->tls_start + 16;
+#endif
             int64_t imm;
             if (type == R_AARCH64_TLSLE_ADD_TPREL_HI12)
                 imm = (tp_offset >> 12) & 0xfff;
