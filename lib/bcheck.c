@@ -53,7 +53,11 @@
   /* an __attribute__ macro is defined in the system headers */
   #undef __attribute__ 
 #endif
+#ifdef __i386__
 #define FASTCALL __attribute__((regparm(3)))
+#else
+#define FASTCALL
+#endif
 
 #ifdef _WIN32
 # define DLL_EXPORT __declspec(dllexport)
@@ -157,12 +161,12 @@ static pthread_spinlock_t bounds_spin;
 #define HAVE_SIGNAL            (1)
 #define HAVE_SIGACTION         (1)
 #define HAVE_FORK              (1)
-#if !defined(__APPLE__) && defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
-#define HAVE_TLS_FUNC          (0)
-#define HAVE_TLS_VAR           (1)
-#else
+#if defined(__APPLE__) || defined(__arm__) || defined(__GNUC__) || defined(BCHECK_RUN)
 #define HAVE_TLS_FUNC          (1)
 #define HAVE_TLS_VAR           (0)
+#else
+#define HAVE_TLS_FUNC          (0)
+#define HAVE_TLS_VAR           (1)
 #endif
 #if defined CONFIG_TCC_MUSL || defined __ANDROID__
 # undef HAVE_CTYPE

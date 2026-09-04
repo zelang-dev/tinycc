@@ -1839,7 +1839,10 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
 
 #ifdef CONFIG_TCC_BCHECK
         if (s1->do_bounds_check && s1->output_type != TCC_OUTPUT_DLL) {
-            tcc_add_support(s1, "bcheck.o");
+	    if (s1->output_type == TCC_OUTPUT_MEMORY)
+                tcc_add_support(s1, "bcheck_run.o");
+	    else
+                tcc_add_support(s1, "bcheck.o");
 # if !(TARGETOS_OpenBSD || TARGETOS_NetBSD)
             tcc_add_library(s1, "dl");
 # endif
