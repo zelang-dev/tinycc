@@ -385,6 +385,9 @@ redo:
                 continue;
             }
 
+            if ((s->sh_flags & SHF_TLS) && length)
+                return tcc_error_noabort("thread-local storage not supported with -run");
+
             align = s->sh_addralign;
             if (++n == 1) {
 #if defined TCC_TARGET_I386 || defined TCC_TARGET_X86_64
@@ -486,13 +489,18 @@ static int protect_pages(void *ptr, unsigned long length, int mode)
         };
     if (mprotect(ptr, length, protect[mode]))
         return -1;
+#endif
 /* XXX: BSD sometimes dump core with bad system call */
-# if (defined TCC_TARGET_ARM && !TARGETOS_BSD) || defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
+#if (defined TCC_TARGET_ARM && !TARGETOS_BSD) \
+    || defined TCC_TARGET_ARM64 || defined TCC_TARGET_RISCV64
     if (mode == 0 || mode == 3) {
+#ifdef _WIN32
+        FlushInstructionCache(GetCurrentProcess(), ptr, length);
+#else
         void __clear_cache(void *beginning, void *end);
         __clear_cache(ptr, (char *)ptr + length);
+#endif
     }
-# endif
 #endif
     return 0;
 }

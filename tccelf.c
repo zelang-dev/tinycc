@@ -693,6 +693,14 @@ version_add (TCCState *s1)
 }
 #endif /* ndef ELF_OBJ_ONLY */
 
+/* catch .tbss also */
+static int IS_BSS(TCCState *s1, int ndx)
+{
+    return ndx == SHN_COMMON
+     || (ndx < s1->nb_sections
+         && s1->sections[ndx]->sh_type == SHT_NOBITS);
+}
+
 /* add an elf symbol : check if it is already defined and patch
    it. Return symbol index. NOTE that sh_num can be SHN_UNDEF. */
 ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size,
@@ -744,13 +752,10 @@ ST_FUNC int set_elf_sym(Section *s, addr_t value, unsigned long size,
                 /* ignore hidden symbols after */
             } else if (s->sh_flags & SHF_DYNSYM) {
                 /* we accept that two DLL define the same symbol */
-            } else if ((esym->st_shndx == SHN_COMMON
-                            || esym->st_shndx == bss_section->sh_num)
-                        && (shndx < SHN_LORESERVE
-                            && shndx != bss_section->sh_num)) {
+            } else if (!IS_BSS(s1, shndx) && IS_BSS(s1, esym->st_shndx)) {
                 /* data symbol gets precedence over common/bss */
                 goto do_patch;
-            } else if (shndx == SHN_COMMON || shndx == bss_section->sh_num) {
+            } else if (IS_BSS(s1, shndx)) {
                 /* data symbol keeps precedence over common/bss */
 	    } else if (esym->st_other & ST_ASM_SET) {
 		/* If the existing symbol came from an asm .set
@@ -1834,7 +1839,10 @@ ST_FUNC void tcc_add_runtime(TCCState *s1)
 
 #ifdef CONFIG_TCC_BCHECK
         if (s1->do_bounds_check && s1->output_type != TCC_OUTPUT_DLL) {
-            tcc_add_support(s1, "bcheck.o");
+	    if (s1->output_type == TCC_OUTPUT_MEMORY)
+                tcc_add_support(s1, "bcheck_run.o");
+	    else
+                tcc_add_support(s1, "bcheck.o");
 # if !(TARGETOS_OpenBSD || TARGETOS_NetBSD)
             tcc_add_library(s1, "dl");
 # endif
@@ -2259,6 +2267,7 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
     int i, j, k, f, f0, n;
     int nb_sections = s1->nb_sections;
     int *sec_cls = sec_order + nb_sections;
+    int tls_align = 0; /* need common alignment for all tls sections */
 
     for (i = 1; i < nb_sections; i++) {
         s = s1->sections[i];
@@ -2294,6 +2303,8 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
             k = 0x60;
         /* RELRO sections --> */
         } else if (s->sh_flags & SHF_TLS) {
+            if (s->sh_addralign > tls_align)
+                tls_align = s->sh_addralign;
             k = 0x40 + (s->sh_type == SHT_NOBITS);
         } else if (s->sh_type == SHT_PREINIT_ARRAY) {
             k = 0x42;
@@ -2302,11 +2313,11 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         } else if (s->sh_type == SHT_FINI_ARRAY) {
             k = 0x44;
         } else if (s->sh_type == SHT_DYNAMIC) {
-            k = 0x46;
+            k = 0x48;
         } else if (s == s1->got) {
-            k = 0x47; /* .got as RELRO needs BIND_NOW in DT_FLAGS */
+            k = 0x49; /* .got as RELRO needs BIND_NOW in DT_FLAGS */
         } else if (s->reloc && (s->reloc->sh_flags & SHF_ALLOC) && j == 0x100) {
-            k = 0x45;
+            k = 0x45; /* +1 for data.ro */
         /* <-- */
         } else if (s->sh_type == SHT_NOTE) {
             k = 0x08, d->notes = 1;
@@ -2349,15 +2360,18 @@ static int sort_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
 	    /* NetBSD only supports 2 PT_LOAD sections.
 	       See: https://blog.netbsd.org/tnf/entry/the_first_report_on_lld */
 	    if ((f & SHF_WRITE) == 0)
-                f |= SHF_EXECINSTR, k = 0; /* no relro */
+                f |= SHF_EXECINSTR;
+            k = 0; /* no relro */
 #endif
+            if ((k & 0xfff0) == 0x240) /* RELRO sections */
+                d->relro = 1, f |= SHFX_RELRO;
             /* start new header when flags changed, but avoid zero memsz */
             if (f != f0 && s->sh_size)
                 f0 = f, ++n, f |= SHFX_NEWPH;
-            if ((s->sh_flags & SHF_TLS) && s->sh_size)
+            if ((s->sh_flags & SHF_TLS) && s->sh_size) {
+                s->sh_addralign = tls_align;
                 d->tls = 1, f |= SHF_TLS;
-            if ((k & 0xfff0) == 0x240) /* RELRO sections */
-                d->relro = 1, f |= SHFX_RELRO;
+            }
         }
         sec_cls[i] = f;
         //printf("ph %d sec %02d : %3X %3X  %8.2X  %04X  %s\n", (f>0) * n, i, f, k, s->sh_type, (int)s->sh_size, s->name);
@@ -2484,7 +2498,7 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         s->sh_offset = file_offset;
         s->sh_addr = addr;
 
-        //printf("%d : %08x %08x %04x %03x %s\n", (int)(ph - d->phdr), (int)file_offset, (int)addr, (int)s->sh_size, s->sh_type, s->name);
+        //printf("%d : %08x %08x %04x %03x %s %d\n", n, (int)file_offset, (int)addr, (int)s->sh_size, s->sh_type, s->name, align + 1);
         addr += s->sh_size;
         if (s->sh_type != SHT_NOBITS)
             file_offset += s->sh_size;
@@ -2516,8 +2530,6 @@ static int layout_sections(TCCState *s1, int *sec_order, struct dyn_inf *d)
         }
         if (f & SHF_TLS) {
             ph2 = update_phdr(&d->phdr[d->tls], PT_TLS, s, addr, file_offset);
-            if (s->sh_addralign > ph2->p_align)
-                ph2->p_align = s->sh_addralign;
             if (s->sh_type == SHT_NOBITS)
                 addr -= s->sh_size;
             /* for xxx-link.c:relocate() */
